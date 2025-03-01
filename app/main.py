@@ -8,7 +8,7 @@ import os
 
 from app.parser import parse_notes
 from app.search import VibeSearch
-from app.config import HOST, PORT
+from app.config import HOST, PORT, EMBEDDINGS_CACHE_FILE
 
 app = FastAPI(title="Google Keep Vibe Search")
 
@@ -48,6 +48,7 @@ def stats():
         "total_notes": len(notes),
         "archived_notes": sum(1 for note in notes if note.get("archived", False)),
         "pinned_notes": sum(1 for note in notes if note.get("pinned", False)),
+        "using_cached_embeddings": os.path.exists(EMBEDDINGS_CACHE_FILE)
     }
 
 if __name__ == "__main__":

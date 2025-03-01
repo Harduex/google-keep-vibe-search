@@ -106,7 +106,6 @@ You can adjust the following settings in `app/config.py`:
 ### Missing dependencies
 
 - Ensure you're using the virtual environment and have installed all requirements
-```
 
 ## License
 

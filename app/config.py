@@ -11,3 +11,9 @@ MAX_RESULTS = 20             # Maximum number of results to return
 # Server settings
 HOST = "127.0.0.1"
 PORT = 8000
+
+# Cache settings
+APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CACHE_DIR = os.path.join(APP_DIR, "cache")
+EMBEDDINGS_CACHE_FILE = os.path.join(CACHE_DIR, "embeddings.npz")
+NOTES_HASH_FILE = os.path.join(CACHE_DIR, "notes_hash.json")

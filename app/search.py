@@ -1,10 +1,20 @@
 import re
+import os
+import json
+import hashlib
 from typing import List, Dict, Any, Tuple
 import numpy as np
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 
-from app.config import SEMANTIC_SEARCH_WEIGHT, KEYWORD_SEARCH_WEIGHT, MAX_RESULTS
+from app.config import (
+    SEMANTIC_SEARCH_WEIGHT, 
+    KEYWORD_SEARCH_WEIGHT, 
+    MAX_RESULTS,
+    CACHE_DIR,
+    EMBEDDINGS_CACHE_FILE,
+    NOTES_HASH_FILE
+)
 
 
 class VibeSearch:
@@ -23,9 +33,91 @@ class VibeSearch:
                 self.texts.append(text)
                 self.note_indices.append(i)
         
-        # Pre-compute embeddings for all notes
-        self.embeddings = self.model.encode(self.texts)
+        # Try to load embeddings from cache or compute new ones
+        self.load_or_compute_embeddings()
         
+    def load_or_compute_embeddings(self):
+        """Load embeddings from cache if valid or compute and save new ones."""
+        # Ensure cache directory exists
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        
+        # Generate hash of current notes to check if cache is valid
+        current_hash = self._compute_notes_hash()
+        
+        # Check if cached embeddings exist and are valid
+        if self._is_cache_valid(current_hash):
+            self._load_embeddings_from_cache()
+            print("Loaded embeddings from cache")
+        else:
+            # Compute new embeddings
+            self.embeddings = self.model.encode(self.texts)
+            
+            # Save embeddings and hash to cache
+            self._save_embeddings_to_cache(current_hash)
+            print("Computed new embeddings and saved to cache")
+    
+    def _compute_notes_hash(self) -> str:
+        """Compute a hash of all note texts to detect changes."""
+        hash_obj = hashlib.md5()
+        for text in self.texts:
+            hash_obj.update(text.encode('utf-8'))
+        return hash_obj.hexdigest()
+    
+    def _is_cache_valid(self, current_hash: str) -> bool:
+        """Check if cached embeddings exist and match current notes."""
+        if not os.path.exists(EMBEDDINGS_CACHE_FILE) or not os.path.exists(NOTES_HASH_FILE):
+            return False
+        
+        try:
+            with open(NOTES_HASH_FILE, 'r') as f:
+                cache_info = json.load(f)
+            
+            # Check if the number of notes and hash match
+            return (
+                cache_info.get('hash') == current_hash and
+                cache_info.get('note_count') == len(self.note_indices)
+            )
+        except Exception as e:
+            print(f"Error checking cache validity: {e}")
+            return False
+    
+    def _save_embeddings_to_cache(self, notes_hash: str):
+        """Save embeddings and metadata to cache."""
+        # Save embeddings
+        np.savez_compressed(
+            EMBEDDINGS_CACHE_FILE, 
+            embeddings=self.embeddings,
+            note_indices=np.array(self.note_indices)
+        )
+        
+        # Save hash and metadata
+        cache_info = {
+            'hash': notes_hash,
+            'note_count': len(self.note_indices),
+            'model_name': self.model.get_sentence_embedding_dimension()
+        }
+        
+        with open(NOTES_HASH_FILE, 'w') as f:
+            json.dump(cache_info, f)
+    
+    def _load_embeddings_from_cache(self):
+        """Load embeddings from cache."""
+        try:
+            data = np.load(EMBEDDINGS_CACHE_FILE)
+            self.embeddings = data['embeddings']
+            cached_indices = data['note_indices']
+            
+            # Verify indices match
+            if not np.array_equal(cached_indices, np.array(self.note_indices)):
+                print("Warning: Cached note indices don't match current indices")
+                # Fall back to computing new embeddings
+                self.embeddings = self.model.encode(self.texts)
+                
+        except Exception as e:
+            print(f"Error loading embeddings from cache: {e}")
+            # Fall back to computing new embeddings
+            self.embeddings = self.model.encode(self.texts)
+    
     def search(self, query: str, max_results: int = MAX_RESULTS) -> List[Dict[str, Any]]:
         """
         Search notes using a combination of semantic and keyword search.

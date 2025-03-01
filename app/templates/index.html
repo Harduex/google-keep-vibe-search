@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Keep Vibe Search</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Google Keep Vibe Search</h1>
+            <div class="stats" id="stats">
+                <span id="total-notes">0</span> notes loaded
+            </div>
+        </header>
+        
+        <div class="search-container">
+            <input type="text" id="search-input" placeholder="Search your notes by keywords or vibes..." autofocus>
+            <button id="search-button">Search</button>
+        </div>
+        
+        <div class="results-container">
+            <div id="results-count"></div>
+            <div id="results-list"></div>
+            <div id="no-results" class="hidden">No matching notes found.</div>
+            <div id="loading" class="hidden">Searching...</div>
+        </div>
+    </div>
+    
+    <script src="/static/js/script.js"></script>
+</body>
+</html>

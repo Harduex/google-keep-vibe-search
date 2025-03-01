@@ -1,0 +1,16 @@
+google-keep-vibe-search/
+├── app/
+│   ├── __init__.py
+│   ├── main.py
+│   ├── config.py
+│   ├── parser.py
+│   ├── search.py
+│   ├── static/
+│   │   ├── css/
+│   │   │   └── style.css
+│   │   └── js/
+│   │       └── script.js
+│   └── templates/
+│       └── index.html
+├── requirements.txt
+└── README.md

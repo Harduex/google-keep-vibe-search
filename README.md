@@ -48,13 +48,22 @@ pip install -r requirements.txt
 
 ### 3. Configure the application
 
-Open `app/config.py` in a text editor and update the `GOOGLE_KEEP_PATH` variable to point to your Google Keep export folder:
+Copy the provided `.env.example` file to create a `.env` file:
 
-```python
-# Example:
-GOOGLE_KEEP_PATH = 'D:\\Takeout\\Keep'  # On Windows
+```bash
+# On Windows
+copy .env.example .env
+
+# On macOS/Linux
+cp .env.example .env
+```
+
+Then edit the .env file to set your Google Keep export path:
+
+```
+GOOGLE_KEEP_PATH=D:\\Takeout\\Keep  # On Windows
 # Or
-GOOGLE_KEEP_PATH = '/home/user/Downloads/Takeout/Keep'  # On macOS/Linux
+GOOGLE_KEEP_PATH=/home/user/Downloads/Takeout/Keep  # On macOS/Linux
 ```
 
 ### 4. Run the application

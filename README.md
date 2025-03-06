@@ -75,11 +75,18 @@ python -m app.main
 
 The application should now be running at http://127.0.0.1:8000
 
-### 5. Using the application
+### 5. Example Usage
 
-1. Open your browser and go to http://127.0.0.1:8000
-2. Use the search bar to enter your queries
-3. Results will display matching notes sorted by relevance
+You can use the Vibe Search to ask questions to your notes and receive very accurate results. Here is an example of how to use the search functionality:
+
+1. Open your browser and go to [http://127.0.0.1:8000](http://127.0.0.1:8000).
+2. In the search bar, enter a query such as "meeting notes from last week" or "ideas for project".
+3. Click the "Search" button.
+4. The results will display matching notes sorted by relevance based on the "vibe" of your search.
+
+For example, if you have a note with the content "Discussed project milestones in the meeting last week", and you search for "What are my meeting notes from the last week?", the Vibe Search will find and display this note as a relevant result.
+
+Feel free to experiment with different queries to see how well the Vibe Search can find the most relevant notes based on the meaning of your search terms.
 
 ## How it works
 
@@ -93,7 +100,7 @@ The results are combined with configurable weights (default: 70% semantic, 30% k
 
 ## Customization
 
-You can adjust the following settings in `app/config.py`:
+You can adjust the following settings in your `.env` file:
 
 - `SEMANTIC_SEARCH_WEIGHT`: Weight for semantic search results (0-1)
 - `KEYWORD_SEARCH_WEIGHT`: Weight for keyword search results (0-1)
@@ -104,13 +111,13 @@ You can adjust the following settings in `app/config.py`:
 
 ### No notes are being loaded
 
-- Check that the `GOOGLE_KEEP_PATH` in `config.py` points to the correct location
+- Check that the `GOOGLE_KEEP_PATH` in your `.env` file points to the correct location
 - Ensure the folder contains `.json` files from your Google Keep export
 
-### Search is slow
+### App loads slow
 
-- The first search might take longer as the model loads and computes embeddings
-- Subsequent searches should be faster
+- The first load might take longer as the model loads and computes embeddings
+- Subsequent loads should be faster
 
 ### Missing dependencies
 

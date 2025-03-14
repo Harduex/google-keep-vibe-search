@@ -142,6 +142,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
 
+            const showRelatedButton = `<button class="show-related-button" data-content="${encodeURIComponent(note.title + ' ' + note.content)}">
+                <span class="material-icons">layers</span> Show related</button>`;
+
             card.innerHTML = `
                 <div class="note-header">
                     ${badges}
@@ -153,9 +156,32 @@ document.addEventListener('DOMContentLoaded', function () {
                     <span>Created: ${note.created}</span>
                     <span>Last edited: ${note.edited}</span>
                 </div>
+                <div class="note-actions">
+                    ${showRelatedButton}
+                </div>
             `;
 
             resultsList.appendChild(card);
+        });
+
+        // Add event listeners for "Show related" buttons
+        document.querySelectorAll('.show-related-button').forEach(button => {
+            button.addEventListener('click', function () {
+                const noteContent = decodeURIComponent(this.dataset.content);
+                showRelatedNotes(noteContent);
+            });
+        });
+    }
+
+    function showRelatedNotes(noteContent) {
+        // Use the note content as search query
+        searchInput.value = noteContent
+        performSearch();
+
+        // Scroll to top of results
+        window.scrollTo({
+            top: document.querySelector('.search-container').offsetTop - 20,
+            behavior: 'smooth'
         });
     }
 

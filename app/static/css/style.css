@@ -267,6 +267,34 @@ h1 {
   background-color: var(--light-bg);
 }
 
+.note-actions {
+  margin-top: 1rem;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.show-related-button {
+  background-color: var(--light-bg);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  padding: 0.3rem 0.8rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: background-color 0.2s;
+}
+
+.show-related-button:hover {
+  background-color: var(--border-color);
+}
+
+.show-related-button .material-icons {
+  font-size: 1rem;
+}
+
 @media (max-width: 600px) {
   .search-container {
     flex-direction: column;

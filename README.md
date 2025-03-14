@@ -88,6 +88,14 @@ For example, if you have a note with the content "Discussed project milestones i
 
 Feel free to experiment with different queries to see how well the Vibe Search can find the most relevant notes based on the meaning of your search terms.
 
+### Find Related Notes
+
+Each note in the search results has a "Show related" button that helps you discover connections between your notes:
+
+1. When you click the "Show related" button on a note, the system performs a new search using that note's content
+2. This reveals other notes that share similar topics, ideas, or themes
+3. It's a great way to rediscover forgotten notes and see connections between different ideas
+
 ## How it works
 
 The application combines two search approaches:

@@ -8,6 +8,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const statsElement = document.getElementById('stats');
     const themeToggleButton = document.getElementById('theme-toggle');
 
+    // Maximum height in pixels before collapsing a note
+    const MAX_NOTE_HEIGHT = 150;
+
     // Theme functionality
     initializeTheme();
 
@@ -186,6 +189,12 @@ document.addEventListener('DOMContentLoaded', function () {
             `;
 
             resultsList.appendChild(card);
+
+            // Check if note content is too long and needs to be collapsible
+            const noteContent = card.querySelector('.note-content');
+            if (noteContent && noteContent.clientHeight > MAX_NOTE_HEIGHT) {
+                makeNoteCollapsible(noteContent);
+            }
         });
 
         // Add event listeners for "Show related" buttons
@@ -216,5 +225,42 @@ document.addEventListener('DOMContentLoaded', function () {
         const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const regex = new RegExp(`(${escapedQuery})`, 'gi');
         return text.replace(regex, '<mark>$1</mark>');
+    }
+
+    // Function to make a note collapsible
+    function makeNoteCollapsible(noteElement) {
+        // Save the original content and height
+        const originalContent = noteElement.innerHTML;
+        const originalHeight = noteElement.scrollHeight;
+
+        // Add collapsed class
+        noteElement.classList.add('collapsed-content');
+
+        // Create toggle button
+        const toggleButton = document.createElement('button');
+        toggleButton.className = 'collapse-button';
+        toggleButton.innerHTML = '<span class="material-icons">expand_more</span> Read more';
+
+        // Insert button after the note content
+        noteElement.parentNode.insertBefore(toggleButton, noteElement.nextSibling);
+
+        // Add click handler
+        toggleButton.addEventListener('click', function () {
+            if (noteElement.classList.contains('collapsed-content')) {
+                // Expand
+                noteElement.classList.remove('collapsed-content');
+                this.innerHTML = '<span class="material-icons">expand_less</span> Read less';
+            } else {
+                // Collapse
+                noteElement.classList.add('collapsed-content');
+                this.innerHTML = '<span class="material-icons">expand_more</span> Read more';
+
+                // Scroll back to the top of the note card
+                noteElement.closest('.note-card').scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'nearest'
+                });
+            }
+        });
     }
 });

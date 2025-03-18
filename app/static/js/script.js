@@ -221,10 +221,26 @@ document.addEventListener('DOMContentLoaded', function () {
     function highlightMatches(text, query) {
         if (!text) return '';
 
+        // First sanitize the HTML to prevent XSS
+        const sanitizedText = sanitizeHTML(text);
+
         // Escape special characters for regex
         const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const regex = new RegExp(`(${escapedQuery})`, 'gi');
-        return text.replace(regex, '<mark>$1</mark>');
+
+        // Add highlight marks to the sanitized text
+        return sanitizedText.replace(regex, '<mark>$1</mark>');
+    }
+
+    // Function to sanitize HTML content to prevent XSS
+    function sanitizeHTML(text) {
+        if (!text) return '';
+        return text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
     }
 
     // Function to make a note collapsible

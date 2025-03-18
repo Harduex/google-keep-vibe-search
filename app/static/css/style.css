@@ -241,6 +241,13 @@ h1 {
   color: var(--secondary-color);
 }
 
+.badge-score {
+  background-color: #4285f4;
+  color: var(--secondary-color);
+  margin-left: auto;
+  margin-bottom: 0.5rem;
+}
+
 .hidden {
   display: none;
 }

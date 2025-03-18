@@ -120,6 +120,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 badges += '<span class="note-badge badge-archived">Archived</span>';
             }
 
+            // Add similarity score badge
+            const scorePercentage = Math.round(note.score * 100);
+            badges += `<span class="note-badge badge-score">${scorePercentage}% match</span>`;
+
             // Highlight matching text in title and content
             const highlightedTitle = highlightMatches(note.title, query);
             const highlightedContent = highlightMatches(note.content, query);

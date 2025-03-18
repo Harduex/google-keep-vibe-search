@@ -124,6 +124,25 @@ document.addEventListener('DOMContentLoaded', function () {
             const highlightedTitle = highlightMatches(note.title, query);
             const highlightedContent = highlightMatches(note.content, query);
 
+            // Handle image attachments
+            let attachmentsHTML = '';
+            if (note.attachments && note.attachments.length > 0) {
+                attachmentsHTML = '<div class="note-attachments">';
+                note.attachments.forEach(attachment => {
+                    if (attachment.mimetype && attachment.mimetype.startsWith('image/')) {
+                        attachmentsHTML += `
+                            <div class="note-image-container">
+                                <img src="/api/image/${encodeURIComponent(attachment.filePath)}" 
+                                     alt="Attached image" 
+                                     class="note-image" 
+                                     onclick="window.open(this.src, '_blank')" />
+                            </div>
+                        `;
+                    }
+                });
+                attachmentsHTML += '</div>';
+            }
+
             let annotations = '';
             if (note.annotations && note.annotations.length > 0) {
                 let annotationItems = '';
@@ -151,6 +170,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     ${highlightedTitle ? `<div class="note-title">${highlightedTitle}</div>` : ''}
                 </div>
                 <div class="note-content">${highlightedContent}</div>
+                ${attachmentsHTML}
                 ${annotations}
                 <div class="note-meta">
                     <span>Created: ${note.created}</span>

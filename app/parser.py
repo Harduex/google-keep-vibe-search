@@ -45,6 +45,10 @@ def parse_notes() -> List[Dict[str, Any]]:
             # Add annotations if present
             if note_data.get('annotations'):
                 note['annotations'] = note_data.get('annotations')
+            
+            # Add attachments if present (usually images)
+            if note_data.get('attachments'):
+                note['attachments'] = note_data.get('attachments')
                 
             notes.append(note)
                 

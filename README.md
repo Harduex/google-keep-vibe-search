@@ -44,6 +44,10 @@ source venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
+
+# For development, set up pre-commit hooks
+pip install pre-commit
+pre-commit install
 ```
 
 ### 3. Configure the application
@@ -66,7 +70,7 @@ GOOGLE_KEEP_PATH=D:\\Takeout\\Keep  # On Windows
 GOOGLE_KEEP_PATH=/home/user/Downloads/Takeout/Keep  # On macOS/Linux
 ```
 
-### 4. Run the application
+### 4. Run the backend API
 
 ```bash
 # Make sure your virtual environment is activated
@@ -75,7 +79,22 @@ python -m app.main
 
 The application should now be running at http://127.0.0.1:8000
 
-### 5. Example Usage
+### 5. Run the React client
+
+```bash
+# Navigate to the client directory
+cd client
+
+# Install dependencies (first time only)
+npm install
+
+# Start the development server
+npm run dev
+```
+
+The React client should now be running at http://localhost:3000 and will automatically connect to the backend API.
+
+### 6. Example Usage
 
 You can use the Vibe Search to ask questions to your notes and receive very accurate results. Here is an example of how to use the search functionality:
 
@@ -95,6 +114,34 @@ Each note in the search results has a "Show related" button that helps you disco
 1. When you click the "Show related" button on a note, the system performs a new search using that note's content
 2. This reveals other notes that share similar topics, ideas, or themes
 3. It's a great way to rediscover forgotten notes and see connections between different ideas
+
+## Development
+
+### Code Formatting
+
+This project uses automatic code formatting to maintain consistent code style:
+
+- Python code is formatted with Black and isort
+- JavaScript/TypeScript code is formatted with Prettier
+
+#### VS Code Setup
+
+If you're using VS Code, we've included settings that will automatically format your code on save.
+Just install the recommended extensions when prompted.
+
+#### Manual Formatting
+
+You can manually format the code using:
+
+```bash
+# For Python files
+black app/
+isort app/
+
+# For JavaScript/TypeScript files
+cd client
+npm run format
+```
 
 ## How it works
 

@@ -5,6 +5,7 @@ import { Note } from '@/types/index';
 import { calculateScorePercentage, highlightMatches } from '@/helpers';
 
 import { NoteContent } from '@/components/NoteContent';
+import ImageGallery from '@/components/ImageGallery';
 
 interface NoteCardProps {
   note: Note;
@@ -21,12 +22,14 @@ export const NoteCard = memo(({ note, query, onShowRelated }: NoteCardProps) => 
     onShowRelated(noteContent);
   }, [note.title, note.content, onShowRelated]);
 
-  const handleImageClick = useCallback(
-    (filePath: string) => () => {
-      window.open(`${API_ROUTES.IMAGE}/${encodeURIComponent(filePath)}`, '_blank');
-    },
-    []
-  );
+  // Create image gallery data from attachments
+  const galleryImages =
+    note.attachments
+      ?.filter((attachment) => attachment.mimetype?.startsWith('image/'))
+      .map((attachment) => ({
+        src: `${API_ROUTES.IMAGE}/${encodeURIComponent(attachment.filePath)}`,
+        alt: 'Note attachment',
+      })) || [];
 
   return (
     <div className={`note-card ${note.color !== 'DEFAULT' ? `color-${note.color}` : ''}`}>
@@ -45,8 +48,8 @@ export const NoteCard = memo(({ note, query, onShowRelated }: NoteCardProps) => 
       {/* Content */}
       <NoteContent content={note.content} query={query} />
 
-      {/* Attachments */}
-      {renderAttachments(note, handleImageClick)}
+      {/* Image Gallery */}
+      {galleryImages.length > 0 && <ImageGallery images={galleryImages} />}
 
       {/* Annotations */}
       {renderAnnotations(note)}
@@ -66,33 +69,6 @@ export const NoteCard = memo(({ note, query, onShowRelated }: NoteCardProps) => 
     </div>
   );
 });
-
-const renderAttachments = (note: Note, handleImageClick: (filePath: string) => () => void) => {
-  if (!note.attachments?.length) {
-    return null;
-  }
-
-  const images = note.attachments.filter((attachment) => attachment.mimetype?.startsWith('image/'));
-
-  if (!images.length) {
-    return null;
-  }
-
-  return (
-    <div className="note-attachments">
-      {images.map((attachment, i) => (
-        <div key={i} className="note-image-container">
-          <img
-            src={`${API_ROUTES.IMAGE}/${encodeURIComponent(attachment.filePath)}`}
-            alt="Attached image"
-            className="note-image"
-            onClick={handleImageClick(attachment.filePath)}
-          />
-        </div>
-      ))}
-    </div>
-  );
-};
 
 const renderAnnotations = (note: Note) => {
   if (!note.annotations?.length) {

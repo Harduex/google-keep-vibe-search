@@ -9,6 +9,7 @@ import { formatStatsText, scrollToElement } from '@/helpers';
 import { ErrorDisplay } from '@/components/ErrorDisplay';
 import { Results } from '@/components/Results';
 import { SearchBar } from '@/components/SearchBar';
+import { GalleryProvider, GalleryOverlay } from '@/components/ImageGallery';
 
 import './App.css';
 
@@ -35,33 +36,36 @@ const App = () => {
   const error = statsError || searchError;
 
   return (
-    <div className="container">
-      <header>
-        <h1>Google Keep Vibe Search</h1>
-        <div className="stats" id="stats">
-          {statsText}
-        </div>
-        <button
-          id="theme-toggle"
-          className="theme-toggle"
-          aria-label="Toggle dark mode"
-          onClick={toggleTheme}
-        >
-          <span className="material-icons">{theme === 'DARK' ? 'light_mode' : 'dark_mode'}</span>
-        </button>
-      </header>
+    <GalleryProvider>
+      <div className="container">
+        <header>
+          <h1>Google Keep Vibe Search</h1>
+          <div className="stats" id="stats">
+            {statsText}
+          </div>
+          <button
+            id="theme-toggle"
+            className="theme-toggle"
+            aria-label="Toggle dark mode"
+            onClick={toggleTheme}
+          >
+            <span className="material-icons">{theme === 'DARK' ? 'light_mode' : 'dark_mode'}</span>
+          </button>
+        </header>
 
-      <SearchBar onSearch={handleSearch} currentQuery={query} />
-      <Results
-        query={query}
-        results={results}
-        isLoading={isLoading}
-        hasSearched={hasSearched}
-        onShowRelated={handleSearch}
-      />
+        <SearchBar onSearch={handleSearch} currentQuery={query} />
+        <Results
+          query={query}
+          results={results}
+          isLoading={isLoading}
+          hasSearched={hasSearched}
+          onShowRelated={handleSearch}
+        />
 
-      <ErrorDisplay error={error} onDismiss={statsError ? refetchStats : () => {}} />
-    </div>
+        <ErrorDisplay error={error} onDismiss={statsError ? refetchStats : () => {}} />
+        <GalleryOverlay />
+      </div>
+    </GalleryProvider>
   );
 };
 

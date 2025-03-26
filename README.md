@@ -115,6 +115,43 @@ Each note in the search results has a "Show related" button that helps you disco
 2. This reveals other notes that share similar topics, ideas, or themes
 3. It's a great way to rediscover forgotten notes and see connections between different ideas
 
+## Docker Setup
+
+This application can be run using Docker containers, which simplifies setup and ensures consistent environments.
+
+### Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/)
+- [Docker Compose](https://docs.docker.com/compose/install/)
+- Google Keep export from Google Takeout (as mentioned in the Setup Instructions)
+
+### Running with Docker
+
+1. Create a `.env` file from the example:
+
+```bash
+cp .env.example .env
+```
+
+2. Edit the `.env` file to set your Google Keep export path:
+
+```
+GOOGLE_KEEP_PATH=/path/to/your/Takeout/Keep
+```
+
+3. Build and start the containers:
+
+```bash
+docker compose up -d
+```
+
+4. Access the application at http://localhost
+
+### Troubleshooting
+
+- If the backend can't find your notes, check that the volume mapping in `docker-compose.yml` is correct for your Google Keep export path.
+- If you encounter permission issues with the cache directory, run `chmod -R 777 cache` on your host machine.
+
 ## Development
 
 ### Code Formatting

@@ -31,7 +31,13 @@ export const useSearch = (): UseSearchResult => {
         clearError();
         setQuery(searchQuery);
 
-        const response = await fetch(`${API_ROUTES.SEARCH}?q=${encodeURIComponent(searchQuery)}`);
+        const response = await fetch(`${API_ROUTES.SEARCH}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ query: searchQuery }),
+        });
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);

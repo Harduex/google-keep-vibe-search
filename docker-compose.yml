@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  backend:
+    build: .
+    container_name: keep-vibe-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      # You'll need to set this path to match your Docker volume
+      - GOOGLE_KEEP_PATH=/data/Keep
+    volumes:
+      - ./app:/app/app  # For live code reloading
+      - ./cache:/app/cache  # Persist cache between runs
+      - ${GOOGLE_KEEP_PATH:-~/Takeout/Keep}:/data/Keep:ro  # Mount Keep data as read-only
+    restart: unless-stopped
+
+  frontend:
+    build: ./client
+    container_name: keep-vibe-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+networks:
+  default:
+    name: keep-vibe-network

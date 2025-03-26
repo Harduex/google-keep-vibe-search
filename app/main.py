@@ -6,6 +6,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
 
 from app.config import EMBEDDINGS_CACHE_FILE, GOOGLE_KEEP_PATH, HOST, PORT
 from app.parser import parse_notes
@@ -27,6 +28,10 @@ async def startup_event():
     print(f"Loaded {len(notes)} notes from Google Keep export")
 
 
+class SearchRequest(BaseModel):
+    query: str
+
+
 @app.get("/api/search")
 def search(q: str = ""):
     global search_engine
@@ -34,6 +39,16 @@ def search(q: str = ""):
         return {"error": "Search engine not initialized"}
 
     results = search_engine.search(q)
+    return {"results": results}
+
+
+@app.post("/api/search")
+def search_post(request: SearchRequest):
+    global search_engine
+    if not search_engine:
+        return {"error": "Search engine not initialized"}
+
+    results = search_engine.search(request.query)
     return {"results": results}
 
 

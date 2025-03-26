@@ -26,3 +26,10 @@ export interface Note {
 }
 
 export type ViewMode = 'list' | '3d';
+
+export interface NoteCluster {
+  id: number;
+  keywords: string[];
+  notes: Note[];
+  size: number;
+}

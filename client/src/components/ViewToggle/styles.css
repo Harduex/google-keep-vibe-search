@@ -6,6 +6,7 @@
   padding: 4px;
   margin-bottom: 20px;
   box-shadow: var(--card-shadow);
+  margin: 0;
 }
 
 .view-toggle-btn {

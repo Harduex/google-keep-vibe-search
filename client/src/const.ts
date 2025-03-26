@@ -9,7 +9,13 @@ export const API_ROUTES = {
   STATS: '/api/stats',
   SEARCH: '/api/search',
   IMAGE: '/api/image',
+  EMBEDDINGS: '/api/embeddings',
 };
+
+export const VIEW_MODES = {
+  LIST: 'list',
+  VISUALIZATION: '3d',
+} as const;
 
 export const NOTE_COLORS = {
   RED: 'RED',

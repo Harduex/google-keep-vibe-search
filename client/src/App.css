@@ -9,6 +9,7 @@
   --hover-shadow: 0 4px 8px rgba(60, 64, 67, 0.3);
   --bg-color: #ffffff;
   --card-bg: #ffffff;
+  --card-bg-rgb: 255, 255, 255;
   --input-bg: #ffffff;
   --note-red: #f28b82;
   --note-orange: #fbbc04;
@@ -23,7 +24,7 @@
 
 [data-theme='dark'] {
   /* Dark theme */
-  --primary-color: #ffd04d;
+  --primary-color: #fbbc04;
   --secondary-color: #f1f3f4;
   --text-color: #e8eaed;
   --light-bg: #2d2e30;
@@ -32,6 +33,7 @@
   --hover-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
   --bg-color: #202124;
   --card-bg: #2d2e30;
+  --card-bg-rgb: 45, 46, 48;
   --input-bg: #2d2e30;
   --note-red: #5c2b29;
   --note-orange: #614a19;
@@ -125,6 +127,75 @@ h1 {
 
 .results-container {
   margin-top: 1rem;
+}
+
+.scroll-to-top {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  z-index: 999;
+  transition:
+    opacity 0.3s,
+    visibility 0.3s;
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+.scroll-to-top button {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background-color: var(--primary-color);
+  color: var(--secondary-color);
+  border: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.scroll-to-top button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.7) 0%, rgba(255, 255, 255, 0) 70%);
+  transform: scale(0);
+  border-radius: 50%;
+  transition: transform 0.5s;
+}
+
+.scroll-to-top button:active::before {
+  transform: scale(2);
+  transition: transform 0s;
+}
+
+.scroll-to-top button:hover {
+  transform: translateY(-4px) scale(1.05);
+  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.25);
+  background-color: #f9ab00;
+}
+
+.scroll-to-top .material-icons {
+  font-size: 24px;
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 #results-count {
@@ -477,4 +548,47 @@ h1 {
 
 .error-dismiss:hover {
   background-color: rgba(255, 255, 255, 0.1);
+}
+
+.results-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+#results-visualization {
+  position: relative;
+  margin-top: 20px;
+}
+
+/* Make sure the graph container is responsive */
+@media (max-width: 768px) {
+  .results-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  #results-visualization {
+    height: 60vh;
+  }
+}
+
+/* Highlight effect when note is selected from visualization */
+.highlighted-note {
+  animation: highlight-pulse 2s ease-out;
+  border-radius: 8px;
+}
+
+@keyframes highlight-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(76, 175, 80, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(76, 175, 80, 0);
+  }
 }

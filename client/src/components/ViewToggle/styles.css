@@ -1,0 +1,47 @@
+.view-toggle {
+  display: flex;
+  align-items: center;
+  background-color: var(--light-bg);
+  border-radius: 32px;
+  padding: 4px;
+  margin-bottom: 20px;
+  box-shadow: var(--card-shadow);
+}
+
+.view-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: 28px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: var(--text-color);
+}
+
+.view-toggle-btn.active {
+  background-color: var(--primary-color);
+  color: var(--secondary-color);
+}
+
+.view-toggle-btn:hover:not(.active) {
+  background-color: var(--border-color);
+}
+
+.view-toggle-btn .material-icons {
+  font-size: 20px;
+}
+
+/* On smaller screens, make toggle fixed at the bottom of the screen */
+@media (max-width: 768px) {
+  .view-toggle {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  }
+}

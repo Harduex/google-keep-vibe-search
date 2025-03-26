@@ -4,12 +4,16 @@ import os
 import re
 from typing import Any, Dict, List, Tuple
 
+import nltk
+from nltk.corpus import stopwords
 import numpy as np
 from sentence_transformers import SentenceTransformer
+from sklearn.cluster import KMeans
 from sklearn.metrics.pairwise import cosine_similarity
 
 from app.config import (
     CACHE_DIR,
+    DEFAULT_NUM_CLUSTERS,
     EMBEDDINGS_CACHE_FILE,
     KEYWORD_SEARCH_WEIGHT,
     MAX_RESULTS,
@@ -198,3 +202,153 @@ class VibeSearch:
             scores = scores / np.max(scores)
 
         return scores
+
+    def get_clusters(self, num_clusters: int = None) -> List[Dict[str, Any]]:
+        """
+        Cluster notes based on their embeddings.
+
+        Args:
+            num_clusters: Number of clusters to create, defaults to config setting
+
+        Returns:
+            List of clusters with their notes
+        """
+        if num_clusters is None:
+            num_clusters = DEFAULT_NUM_CLUSTERS
+
+        # Limit num_clusters to at most 75% of the number of notes to avoid too many singleton clusters
+        max_clusters = max(2, int(len(self.note_indices) * 0.75))
+        num_clusters = min(num_clusters, max_clusters)
+
+        # Apply K-means clustering to the embeddings
+        kmeans = KMeans(n_clusters=num_clusters, random_state=42, n_init=10)
+        clusters = kmeans.fit_predict(self.embeddings)
+
+        # Organize notes by cluster
+        cluster_notes = [[] for _ in range(num_clusters)]
+        cluster_center_distances = [[] for _ in range(num_clusters)]
+
+        # Calculate distances to cluster centers for each note
+        for i, cluster_idx in enumerate(clusters):
+            note_idx = self.note_indices[i]
+            note = self.notes[note_idx].copy()
+
+            # Calculate distance to cluster center
+            center_distance = np.linalg.norm(
+                self.embeddings[i] - kmeans.cluster_centers_[cluster_idx]
+            )
+            cluster_notes[cluster_idx].append(note)
+            cluster_center_distances[cluster_idx].append((note, center_distance))
+
+        # Sort notes within each cluster by closeness to cluster center
+        for cluster_idx in range(num_clusters):
+            cluster_center_distances[cluster_idx].sort(key=lambda x: x[1])
+            cluster_notes[cluster_idx] = [item[0] for item in cluster_center_distances[cluster_idx]]
+
+        # Create cluster objects with notes and extract topics
+        clusters_result = []
+        for cluster_idx in range(num_clusters):
+            if not cluster_notes[cluster_idx]:
+                continue  # Skip empty clusters
+
+            # Extract top keywords from cluster
+            cluster_keywords = self._extract_cluster_keywords(cluster_notes[cluster_idx])
+
+            clusters_result.append(
+                {
+                    "id": cluster_idx,
+                    "keywords": cluster_keywords,
+                    "notes": cluster_notes[cluster_idx],
+                    "size": len(cluster_notes[cluster_idx]),
+                }
+            )
+
+        # Sort clusters by size (descending)
+        clusters_result.sort(key=lambda x: x["size"], reverse=True)
+
+        return clusters_result
+
+    def _extract_cluster_keywords(
+        self, notes: List[Dict[str, Any]], num_keywords: int = 5
+    ) -> List[str]:
+        """Extract representative keywords for a cluster of notes."""
+        # Combine all text from notes in cluster
+        all_text = " ".join([f"{note['title']} {note['content']}" for note in notes])
+
+        # Get standard stopwords
+        try:
+            standard_stop_words = set(stopwords.words('english'))
+        except LookupError:
+            nltk.download('stopwords')
+            standard_stop_words = set(stopwords.words('english'))
+            
+        # Add custom stopwords
+        technical_stop_words = {
+            # URLs and web-related
+            'http', 'https', 'www', 'com', 'org', 'net', 
+            # Days and months
+            'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+            'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august',
+            'september', 'october', 'november', 'december'
+        }
+        
+        # Combine both stopword sets
+        stop_words = standard_stop_words.union(technical_stop_words)
+        
+        # First, remove URLs completely to avoid partial URL keywords
+        cleaned_text = re.sub(r'https?://\S+|www\.\S+', ' ', all_text)
+        
+        # Tokenize text and find phrases (bigrams and single words)
+        words = re.findall(r"\b[a-zA-Z]{3,}\b", cleaned_text.lower())
+        
+        # Create word counts
+        word_counts = {}
+        
+        # Count single words
+        for word in words:
+            if word not in stop_words:
+                word_counts[word] = word_counts.get(word, 0) + 1
+        
+        # Try to extract bigrams (two-word phrases) for more meaningful keywords
+        bigrams = []
+        for i in range(len(words) - 1):
+            if (words[i] not in stop_words) and (words[i+1] not in stop_words):
+                bigram = f"{words[i]} {words[i+1]}"
+                bigrams.append(bigram)
+        
+        # Count bigrams
+        bigram_counts = {}
+        for bigram in bigrams:
+            bigram_counts[bigram] = bigram_counts.get(bigram, 0) + 1
+        
+        # Favor more meaningful phrases by giving bigrams a boost
+        for bigram, count in bigram_counts.items():
+            if count >= 2:  # Only consider repeated bigrams
+                word_counts[bigram] = count * 1.5  # Apply a boost to bigrams
+        
+        # Get top keywords, preferring longer words and phrases that are more likely unique/meaningful
+        keywords = sorted(
+            word_counts.items(),
+            key=lambda x: (x[1], len(x[0])),  # Sort by frequency then by length
+            reverse=True
+        )
+        
+        # Return only unique keywords
+        unique_keywords = []
+        seen_words = set()
+        
+        for word, _ in keywords:
+            # Skip if the word is part of an already selected bigram
+            word_parts = word.split()
+            if any(part in seen_words for part in word_parts):
+                continue
+                
+            unique_keywords.append(word)
+            # Add individual words to seen_words
+            for part in word_parts:
+                seen_words.add(part)
+                
+            if len(unique_keywords) >= num_keywords:
+                break
+                
+        return unique_keywords

@@ -19,6 +19,9 @@ KEYWORD_SEARCH_WEIGHT = float(
 )  # Weight for keyword search results (0-1)
 MAX_RESULTS = int(os.getenv("MAX_RESULTS", 20))  # Maximum number of results to return
 
+# Clustering settings
+DEFAULT_NUM_CLUSTERS = int(os.getenv("DEFAULT_NUM_CLUSTERS", 8))  # Default number of clusters
+
 # Server settings
 HOST = os.getenv("HOST", "127.0.0.1")
 PORT = int(os.getenv("PORT", 8000))

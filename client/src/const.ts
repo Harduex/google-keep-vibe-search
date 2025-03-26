@@ -10,6 +10,7 @@ export const API_ROUTES = {
   SEARCH: '/api/search',
   IMAGE: '/api/image',
   EMBEDDINGS: '/api/embeddings',
+  CLUSTERS: '/api/clusters',
 };
 
 export const VIEW_MODES = {

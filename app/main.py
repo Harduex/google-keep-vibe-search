@@ -1,9 +1,9 @@
 import os
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import numpy as np
 import uvicorn
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -52,6 +52,20 @@ def search_post(request: SearchRequest):
 
     results = search_engine.search(request.query)
     return {"results": results}
+
+
+@app.get("/api/clusters")
+def get_clusters(num_clusters: Optional[int] = None):
+    """Return clustered notes."""
+    global search_engine
+    if not search_engine:
+        raise HTTPException(status_code=500, detail="Search engine not initialized")
+
+    try:
+        clusters = search_engine.get_clusters(num_clusters)
+        return {"clusters": clusters}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error clustering notes: {str(e)}")
 
 
 @app.get("/api/stats")

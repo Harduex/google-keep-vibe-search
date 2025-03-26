@@ -24,3 +24,5 @@ export interface Note {
   annotations?: Annotation[];
   attachments?: Attachment[];
 }
+
+export type ViewMode = 'list' | '3d';

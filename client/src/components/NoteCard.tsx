@@ -36,7 +36,9 @@ export const NoteCard = memo(({ note, query, onShowRelated }: NoteCardProps) => 
         {/* Badges */}
         {note.pinned && <span className="note-badge badge-pinned">Pinned</span>}
         {note.archived && <span className="note-badge badge-archived">Archived</span>}
-        <span className="note-badge badge-score">{scorePercentage}% match</span>
+        {scorePercentage ? (
+          <span className="note-badge badge-score">{scorePercentage}% match</span>
+        ) : null}
 
         {/* Title */}
         {note.title && (

@@ -1,6 +1,7 @@
-import { memo, useState, useCallback, useMemo } from 'react';
+import { memo, useState, useCallback, useMemo, useEffect } from 'react';
 
 import { NoteCard } from '@/components/NoteCard';
+import { ScrollToTop } from '@/components/ScrollToTop';
 import { ViewToggle } from '@/components/ViewToggle';
 import { Visualization } from '@/components/Visualization';
 import { VIEW_MODES } from '@/const';
@@ -18,6 +19,7 @@ export const AllNotes = memo(({ onShowRelated }: AllNotesProps) => {
   const [sortBy, setSortBy] = useState<'edited' | 'created'>('edited');
   const [filterArchived, setFilterArchived] = useState<boolean>(false);
   const [filterPinned, setFilterPinned] = useState<boolean>(false);
+  const [visibleNotesCount, setVisibleNotesCount] = useState<number>(20);
 
   // Sort and filter notes
   const filteredNotes = useMemo(() => {
@@ -42,6 +44,11 @@ export const AllNotes = memo(({ onShowRelated }: AllNotesProps) => {
     return filtered;
   }, [notes, sortBy, filterArchived, filterPinned]);
 
+  const visibleNotes = useMemo(
+    () => filteredNotes.slice(0, visibleNotesCount),
+    [filteredNotes, visibleNotesCount],
+  );
+
   const handleSelectNote = useCallback((noteId: string) => {
     const element = document.getElementById(`note-${noteId}`);
     if (element) {
@@ -57,7 +64,6 @@ export const AllNotes = memo(({ onShowRelated }: AllNotesProps) => {
     setViewMode(newMode);
   }, []);
 
-  // New callback functions for form controls
   const handleSortChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     setSortBy(e.target.value as 'edited' | 'created');
   }, []);
@@ -69,6 +75,24 @@ export const AllNotes = memo(({ onShowRelated }: AllNotesProps) => {
   const handleArchivedFilterChange = useCallback(() => {
     setFilterArchived((prev) => !prev);
   }, []);
+
+  const handleLoadMore = useCallback(() => {
+    setVisibleNotesCount((prev) => prev + 20);
+  }, []);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (
+        window.innerHeight + document.documentElement.scrollTop >=
+        document.documentElement.offsetHeight - 100
+      ) {
+        handleLoadMore();
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [handleLoadMore]);
 
   if (isLoading) {
     return <div className="all-notes-loading">Loading notes...</div>;
@@ -113,10 +137,10 @@ export const AllNotes = memo(({ onShowRelated }: AllNotesProps) => {
 
       {viewMode === VIEW_MODES.LIST ? (
         <div className="all-notes-list">
-          {filteredNotes.length === 0 ? (
+          {visibleNotes.length === 0 ? (
             <div className="all-notes-empty">No notes to display with current filters</div>
           ) : (
-            filteredNotes.map((note) => (
+            visibleNotes.map((note) => (
               <div id={`note-${note.id}`} key={note.id}>
                 <NoteCard note={note} query="" onShowRelated={onShowRelated} />
               </div>
@@ -125,9 +149,15 @@ export const AllNotes = memo(({ onShowRelated }: AllNotesProps) => {
         </div>
       ) : (
         <div className="all-notes-visualization">
-          <Visualization searchResults={filteredNotes} onSelectNote={handleSelectNote} />
+          <Visualization
+            searchResults={visibleNotes}
+            onSelectNote={handleSelectNote}
+            isAllNotesView={true}
+          />
         </div>
       )}
+
+      <ScrollToTop threshold={200} />
     </div>
   );
 });

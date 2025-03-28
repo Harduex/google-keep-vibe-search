@@ -14,7 +14,7 @@ interface TabNavigationProps {
   onChange: (tab: TabId) => void;
 }
 
-const tabs: TabItem[] = [
+const TABS: TabItem[] = [
   {
     id: 'search',
     label: 'Search',
@@ -60,7 +60,7 @@ const TabButton = memo(({ tab, isActive, onTabChange }: TabButtonProps) => {
 export const TabNavigation = memo(({ activeTab, onChange }: TabNavigationProps) => {
   return (
     <div className="tab-navigation">
-      {tabs.map((tab) => (
+      {TABS.map((tab) => (
         <TabButton key={tab.id} tab={tab} isActive={activeTab === tab.id} onTabChange={onChange} />
       ))}
     </div>

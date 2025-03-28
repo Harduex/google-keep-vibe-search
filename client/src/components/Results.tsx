@@ -6,6 +6,8 @@ import { Visualization } from '@/components/Visualization';
 import { VIEW_MODES } from '@/const';
 import { Note, ViewMode } from '@/types/index';
 
+import { ScrollToTop } from './ScrollToTop';
+
 interface ResultsProps {
   query: string;
   results: Note[];
@@ -17,7 +19,6 @@ interface ResultsProps {
 export const Results = memo(
   ({ query, results, isLoading, hasSearched, onShowRelated }: ResultsProps) => {
     const [viewMode, setViewMode] = useState<ViewMode>(VIEW_MODES.LIST);
-    const [showScrollToTop, setShowScrollToTop] = useState<boolean>(false);
     const prevQueryRef = useRef<string>(query);
 
     useEffect(() => {
@@ -31,32 +32,8 @@ export const Results = memo(
       prevQueryRef.current = query;
     }, [query]);
 
-    useEffect(() => {
-      const handleScroll = () => {
-        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-        const shouldShow = scrollTop > 300;
-
-        if (shouldShow !== showScrollToTop) {
-          setShowScrollToTop(shouldShow);
-        }
-      };
-
-      window.addEventListener('scroll', handleScroll);
-      // Initial check
-      handleScroll();
-
-      return () => window.removeEventListener('scroll', handleScroll);
-    }, [showScrollToTop]);
-
     const handleViewChange = useCallback((newMode: ViewMode) => {
       setViewMode(newMode);
-    }, []);
-
-    const handleScrollToTop = useCallback(() => {
-      window.scrollTo({
-        top: 0,
-        behavior: 'smooth',
-      });
     }, []);
 
     const handleSelectNote = useCallback(
@@ -125,13 +102,7 @@ export const Results = memo(
           </div>
         )}
 
-        {showScrollToTop && (
-          <div className="scroll-to-top" role="button" aria-label="Scroll to top">
-            <button onClick={handleScrollToTop} title="Scroll to top">
-              <span className="material-icons">arrow_upward</span>
-            </button>
-          </div>
-        )}
+        <ScrollToTop smooth={true} threshold={300} />
       </div>
     );
   },

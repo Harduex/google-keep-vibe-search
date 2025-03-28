@@ -193,26 +193,50 @@ const PointCloud = ({
                 color={pointColor}
                 emissive={isHovered ? '#ffffff' : '#000000'}
                 emissiveIntensity={isHovered ? 0.5 : 0}
-                opacity={0.5}
+                opacity={isSearchResult ? 0.7 : 0.15}
+                transparent={true}
               />
             </mesh>
 
             {isHovered && (
-              <Billboard follow={true} position={[0, 0.3, 0]}>
-                <Text
-                  color="white"
-                  fontSize={0.2}
-                  maxWidth={2}
-                  textAlign="center"
-                  anchorX="center"
-                  anchorY="middle"
-                  outlineWidth={0.02}
-                  outlineColor="#000000"
+              <>
+                <Billboard 
+                  follow={true} 
+                  position={[0, 0.3, 0]}
                 >
-                  {isSearchResult ? `${score}% - ` : ''}
-                  {point.title || point.content.substring(0, 100) + '...'}
-                </Text>
-              </Billboard>
+                  <mesh renderOrder={1}>
+                    <meshBasicMaterial 
+                      color="#000000" 
+                      opacity={0.6} 
+                      transparent 
+                      depthWrite={false}
+                      depthTest={false}
+                    />
+                  </mesh>
+
+                  <Text
+                    position={[0, 0, 0.01]}
+                    color="white"
+                    fontSize={0.2}
+                    maxWidth={2}
+                    textAlign="center"
+                    anchorX="center"
+                    anchorY="middle"
+                    outlineWidth={0.02}
+                    outlineColor="#000000"
+                    renderOrder={2}
+                    material={new THREE.MeshBasicMaterial({
+                      color: 'white',
+                      depthWrite: false,
+                      depthTest: false,
+                      transparent: true
+                    })}
+                  >
+                    {isSearchResult ? `${score}% - ` : ''}
+                    {point.title || point.content.substring(0, 100) + '...'}
+                  </Text>
+                </Billboard>
+              </>
             )}
           </group>
         );

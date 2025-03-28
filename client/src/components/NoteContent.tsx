@@ -6,9 +6,10 @@ import { highlightMatches } from '@/helpers';
 interface NoteContentProps {
   content: string;
   query: string;
+  refinementKeywords?: string;
 }
 
-export const NoteContent = memo(({ content, query }: NoteContentProps) => {
+export const NoteContent = memo(({ content, query, refinementKeywords }: NoteContentProps) => {
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [shouldCollapse, setShouldCollapse] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -35,7 +36,7 @@ export const NoteContent = memo(({ content, query }: NoteContentProps) => {
     }
   }, [isCollapsed]);
 
-  const highlightedContent = highlightMatches(content, query);
+  const highlightedContent = highlightMatches(content, query, refinementKeywords);
 
   return (
     <>

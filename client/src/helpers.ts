@@ -14,18 +14,45 @@ export const sanitizeHTML = (text: string): string => {
 };
 
 /**
- * Highlight search matches in text
+ * Highlight search matches and refinement keywords in text
  */
-export const highlightMatches = (text: string, query: string): string => {
-  if (!text || !query) {
-    return sanitizeHTML(text);
+export const highlightMatches = (
+  text: string,
+  query: string,
+  refinementKeywords?: string,
+): string => {
+  if (!text) {
+    return '';
   }
 
-  const sanitizedText = sanitizeHTML(text);
-  const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const regex = new RegExp(`(${escapedQuery})`, 'gi');
+  let sanitizedText = sanitizeHTML(text);
 
-  return sanitizedText.replace(regex, '<mark>$1</mark>');
+  // Highlight main query if it exists
+  if (query) {
+    const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(${escapedQuery})`, 'gi');
+    sanitizedText = sanitizedText.replace(regex, '<mark>$1</mark>');
+  }
+
+  // Highlight refinement keywords if they exist
+  if (refinementKeywords) {
+    const keywords = parseKeywords(refinementKeywords);
+
+    // Apply highlighting for each keyword individually
+    keywords.forEach((keyword) => {
+      if (keyword) {
+        const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // Using a different CSS class for refinement keyword highlighting
+        const regex = new RegExp(`(${escapedKeyword})`, 'gi');
+        sanitizedText = sanitizedText.replace(
+          regex,
+          '<mark class="refinement-highlight">$1</mark>',
+        );
+      }
+    });
+  }
+
+  return sanitizedText;
 };
 
 /**

@@ -983,3 +983,23 @@ h1 {
     width: 100%;
   }
 }
+
+/* Refinement highlight styling */
+.refinement-highlight {
+  background-color: #ffcc80; /* Light orange background */
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+/* This is to ensure we don't have conflicts with nested highlights */
+mark .refinement-highlight,
+.refinement-highlight mark {
+  background-color: #ffcc80; /* Keep consistent */
+  border-bottom: 2px solid #ff9800; /* Add a border to show dual highlighting */
+}
+
+/* For titles, make refinement highlights more noticeable */
+.note-title .refinement-highlight {
+  background-color: #ffcc80;
+  border-bottom: 2px solid #ff9800;
+}

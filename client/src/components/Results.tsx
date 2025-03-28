@@ -147,7 +147,12 @@ export const Results = memo(
           <div id="results-list">
             {results.map((note) => (
               <div id={`note-${note.id}`} key={note.id}>
-                <NoteCard note={note} query={query} onShowRelated={onShowRelated} />
+                <NoteCard
+                  note={note}
+                  query={query}
+                  refinementKeywords={refinementKeywords}
+                  onShowRelated={onShowRelated}
+                />
               </div>
             ))}
           </div>

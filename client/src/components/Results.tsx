@@ -1,6 +1,7 @@
 import { memo, useState, useEffect, useCallback, useRef } from 'react';
 
 import { NoteCard } from '@/components/NoteCard';
+import { RefinementSearchBar } from '@/components/RefinementSearchBar';
 import { ViewToggle } from '@/components/ViewToggle';
 import { Visualization } from '@/components/Visualization';
 import { VIEW_MODES } from '@/const';
@@ -11,15 +12,32 @@ import { ScrollToTop } from './ScrollToTop';
 interface ResultsProps {
   query: string;
   results: Note[];
+  originalResults: Note[];
+  refinementKeywords: string;
   isLoading: boolean;
   hasSearched: boolean;
+  isRefined: boolean;
   onShowRelated: (content: string) => void;
+  onRefine: (keywords: string) => void;
+  onResetRefinement: () => void;
 }
 
 export const Results = memo(
-  ({ query, results, isLoading, hasSearched, onShowRelated }: ResultsProps) => {
+  ({
+    query,
+    results,
+    originalResults,
+    refinementKeywords,
+    isLoading,
+    hasSearched,
+    isRefined,
+    onShowRelated,
+    onRefine,
+    onResetRefinement,
+  }: ResultsProps) => {
     const [viewMode, setViewMode] = useState<ViewMode>(VIEW_MODES.LIST);
     const prevQueryRef = useRef<string>(query);
+    const [showRefinement, setShowRefinement] = useState<boolean>(false);
 
     useEffect(() => {
       if (results.length === 0 || !hasSearched) {
@@ -30,6 +48,8 @@ export const Results = memo(
     // Update query reference when it changes
     useEffect(() => {
       prevQueryRef.current = query;
+      // Hide refinement search when new search is performed
+      setShowRefinement(false);
     }, [query]);
 
     const handleViewChange = useCallback((newMode: ViewMode) => {
@@ -58,6 +78,22 @@ export const Results = memo(
       [results],
     );
 
+    const handleRefineSubmit = useCallback(
+      (keywords: string) => {
+        onRefine(keywords);
+      },
+      [onRefine],
+    );
+
+    const toggleRefinement = useCallback(() => {
+      setShowRefinement((prev) => !prev);
+
+      // When toggling refinement off, reset any existing refinement
+      if (showRefinement && refinementKeywords) {
+        onResetRefinement();
+      }
+    }, [showRefinement, refinementKeywords, onResetRefinement]);
+
     if (isLoading) {
       return (
         <div className="results-container">
@@ -68,6 +104,11 @@ export const Results = memo(
 
     return (
       <div className="results-container">
+        {/* Show refinement search bar when toggled and we have search results */}
+        {showRefinement && hasSearched && originalResults.length > 0 && (
+          <RefinementSearchBar onRefine={handleRefineSubmit} isVisible={true} />
+        )}
+
         <div className="results-header">
           {hasSearched && results.length === 0 ? (
             <div id="no-results">No matching notes found.</div>
@@ -75,13 +116,29 @@ export const Results = memo(
             hasSearched && (
               <div id="results-count">
                 Found {results.length} matching note{results.length === 1 ? '' : 's'}
+                {isRefined && (
+                  <span className="refined-filter-info">(filtered by: {refinementKeywords})</span>
+                )}
               </div>
             )
           )}
 
-          {results.length > 0 && (
+          {hasSearched && originalResults.length > 0 && (
             <div className="controls-container">
-              <ViewToggle currentView={viewMode} onChange={handleViewChange} />
+              {/* Refinement Toggle Button */}
+              <button
+                className={`refinement-toggle-button ${showRefinement ? 'active' : ''}`}
+                onClick={toggleRefinement}
+                title={showRefinement ? 'Hide refinement search' : 'Refine search results'}
+              >
+                <span className="material-icons">filter_list</span>
+                <span>Refine</span>
+              </button>
+
+              {/* View Mode Toggle (only show when we have results) */}
+              {results.length > 0 && (
+                <ViewToggle currentView={viewMode} onChange={handleViewChange} />
+              )}
             </div>
           )}
         </div>

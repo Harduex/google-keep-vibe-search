@@ -1,24 +1,36 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 
 import { API_ROUTES } from '@/const';
+import { filterByKeywords } from '@/helpers';
 import { useError } from '@/hooks/useError';
 import { Note } from '@/types/index';
 
 interface UseSearchResult {
   query: string;
   results: Note[];
+  originalResults: Note[];
+  refinementKeywords: string;
   isLoading: boolean;
   hasSearched: boolean;
+  isRefined: boolean;
   error: string | null;
   performSearch: (searchQuery: string) => Promise<void>;
+  refineResults: (keywords: string) => void;
+  resetRefinement: () => void;
 }
 
 export const useSearch = (): UseSearchResult => {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<Note[]>([]);
+  const [originalResults, setOriginalResults] = useState<Note[]>([]);
+  const [refinementKeywords, setRefinementKeywords] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const { error, handleError, clearError } = useError();
+
+  // Apply refinement filter to original results
+  const results = useMemo(() => {
+    return filterByKeywords(originalResults, refinementKeywords);
+  }, [originalResults, refinementKeywords]);
 
   const performSearch = useCallback(
     async (searchQuery: string): Promise<void> => {
@@ -30,6 +42,7 @@ export const useSearch = (): UseSearchResult => {
         setIsLoading(true);
         clearError();
         setQuery(searchQuery);
+        setRefinementKeywords(''); // Clear refinement when performing a new search
 
         const response = await fetch(`${API_ROUTES.SEARCH}`, {
           method: 'POST',
@@ -44,11 +57,11 @@ export const useSearch = (): UseSearchResult => {
         }
 
         const data = await response.json();
-        setResults(data.results || []);
+        setOriginalResults(data.results || []);
         setHasSearched(true);
       } catch (err) {
         handleError(err);
-        setResults([]);
+        setOriginalResults([]);
       } finally {
         setIsLoading(false);
       }
@@ -56,12 +69,25 @@ export const useSearch = (): UseSearchResult => {
     [clearError, handleError],
   );
 
+  const refineResults = useCallback((keywords: string) => {
+    setRefinementKeywords(keywords);
+  }, []);
+
+  const resetRefinement = useCallback(() => {
+    setRefinementKeywords('');
+  }, []);
+
   return {
     query,
     results,
+    originalResults,
+    refinementKeywords,
     isLoading,
     hasSearched,
+    isRefined: !!refinementKeywords,
     error,
     performSearch,
+    refineResults,
+    resetRefinement,
   };
 };

@@ -29,6 +29,51 @@ export const highlightMatches = (text: string, query: string): string => {
 };
 
 /**
+ * Parse comma-separated keywords for refinement search
+ */
+export const parseKeywords = (keywordsString: string): string[] => {
+  if (!keywordsString) {
+    return [];
+  }
+
+  return keywordsString
+    .split(',')
+    .map((keyword) => keyword.trim().toLowerCase())
+    .filter((keyword) => keyword.length > 0);
+};
+
+/**
+ * Check if text contains all the specified keywords
+ */
+export const containsKeywords = (text: string, keywords: string[]): boolean => {
+  if (!text || !keywords || keywords.length === 0) {
+    return true;
+  }
+
+  const lowerText = text.toLowerCase();
+  return keywords.every((keyword) => lowerText.includes(keyword));
+};
+
+/**
+ * Filter notes based on refinement keywords
+ */
+export const filterByKeywords = <T extends { title?: string; content: string }>(
+  items: T[],
+  keywordsString: string,
+): T[] => {
+  const keywords = parseKeywords(keywordsString);
+
+  if (keywords.length === 0) {
+    return items;
+  }
+
+  return items.filter((item) => {
+    const titleContent = [item.title || '', item.content].join(' ');
+    return containsKeywords(titleContent, keywords);
+  });
+};
+
+/**
  * Format statistics text
  */
 export const formatStatsText = (

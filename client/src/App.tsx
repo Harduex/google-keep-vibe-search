@@ -18,7 +18,19 @@ import './App.css';
 const App = () => {
   const { theme, toggleTheme } = useTheme();
   const { stats, error: statsError, refetchStats } = useStats();
-  const { query, results, isLoading, hasSearched, performSearch, error: searchError } = useSearch();
+  const {
+    query,
+    results,
+    originalResults,
+    refinementKeywords,
+    isLoading,
+    hasSearched,
+    isRefined,
+    performSearch,
+    refineResults,
+    resetRefinement,
+    error: searchError,
+  } = useSearch();
 
   // Add state for active tab
   const [activeTab, setActiveTab] = useState<TabId>('search');
@@ -30,6 +42,13 @@ const App = () => {
       scrollToElement('.search-container', UI_ELEMENTS.SEARCH_OFFSET);
     },
     [performSearch],
+  );
+
+  const handleRefinement = useCallback(
+    (keywords: string) => {
+      refineResults(keywords);
+    },
+    [refineResults],
   );
 
   const handleDismissError = useCallback(() => {
@@ -76,9 +95,14 @@ const App = () => {
           <Results
             query={query}
             results={results}
+            originalResults={originalResults}
+            refinementKeywords={refinementKeywords}
             isLoading={isLoading}
             hasSearched={hasSearched}
+            isRefined={isRefined}
             onShowRelated={handleSearch}
+            onRefine={handleRefinement}
+            onResetRefinement={resetRefinement}
           />
         )}
 

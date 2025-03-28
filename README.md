@@ -1,12 +1,10 @@
 # Google Keep Vibe Search
 
-A semantic search application for your Google Keep notes export. This app lets you search through your notes using natural language queries and keywords, finding the most relevant notes based on the "vibe" of your search.
+A semantic search application for your Google Keep notes export. This app lets you search through your notes using natural language queries, finding the most relevant notes based on the "vibe" of your search.
 
 ## Features
 
 - **Semantic Search**: Find notes based on meaning, not just exact keyword matches
-- **Keyword Search**: Traditional search capability for precise matching
-- **Hybrid Approach**: Combines both methods for optimal results
 - **Clean UI**: Simple, responsive interface inspired by Google Keep
 - **Self-contained**: Easy to set up and run locally
 
@@ -182,20 +180,16 @@ npm run format
 
 ## How it works
 
-The application combines two search approaches:
+The application uses semantic search to find relevant notes:
 
-1. **Semantic Search**: Uses the `sentence-transformers` model to convert your notes and queries into vector embeddings and finds similar content based on meaning.
+**Semantic Search**: Uses the `sentence-transformers` model to convert your notes and queries into vector embeddings and finds similar content based on meaning.
 
-2. **Keyword Search**: Traditional text search that looks for exact matches of words and phrases.
-
-The results are combined with configurable weights (default: 70% semantic, 30% keyword) to give you the most relevant matches.
+This approach allows you to find notes that are conceptually related to your query even if they don't contain the exact same words.
 
 ## Customization
 
 You can adjust the following settings in your `.env` file:
 
-- `SEMANTIC_SEARCH_WEIGHT`: Weight for semantic search results (0-1)
-- `KEYWORD_SEARCH_WEIGHT`: Weight for keyword search results (0-1)
 - `MAX_RESULTS`: Maximum number of results to return
 - `HOST` and `PORT`: Server binding settings
 

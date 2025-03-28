@@ -11,12 +11,6 @@ GOOGLE_KEEP_PATH = os.getenv(
 )  # Path to the Keep folder from Google Takeout
 
 # Search settings
-SEMANTIC_SEARCH_WEIGHT = float(
-    os.getenv("SEMANTIC_SEARCH_WEIGHT", 0.7)
-)  # Weight for semantic search results (0-1)
-KEYWORD_SEARCH_WEIGHT = float(
-    os.getenv("KEYWORD_SEARCH_WEIGHT", 0.3)
-)  # Weight for keyword search results (0-1)
 MAX_RESULTS = int(os.getenv("MAX_RESULTS", 20))  # Maximum number of results to return
 
 # Clustering settings

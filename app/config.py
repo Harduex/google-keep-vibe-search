@@ -12,6 +12,7 @@ GOOGLE_KEEP_PATH = os.getenv(
 
 # Search settings
 MAX_RESULTS = int(os.getenv("MAX_RESULTS", 20))  # Maximum number of results to return
+SEARCH_THRESHOLD = float(os.getenv("SEARCH_THRESHOLD", 0.0))  # Minimum relevance score (0.0 - 1.0) for search results
 
 # Clustering settings
 DEFAULT_NUM_CLUSTERS = int(os.getenv("DEFAULT_NUM_CLUSTERS", 8))  # Default number of clusters

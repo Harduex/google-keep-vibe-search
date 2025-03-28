@@ -17,6 +17,7 @@ from app.config import (
     EMBEDDINGS_CACHE_FILE,
     MAX_RESULTS,
     NOTES_HASH_FILE,
+    SEARCH_THRESHOLD,
 )
 
 
@@ -147,10 +148,13 @@ class VibeSearch:
         # Sort by score (descending)
         scores.sort(key=lambda x: x[1], reverse=True)
 
-        # Return top results
+        # Return top results that meet the threshold
         results = []
         for note_idx, score in scores[:max_results]:
-            if score > 0:  # Only include notes with positive scores
+            # Only include notes with scores above the threshold
+            # Convert score to 0-1 range for threshold comparison
+            normalized_score = max(0, min(float(score), 1))
+            if normalized_score >= SEARCH_THRESHOLD:
                 note = self.notes[note_idx].copy()
                 note["score"] = float(score)
                 results.append(note)

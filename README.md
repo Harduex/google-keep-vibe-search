@@ -191,6 +191,11 @@ This approach allows you to find notes that are conceptually related to your que
 You can adjust the following settings in your `.env` file:
 
 - `MAX_RESULTS`: Maximum number of results to return
+- `SEARCH_THRESHOLD`: Minimum relevance score (0.0 - 1.0) for search results
+  - 0.0: Show all results (default)
+  - 0.5: Show moderately relevant results
+  - 0.7: Show highly relevant results
+  - 1.0: Show only perfect matches
 - `HOST` and `PORT`: Server binding settings
 
 ## Troubleshooting

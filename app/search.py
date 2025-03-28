@@ -2,7 +2,7 @@ import hashlib
 import json
 import os
 import re
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Set
 
 import nltk
 from nltk.corpus import stopwords
@@ -121,9 +121,42 @@ class VibeSearch:
             # Fall back to computing new embeddings
             self.embeddings = self.model.encode(self.texts)
 
+    def _keyword_search(self, query: str) -> List[Tuple[int, float]]:
+        """
+        Perform keyword-based search.
+        
+        Args:
+            query: The search query
+            
+        Returns:
+            List of tuples with (note_index, score)
+        """
+        # Break query into keywords
+        keywords = query.lower().split()
+        results = []
+        
+        # Score for each note based on keyword matches
+        for i, note_idx in enumerate(self.note_indices):
+            note = self.notes[note_idx]
+            text = f"{note['title']} {note['content']}".lower()
+            
+            # Count exact keyword matches
+            match_count = 0
+            for keyword in keywords:
+                # Only count keywords with length >= 3 to avoid common words like "a", "an", "the"
+                if len(keyword) >= 3 and keyword in text:
+                    match_count += 1
+            
+            # Calculate score based on proportion of matching keywords
+            if match_count > 0:
+                score = match_count / len(keywords)
+                results.append((note_idx, score))
+                
+        return results
+
     def search(self, query: str, max_results: int = MAX_RESULTS) -> List[Dict[str, Any]]:
         """
-        Search notes using only semantic search.
+        Search notes using both semantic and keyword search.
 
         Args:
             query: The search query
@@ -138,25 +171,34 @@ class VibeSearch:
         # Get semantic search scores
         semantic_scores = self._semantic_search(query)
         
-        # Create scores list
+        # Get keyword search scores
+        keyword_matches = self._keyword_search(query)
+        
+        # Create a map for keyword search scores for quick lookup
+        keyword_score_map = {idx: score for idx, score in keyword_matches}
+        
+        # Create scores list with combined scores
         scores = []
         for i in range(len(self.note_indices)):
             note_idx = self.note_indices[i]
-            score = semantic_scores[i]
-            scores.append((note_idx, score))
+            semantic_score = semantic_scores[i]
+            keyword_score = keyword_score_map.get(note_idx, 0)
+            
+            # Combine scores - semantic search gets priority but exact keyword matches boost the score
+            # This formula gives more weight to semantic search (0.7) while still boosting exact matches (0.3)
+            combined_score = (semantic_score * 0.7) + (keyword_score * 0.3)
+            
+            scores.append((note_idx, combined_score, semantic_score > SEARCH_THRESHOLD or keyword_score > 0))
 
-        # Sort by score (descending)
+        # Sort by combined score (descending)
         scores.sort(key=lambda x: x[1], reverse=True)
 
         # Return top results that meet the threshold
         results = []
-        for note_idx, score in scores[:max_results]:
-            # Only include notes with scores above the threshold
-            # Convert score to 0-1 range for threshold comparison
-            normalized_score = max(0, min(float(score), 1))
-            if normalized_score >= SEARCH_THRESHOLD:
+        for note_idx, combined_score, should_include in scores[:max_results]:
+            if should_include:
                 note = self.notes[note_idx].copy()
-                note["score"] = float(score)
+                note["score"] = float(combined_score)
                 results.append(note)
 
         return results

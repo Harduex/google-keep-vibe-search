@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 
 import { API_ROUTES } from '@/const';
-import { Note } from '@/types';
 import { useError } from '@/hooks/useError';
+import { Note } from '@/types';
 
 interface UseAllNotesResult {
   notes: Note[];

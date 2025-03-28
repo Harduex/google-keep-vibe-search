@@ -13,5 +13,3 @@ export const ImageThumbnail = memo(({ src, alt, onClick }: ImageThumbnailProps) 
     </div>
   );
 });
-
-ImageThumbnail.displayName = 'ImageThumbnail';

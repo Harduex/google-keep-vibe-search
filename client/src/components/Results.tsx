@@ -1,11 +1,10 @@
 import { memo, useState, useEffect, useCallback, useRef } from 'react';
 
-import { Note, ViewMode } from '@/types/index';
-import { VIEW_MODES } from '@/const';
-
 import { NoteCard } from '@/components/NoteCard';
 import { ViewToggle } from '@/components/ViewToggle';
 import { Visualization } from '@/components/Visualization';
+import { VIEW_MODES } from '@/const';
+import { Note, ViewMode } from '@/types/index';
 
 interface ResultsProps {
   query: string;
@@ -79,7 +78,7 @@ export const Results = memo(
           }, 100);
         }
       },
-      [results]
+      [results],
     );
 
     if (isLoading) {
@@ -135,7 +134,5 @@ export const Results = memo(
         )}
       </div>
     );
-  }
+  },
 );
-
-Results.displayName = 'Results';

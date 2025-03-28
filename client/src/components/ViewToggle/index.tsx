@@ -1,6 +1,7 @@
-import { memo } from 'react';
-import { ViewMode } from '@/types';
+import { memo, useCallback } from 'react';
+
 import { VIEW_MODES } from '@/const';
+import { ViewMode } from '@/types';
 import './styles.css';
 
 interface ViewToggleProps {
@@ -9,11 +10,19 @@ interface ViewToggleProps {
 }
 
 export const ViewToggle = memo(({ currentView, onChange }: ViewToggleProps) => {
+  const handleShowListView = useCallback(() => {
+    onChange(VIEW_MODES.LIST);
+  }, [onChange]);
+
+  const handleShowVisualizationView = useCallback(() => {
+    onChange(VIEW_MODES.VISUALIZATION);
+  }, [onChange]);
+
   return (
     <div className="view-toggle">
       <button
         className={`view-toggle-btn ${currentView === VIEW_MODES.LIST ? 'active' : ''}`}
-        onClick={() => onChange(VIEW_MODES.LIST)}
+        onClick={handleShowListView}
         aria-label="List view"
         title="List view"
       >
@@ -21,7 +30,7 @@ export const ViewToggle = memo(({ currentView, onChange }: ViewToggleProps) => {
       </button>
       <button
         className={`view-toggle-btn ${currentView === VIEW_MODES.VISUALIZATION ? 'active' : ''}`}
-        onClick={() => onChange(VIEW_MODES.VISUALIZATION)}
+        onClick={handleShowVisualizationView}
         aria-label="3D visualization view"
         title="3D visualization view"
       >
@@ -30,5 +39,3 @@ export const ViewToggle = memo(({ currentView, onChange }: ViewToggleProps) => {
     </div>
   );
 });
-
-ViewToggle.displayName = 'ViewToggle';

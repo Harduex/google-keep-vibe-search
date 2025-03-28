@@ -1,4 +1,5 @@
 import { useEffect, useCallback } from 'react';
+
 import { useGallery } from './GalleryContext';
 
 export const GalleryOverlay: React.FC = () => {
@@ -6,7 +7,9 @@ export const GalleryOverlay: React.FC = () => {
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      if (!isOpen) return;
+      if (!isOpen) {
+        return;
+      }
 
       switch (e.key) {
         case 'Escape':
@@ -20,7 +23,7 @@ export const GalleryOverlay: React.FC = () => {
           break;
       }
     },
-    [isOpen, closeGallery, nextImage, prevImage]
+    [isOpen, closeGallery, nextImage, prevImage],
   );
 
   useEffect(() => {

@@ -18,8 +18,6 @@ export const useError = (): UseErrorResult => {
     } else {
       setError('An unknown error occurred');
     }
-
-    console.error(err);
   }, []);
 
   const clearError = useCallback(() => {

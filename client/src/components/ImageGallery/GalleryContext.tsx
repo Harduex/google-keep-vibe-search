@@ -63,7 +63,7 @@ function useCreateGallery(): GalleryContextData {
       nextImage,
       prevImage,
     }),
-    [isOpen, images, currentIndex, openGallery, closeGallery, nextImage, prevImage]
+    [isOpen, images, currentIndex, openGallery, closeGallery, nextImage, prevImage],
   );
 }
 

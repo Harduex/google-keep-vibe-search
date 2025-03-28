@@ -17,5 +17,3 @@ export const ClustersButton = memo(({ onClick, isActive }: ClustersButtonProps) 
     </button>
   );
 });
-
-ClustersButton.displayName = 'ClustersButton';

@@ -1,11 +1,10 @@
 import { memo, useCallback } from 'react';
 
-import { API_ROUTES } from '@/const';
-import { Note } from '@/types/index';
-import { calculateScorePercentage, highlightMatches } from '@/helpers';
-
-import { NoteContent } from '@/components/NoteContent';
 import ImageGallery from '@/components/ImageGallery';
+import { NoteContent } from '@/components/NoteContent';
+import { API_ROUTES } from '@/const';
+import { calculateScorePercentage, highlightMatches } from '@/helpers';
+import { Note } from '@/types/index';
 
 interface NoteCardProps {
   note: Note;
@@ -93,5 +92,3 @@ const renderAnnotations = (note: Note) => {
     </div>
   );
 };
-
-NoteCard.displayName = 'NoteCard';

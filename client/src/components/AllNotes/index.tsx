@@ -1,9 +1,10 @@
 import { memo, useState, useCallback, useMemo } from 'react';
-import { useAllNotes } from '@/hooks/useAllNotes';
+
 import { NoteCard } from '@/components/NoteCard';
-import { VIEW_MODES } from '@/const';
 import { ViewToggle } from '@/components/ViewToggle';
 import { Visualization } from '@/components/Visualization';
+import { VIEW_MODES } from '@/const';
+import { useAllNotes } from '@/hooks/useAllNotes';
 import { ViewMode } from '@/types';
 import './styles.css';
 
@@ -21,23 +22,23 @@ export const AllNotes = memo(({ onShowRelated }: AllNotesProps) => {
   // Sort and filter notes
   const filteredNotes = useMemo(() => {
     let filtered = [...notes];
-    
+
     // Apply filters
     if (filterArchived) {
-      filtered = filtered.filter(note => note.archived);
+      filtered = filtered.filter((note) => note.archived);
     }
-    
+
     if (filterPinned) {
-      filtered = filtered.filter(note => note.pinned);
+      filtered = filtered.filter((note) => note.pinned);
     }
-    
+
     // Apply sorting
     filtered.sort((a, b) => {
       const dateA = new Date(sortBy === 'edited' ? a.edited : a.created);
       const dateB = new Date(sortBy === 'edited' ? b.edited : b.created);
       return dateB.getTime() - dateA.getTime(); // Newest first
     });
-    
+
     return filtered;
   }, [notes, sortBy, filterArchived, filterPinned]);
 
@@ -56,6 +57,19 @@ export const AllNotes = memo(({ onShowRelated }: AllNotesProps) => {
     setViewMode(newMode);
   }, []);
 
+  // New callback functions for form controls
+  const handleSortChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSortBy(e.target.value as 'edited' | 'created');
+  }, []);
+
+  const handlePinnedFilterChange = useCallback(() => {
+    setFilterPinned((prev) => !prev);
+  }, []);
+
+  const handleArchivedFilterChange = useCallback(() => {
+    setFilterArchived((prev) => !prev);
+  }, []);
+
   if (isLoading) {
     return <div className="all-notes-loading">Loading notes...</div>;
   }
@@ -70,37 +84,29 @@ export const AllNotes = memo(({ onShowRelated }: AllNotesProps) => {
         <div className="all-notes-count">
           {filteredNotes.length} note{filteredNotes.length === 1 ? '' : 's'}
         </div>
-        
+
         <div className="all-notes-controls">
           <div className="all-notes-filters">
-            <select 
-              value={sortBy} 
-              onChange={(e) => setSortBy(e.target.value as 'edited' | 'created')}
-              className="all-notes-select"
-            >
+            <select value={sortBy} onChange={handleSortChange} className="all-notes-select">
               <option value="edited">Sort by Last Edited</option>
               <option value="created">Sort by Created Date</option>
             </select>
-            
+
             <label className="filter-checkbox">
-              <input 
-                type="checkbox" 
-                checked={filterPinned}
-                onChange={() => setFilterPinned(!filterPinned)} 
-              />
+              <input type="checkbox" checked={filterPinned} onChange={handlePinnedFilterChange} />
               Pinned Only
             </label>
-            
+
             <label className="filter-checkbox">
-              <input 
-                type="checkbox" 
+              <input
+                type="checkbox"
                 checked={filterArchived}
-                onChange={() => setFilterArchived(!filterArchived)} 
+                onChange={handleArchivedFilterChange}
               />
               Archived Only
             </label>
           </div>
-          
+
           <ViewToggle currentView={viewMode} onChange={handleViewChange} />
         </div>
       </div>
@@ -125,5 +131,3 @@ export const AllNotes = memo(({ onShowRelated }: AllNotesProps) => {
     </div>
   );
 });
-
-AllNotes.displayName = 'AllNotes';

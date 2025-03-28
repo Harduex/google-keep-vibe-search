@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 import './styles.css';
 
 export type TabId = 'search' | 'clusters' | 'all-notes';
@@ -32,23 +32,37 @@ const tabs: TabItem[] = [
   },
 ];
 
+interface TabButtonProps {
+  tab: TabItem;
+  isActive: boolean;
+  onTabChange: (tabId: TabId) => void;
+}
+
+const TabButton = memo(({ tab, isActive, onTabChange }: TabButtonProps) => {
+  const handleClick = useCallback(() => {
+    onTabChange(tab.id);
+  }, [tab.id, onTabChange]);
+
+  return (
+    <button
+      key={tab.id}
+      className={`tab-button ${isActive ? 'active' : ''}`}
+      onClick={handleClick}
+      aria-label={tab.label}
+      title={tab.label}
+    >
+      <span className="material-icons">{tab.icon}</span>
+      <span>{tab.label}</span>
+    </button>
+  );
+});
+
 export const TabNavigation = memo(({ activeTab, onChange }: TabNavigationProps) => {
   return (
     <div className="tab-navigation">
       {tabs.map((tab) => (
-        <button
-          key={tab.id}
-          className={`tab-button ${activeTab === tab.id ? 'active' : ''}`}
-          onClick={() => onChange(tab.id)}
-          aria-label={tab.label}
-          title={tab.label}
-        >
-          <span className="material-icons">{tab.icon}</span>
-          <span>{tab.label}</span>
-        </button>
+        <TabButton key={tab.id} tab={tab} isActive={activeTab === tab.id} onTabChange={onChange} />
       ))}
     </div>
   );
 });
-
-TabNavigation.displayName = 'TabNavigation';

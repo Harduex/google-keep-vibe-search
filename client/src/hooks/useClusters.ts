@@ -1,8 +1,8 @@
 import { useState, useCallback } from 'react';
 
 import { API_ROUTES } from '@/const';
-import { NoteCluster } from '@/types';
 import { useError } from '@/hooks/useError';
+import { NoteCluster } from '@/types';
 
 interface UseClustersResult {
   clusters: NoteCluster[];
@@ -42,7 +42,7 @@ export const useClusters = (): UseClustersResult => {
         setIsLoading(false);
       }
     },
-    [clearError, handleError]
+    [clearError, handleError],
   );
 
   return { clusters, isLoading, error, fetchClusters };

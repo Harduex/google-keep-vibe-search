@@ -1,7 +1,9 @@
-import { memo, useState } from 'react';
-import { EmbeddingsVisualization } from './EmbeddingsVisualization';
+import { memo, useCallback, useState } from 'react';
+
 import { useEmbeddings } from '@/hooks/useEmbeddings';
 import { Note } from '@/types';
+
+import { EmbeddingsVisualization } from './EmbeddingsVisualization';
 import './styles.css';
 
 interface VisualizationProps {
@@ -15,9 +17,17 @@ export const Visualization = memo(({ searchResults, onSelectNote }: Visualizatio
   const [matchThreshold, setMatchThreshold] = useState(0); // 0-100%
   const [spreadFactor, setSpreadFactor] = useState(5); // 1-10
 
-  const toggleShowAllPoints = () => {
+  const toggleShowAllPoints = useCallback(() => {
     setShowAllPoints((prev) => !prev);
-  };
+  }, []);
+
+  const handleMatchThresholdChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setMatchThreshold(parseInt(e.target.value));
+  }, []);
+
+  const handleSpreadFactorChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setSpreadFactor(parseInt(e.target.value));
+  }, []);
 
   if (error) {
     return <div className="visualization-empty">Error loading visualization: {error}</div>;
@@ -52,7 +62,7 @@ export const Visualization = memo(({ searchResults, onSelectNote }: Visualizatio
               min="0"
               max="100"
               value={matchThreshold}
-              onChange={(e) => setMatchThreshold(parseInt(e.target.value))}
+              onChange={handleMatchThresholdChange}
               className="slider"
             />
           </div>
@@ -65,7 +75,7 @@ export const Visualization = memo(({ searchResults, onSelectNote }: Visualizatio
               min="1"
               max="10"
               value={spreadFactor}
-              onChange={(e) => setSpreadFactor(parseInt(e.target.value))}
+              onChange={handleSpreadFactorChange}
               className="slider"
             />
           </div>
@@ -91,5 +101,3 @@ export const Visualization = memo(({ searchResults, onSelectNote }: Visualizatio
     </div>
   );
 });
-
-Visualization.displayName = 'Visualization';

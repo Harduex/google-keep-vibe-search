@@ -1,10 +1,11 @@
-import { useRef, useState, useMemo, useCallback } from 'react';
-import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Text, Billboard } from '@react-three/drei';
+import { Canvas } from '@react-three/fiber';
+import { useRef, useState, useMemo, useCallback } from 'react';
 import * as THREE from 'three';
+
+import { calculateScorePercentage } from '@/helpers';
 import { EmbeddingPoint } from '@/hooks/useEmbeddings';
 import { Note } from '@/types';
-import { calculateScorePercentage } from '@/helpers';
 
 interface EmbeddingsVisualizationProps {
   embeddings: EmbeddingPoint[];
@@ -57,7 +58,9 @@ export const EmbeddingsVisualization = ({
   }, [embeddings, searchResultMap, showAllPoints, matchThreshold]);
 
   const toggleFullscreen = useCallback(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current) {
+      return;
+    }
 
     if (!document.fullscreenElement) {
       containerRef.current
@@ -65,8 +68,9 @@ export const EmbeddingsVisualization = ({
         .then(() => {
           setIsFullscreen(true);
         })
-        .catch((err) => {
-          console.error(`Error attempting to enable fullscreen: ${err.message}`);
+        .catch((_err) => {
+          // Handle fullscreen error silently in production
+          setIsFullscreen(false);
         });
     } else {
       document
@@ -74,8 +78,8 @@ export const EmbeddingsVisualization = ({
         .then(() => {
           setIsFullscreen(false);
         })
-        .catch((err) => {
-          console.error(`Error attempting to exit fullscreen: ${err.message}`);
+        .catch((_err) => {
+          // Handle exit fullscreen error silently
         });
     }
   }, []);
@@ -146,13 +150,35 @@ const PointCloud = ({
     points.forEach((point) => {
       point.coordinates.forEach((coord) => {
         const absVal = Math.abs(coord);
-        if (absVal > maxAbs) maxAbs = absVal;
+        if (absVal > maxAbs) {
+          maxAbs = absVal;
+        }
       });
     });
 
     // Scale to fit in approximately -5 to 5 range, adjusted by spread factor
     return maxAbs > 0 ? spreadFactor / maxAbs : 1;
   }, [points, spreadFactor]);
+
+  const handlePointClick = useCallback(
+    (pointId: string) => () => {
+      onSelectNote(pointId);
+    },
+    [onSelectNote],
+  );
+
+  const handlePointerOver = useCallback(
+    (pointId: string) => () => {
+      setHoveredPoint(pointId);
+      setIsPointerOverPoint(true);
+    },
+    [setHoveredPoint, setIsPointerOverPoint],
+  );
+
+  const handlePointerOut = useCallback(() => {
+    setHoveredPoint(null);
+    setIsPointerOverPoint(false);
+  }, [setHoveredPoint, setIsPointerOverPoint]);
 
   return (
     <group ref={groupRef}>
@@ -178,41 +204,58 @@ const PointCloud = ({
         return (
           <group key={point.id} position={[x, y, z]}>
             <mesh
-              onClick={() => onSelectNote(point.id)}
-              onPointerOver={() => {
-                setHoveredPoint(point.id);
-                setIsPointerOverPoint(true);
-              }}
-              onPointerOut={() => {
-                setHoveredPoint(null);
-                setIsPointerOverPoint(false);
-              }}
+              onClick={handlePointClick(point.id)}
+              onPointerOver={handlePointerOver(point.id)}
+              onPointerOut={handlePointerOut}
             >
               <sphereGeometry args={[isHovered ? 0.15 : 0.1, 16, 16]} />
               <meshStandardMaterial
                 color={pointColor}
                 emissive={isHovered ? '#ffffff' : '#000000'}
                 emissiveIntensity={isHovered ? 0.5 : 0}
-                opacity={0.5}
+                opacity={isSearchResult ? 0.7 : 0.15}
+                transparent={true}
               />
             </mesh>
 
             {isHovered && (
-              <Billboard follow={true} position={[0, 0.3, 0]}>
-                <Text
-                  color="white"
-                  fontSize={0.2}
-                  maxWidth={2}
-                  textAlign="center"
-                  anchorX="center"
-                  anchorY="middle"
-                  outlineWidth={0.02}
-                  outlineColor="#000000"
-                >
-                  {isSearchResult ? `${score}% - ` : ''}
-                  {point.title || point.content.substring(0, 100) + '...'}
-                </Text>
-              </Billboard>
+              <>
+                <Billboard follow={true} position={[0, 0.3, 0]}>
+                  <mesh renderOrder={1}>
+                    <meshBasicMaterial
+                      color="#000000"
+                      opacity={0.6}
+                      transparent
+                      depthWrite={false}
+                      depthTest={false}
+                    />
+                  </mesh>
+
+                  <Text
+                    position={[0, 0, 0.01]}
+                    color="white"
+                    fontSize={0.2}
+                    maxWidth={2}
+                    textAlign="center"
+                    anchorX="center"
+                    anchorY="middle"
+                    outlineWidth={0.02}
+                    outlineColor="#000000"
+                    renderOrder={2}
+                    material={
+                      new THREE.MeshBasicMaterial({
+                        color: 'white',
+                        depthWrite: false,
+                        depthTest: false,
+                        transparent: true,
+                      })
+                    }
+                  >
+                    {isSearchResult ? `${score}% - ` : ''}
+                    {point.title || point.content.substring(0, 100) + '...'}
+                  </Text>
+                </Billboard>
+              </>
             )}
           </group>
         );

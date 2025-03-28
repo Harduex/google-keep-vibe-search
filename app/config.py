@@ -19,6 +19,9 @@ KEYWORD_SEARCH_WEIGHT = float(
 )  # Weight for keyword search results (0-1)
 MAX_RESULTS = int(os.getenv("MAX_RESULTS", 20))  # Maximum number of results to return
 
+# Clustering settings
+DEFAULT_NUM_CLUSTERS = int(os.getenv("DEFAULT_NUM_CLUSTERS", 8))  # Default number of clusters
+
 # Server settings
 HOST = os.getenv("HOST", "127.0.0.1")
 PORT = int(os.getenv("PORT", 8000))
@@ -28,3 +31,4 @@ APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CACHE_DIR = os.path.join(APP_DIR, "cache")
 EMBEDDINGS_CACHE_FILE = os.path.join(CACHE_DIR, "embeddings.npz")
 NOTES_HASH_FILE = os.path.join(CACHE_DIR, "notes_hash.json")
+NOTES_CACHE_FILE = os.path.join(CACHE_DIR, "notes_cache.json")

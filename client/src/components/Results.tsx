@@ -1,11 +1,12 @@
-import { memo, useState, useEffect, useCallback } from 'react';
-
-import { Note, ViewMode } from '@/types/index';
-import { VIEW_MODES } from '@/const';
+import { memo, useState, useEffect, useCallback, useRef } from 'react';
 
 import { NoteCard } from '@/components/NoteCard';
 import { ViewToggle } from '@/components/ViewToggle';
 import { Visualization } from '@/components/Visualization';
+import { VIEW_MODES } from '@/const';
+import { Note, ViewMode } from '@/types/index';
+
+import { ScrollToTop } from './ScrollToTop';
 
 interface ResultsProps {
   query: string;
@@ -18,7 +19,7 @@ interface ResultsProps {
 export const Results = memo(
   ({ query, results, isLoading, hasSearched, onShowRelated }: ResultsProps) => {
     const [viewMode, setViewMode] = useState<ViewMode>(VIEW_MODES.LIST);
-    const [showScrollToTop, setShowScrollToTop] = useState<boolean>(false);
+    const prevQueryRef = useRef<string>(query);
 
     useEffect(() => {
       if (results.length === 0 || !hasSearched) {
@@ -26,32 +27,13 @@ export const Results = memo(
       }
     }, [results.length, hasSearched]);
 
+    // Update query reference when it changes
     useEffect(() => {
-      const handleScroll = () => {
-        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-        const shouldShow = scrollTop > 300;
-
-        if (shouldShow !== showScrollToTop) {
-          setShowScrollToTop(shouldShow);
-        }
-      };
-
-      window.addEventListener('scroll', handleScroll);
-      // Initial check
-      handleScroll();
-
-      return () => window.removeEventListener('scroll', handleScroll);
-    }, [showScrollToTop]);
+      prevQueryRef.current = query;
+    }, [query]);
 
     const handleViewChange = useCallback((newMode: ViewMode) => {
       setViewMode(newMode);
-    }, []);
-
-    const handleScrollToTop = useCallback(() => {
-      window.scrollTo({
-        top: 0,
-        behavior: 'smooth',
-      });
     }, []);
 
     const handleSelectNote = useCallback(
@@ -73,7 +55,7 @@ export const Results = memo(
           }, 100);
         }
       },
-      [results]
+      [results],
     );
 
     if (isLoading) {
@@ -84,54 +66,44 @@ export const Results = memo(
       );
     }
 
-    if (hasSearched && results.length === 0) {
-      return (
-        <div className="results-container">
-          <div id="no-results">No matching notes found.</div>
-        </div>
-      );
-    }
-
     return (
       <div className="results-container">
-        {results.length > 0 && (
-          <>
-            <div className="results-header">
+        <div className="results-header">
+          {hasSearched && results.length === 0 ? (
+            <div id="no-results">No matching notes found.</div>
+          ) : (
+            hasSearched && (
               <div id="results-count">
                 Found {results.length} matching note{results.length === 1 ? '' : 's'}
               </div>
+            )
+          )}
 
-              {results.length > 0 && (
-                <ViewToggle currentView={viewMode} onChange={handleViewChange} />
-              )}
+          {results.length > 0 && (
+            <div className="controls-container">
+              <ViewToggle currentView={viewMode} onChange={handleViewChange} />
             </div>
+          )}
+        </div>
 
-            {viewMode === VIEW_MODES.LIST ? (
-              <div id="results-list">
-                {results.map((note) => (
-                  <div id={`note-${note.id}`} key={note.id}>
-                    <NoteCard note={note} query={query} onShowRelated={onShowRelated} />
-                  </div>
-                ))}
+        {viewMode === VIEW_MODES.LIST && hasSearched && results.length > 0 && (
+          <div id="results-list">
+            {results.map((note) => (
+              <div id={`note-${note.id}`} key={note.id}>
+                <NoteCard note={note} query={query} onShowRelated={onShowRelated} />
               </div>
-            ) : (
-              <div id="results-visualization">
-                <Visualization searchResults={results} onSelectNote={handleSelectNote} />
-              </div>
-            )}
-          </>
-        )}
-
-        {showScrollToTop && (
-          <div className="scroll-to-top" role="button" aria-label="Scroll to top">
-            <button onClick={handleScrollToTop} title="Scroll to top">
-              <span className="material-icons">arrow_upward</span>
-            </button>
+            ))}
           </div>
         )}
+
+        {viewMode === VIEW_MODES.VISUALIZATION && hasSearched && results.length > 0 && (
+          <div id="results-visualization">
+            <Visualization searchResults={results} onSelectNote={handleSelectNote} />
+          </div>
+        )}
+
+        <ScrollToTop smooth={true} threshold={300} />
       </div>
     );
-  }
+  },
 );
-
-Results.displayName = 'Results';

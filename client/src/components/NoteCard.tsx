@@ -1,11 +1,10 @@
 import { memo, useCallback } from 'react';
 
-import { API_ROUTES } from '@/const';
-import { Note } from '@/types/index';
-import { calculateScorePercentage, highlightMatches } from '@/helpers';
-
-import { NoteContent } from '@/components/NoteContent';
 import ImageGallery from '@/components/ImageGallery';
+import { NoteContent } from '@/components/NoteContent';
+import { API_ROUTES } from '@/const';
+import { calculateScorePercentage, highlightMatches } from '@/helpers';
+import { Note } from '@/types/index';
 
 interface NoteCardProps {
   note: Note;
@@ -37,7 +36,9 @@ export const NoteCard = memo(({ note, query, onShowRelated }: NoteCardProps) => 
         {/* Badges */}
         {note.pinned && <span className="note-badge badge-pinned">Pinned</span>}
         {note.archived && <span className="note-badge badge-archived">Archived</span>}
-        <span className="note-badge badge-score">{scorePercentage}% match</span>
+        {scorePercentage ? (
+          <span className="note-badge badge-score">{scorePercentage}% match</span>
+        ) : null}
 
         {/* Title */}
         {note.title && (
@@ -93,5 +94,3 @@ const renderAnnotations = (note: Note) => {
     </div>
   );
 };
-
-NoteCard.displayName = 'NoteCard';

@@ -54,5 +54,3 @@ export const NoteContent = memo(({ content, query }: NoteContentProps) => {
     </>
   );
 });
-
-NoteContent.displayName = 'NoteContent';

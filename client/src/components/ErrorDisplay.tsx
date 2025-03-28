@@ -22,5 +22,3 @@ export const ErrorDisplay = memo(({ error, onDismiss }: ErrorDisplayProps) => {
     </div>
   );
 });
-
-ErrorDisplay.displayName = 'ErrorDisplay';

@@ -17,7 +17,7 @@ export const SearchBar = memo(({ onSearch, currentQuery = '' }: SearchBarProps) 
       e.preventDefault();
       onSearch(inputValue);
     },
-    [inputValue, onSearch]
+    [inputValue, onSearch],
   );
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -42,5 +42,3 @@ export const SearchBar = memo(({ onSearch, currentQuery = '' }: SearchBarProps) 
     </div>
   );
 });
-
-SearchBar.displayName = 'SearchBar';

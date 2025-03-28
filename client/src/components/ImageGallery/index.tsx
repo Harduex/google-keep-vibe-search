@@ -1,7 +1,8 @@
 import { memo, useCallback } from 'react';
+
 import { useGallery } from './GalleryContext';
-import { ImageThumbnail } from './ImageThumbnail';
 import { GalleryOverlay } from './GalleryOverlay';
+import { ImageThumbnail } from './ImageThumbnail';
 import './styles.css';
 
 interface ImageGalleryProps {
@@ -11,6 +12,25 @@ interface ImageGalleryProps {
   }>;
 }
 
+// Extracted list item component
+const GalleryItem = memo(
+  ({
+    image,
+    index,
+    onItemClick,
+  }: {
+    image: { src: string; alt?: string };
+    index: number;
+    onItemClick: (index: number) => void;
+  }) => {
+    const handleClick = useCallback(() => {
+      onItemClick(index);
+    }, [index, onItemClick]);
+
+    return <ImageThumbnail src={image.src} alt={image.alt} onClick={handleClick} />;
+  },
+);
+
 const ImageGallery = memo(({ images }: ImageGalleryProps) => {
   const { openGallery } = useGallery();
 
@@ -18,7 +38,7 @@ const ImageGallery = memo(({ images }: ImageGalleryProps) => {
     (index: number) => {
       openGallery(images, index);
     },
-    [images, openGallery]
+    [images, openGallery],
   );
 
   if (!images || images.length === 0) {
@@ -28,18 +48,16 @@ const ImageGallery = memo(({ images }: ImageGalleryProps) => {
   return (
     <div className="image-gallery">
       {images.map((image, index) => (
-        <ImageThumbnail
+        <GalleryItem
           key={`${image.src}-${index}`}
-          src={image.src}
-          alt={image.alt}
-          onClick={() => handleImageClick(index)}
+          image={image}
+          index={index}
+          onItemClick={handleImageClick}
         />
       ))}
     </div>
   );
 });
-
-ImageGallery.displayName = 'ImageGallery';
 
 export default ImageGallery;
 export { GalleryProvider, useGallery } from './GalleryContext';

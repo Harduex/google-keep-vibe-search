@@ -34,7 +34,7 @@ export const highlightMatches = (text: string, query: string): string => {
 export const formatStatsText = (
   totalNotes?: number,
   archivedNotes?: number,
-  pinnedNotes?: number
+  pinnedNotes?: number,
 ): string => {
   if (totalNotes === undefined) {
     return 'Loading notes...';

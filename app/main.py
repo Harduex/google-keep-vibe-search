@@ -1,17 +1,19 @@
 import os
-from typing import Any, Dict
+import json
+import time
+from typing import Any, Dict, Optional, List
 
 import numpy as np
 import uvicorn
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from sklearn.decomposition import PCA
 
-from app.config import EMBEDDINGS_CACHE_FILE, GOOGLE_KEEP_PATH, HOST, PORT
-from app.parser import parse_notes
+from app.config import EMBEDDINGS_CACHE_FILE, GOOGLE_KEEP_PATH, HOST, PORT, NOTES_CACHE_FILE, CACHE_DIR
+from app.parser import parse_notes, get_latest_modification_time
 from app.search import VibeSearch
 
 app = FastAPI(title="Google Keep Vibe Search")
@@ -22,12 +24,69 @@ notes = []
 search_engine = None
 
 
+def save_notes_to_cache(notes_data: List[Dict[str, Any]]) -> None:
+    """Save notes data to cache file."""
+    # Ensure cache directory exists
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    
+    cache_data = {
+        "timestamp": time.time(),
+        "notes": notes_data
+    }
+    
+    try:
+        with open(NOTES_CACHE_FILE, 'w', encoding='utf-8') as f:
+            json.dump(cache_data, f)
+        print(f"Notes cached to {NOTES_CACHE_FILE}")
+    except Exception as e:
+        print(f"Error caching notes: {e}")
+
+
+def load_notes_from_cache() -> List[Dict[str, Any]]:
+    """Load notes data from cache if available and valid."""
+    if not os.path.exists(NOTES_CACHE_FILE):
+        return None
+        
+    try:
+        with open(NOTES_CACHE_FILE, 'r', encoding='utf-8') as f:
+            cache_data = json.load(f)
+            
+        cache_timestamp = cache_data.get("timestamp", 0)
+        notes_data = cache_data.get("notes", [])
+        
+        # Check if source data is newer than cache
+        latest_mod_time = get_latest_modification_time(GOOGLE_KEEP_PATH)
+        
+        if latest_mod_time > cache_timestamp:
+            print("Source notes modified since last cache, will re-parse")
+            return None
+            
+        return notes_data
+    except Exception as e:
+        print(f"Error loading notes from cache: {e}")
+        return None
+
+
 @app.on_event("startup")
 async def startup_event():
     global notes, search_engine
-    notes = parse_notes()
+    
+    # Try to load notes from cache first
+    cached_notes = load_notes_from_cache()
+    
+    if cached_notes:
+        notes = cached_notes
+        print(f"Loaded {len(notes)} notes from cache")
+    else:
+        # Parse notes from source files
+        notes = parse_notes()
+        print(f"Parsed {len(notes)} notes from Google Keep export")
+        
+        # Cache the parsed notes for future use
+        save_notes_to_cache(notes)
+    
+    # Initialize the search engine
     search_engine = VibeSearch(notes)
-    print(f"Loaded {len(notes)} notes from Google Keep export")
 
 
 class SearchRequest(BaseModel):
@@ -52,6 +111,37 @@ def search_post(request: SearchRequest):
 
     results = search_engine.search(request.query)
     return {"results": results}
+
+
+@app.get("/api/all-notes")
+def get_all_notes():
+    """Return all notes."""
+    global notes
+    if not notes:
+        raise HTTPException(status_code=500, detail="Notes not loaded")
+    
+    # Add a default score of 0 to each note to match the search results format
+    all_notes = []
+    for note in notes:
+        note_with_score = note.copy()
+        note_with_score["score"] = 0.0
+        all_notes.append(note_with_score)
+        
+    return {"notes": all_notes}
+
+
+@app.get("/api/clusters")
+def get_clusters(num_clusters: Optional[int] = None):
+    """Return clustered notes."""
+    global search_engine
+    if not search_engine:
+        raise HTTPException(status_code=500, detail="Search engine not initialized")
+
+    try:
+        clusters = search_engine.get_clusters(num_clusters)
+        return {"clusters": clusters}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error clustering notes: {str(e)}")
 
 
 @app.get("/api/stats")

@@ -110,26 +110,28 @@ export const AllNotes = memo(({ onShowRelated }: AllNotesProps) => {
         </div>
 
         <div className="all-notes-controls">
-          <div className="all-notes-filters">
-            <select value={sortBy} onChange={handleSortChange} className="all-notes-select">
-              <option value="edited">Sort by Last Edited</option>
-              <option value="created">Sort by Created Date</option>
-            </select>
+          {viewMode === VIEW_MODES.LIST && (
+            <div className="all-notes-filters">
+              <select value={sortBy} onChange={handleSortChange} className="all-notes-select">
+                <option value="edited">Sort by Last Edited</option>
+                <option value="created">Sort by Created Date</option>
+              </select>
 
-            <label className="filter-checkbox">
-              <input type="checkbox" checked={filterPinned} onChange={handlePinnedFilterChange} />
-              Pinned Only
-            </label>
+              <label className="filter-checkbox">
+                <input type="checkbox" checked={filterPinned} onChange={handlePinnedFilterChange} />
+                Pinned Only
+              </label>
 
-            <label className="filter-checkbox">
-              <input
-                type="checkbox"
-                checked={filterArchived}
-                onChange={handleArchivedFilterChange}
-              />
-              Archived Only
-            </label>
-          </div>
+              <label className="filter-checkbox">
+                <input
+                  type="checkbox"
+                  checked={filterArchived}
+                  onChange={handleArchivedFilterChange}
+                />
+                Archived Only
+              </label>
+            </div>
+          )}
 
           <ViewToggle currentView={viewMode} onChange={handleViewChange} />
         </div>

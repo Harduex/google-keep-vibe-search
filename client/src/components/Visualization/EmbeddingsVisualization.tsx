@@ -7,6 +7,8 @@ import { calculateScorePercentage } from '@/helpers';
 import { EmbeddingPoint } from '@/hooks/useEmbeddings';
 import { Note } from '@/types';
 
+import { VisualizationControls } from './VisualizationControls';
+
 interface EmbeddingsVisualizationProps {
   embeddings: EmbeddingPoint[];
   searchResults: Note[];
@@ -15,6 +17,10 @@ interface EmbeddingsVisualizationProps {
   showAllPoints: boolean;
   matchThreshold: number;
   spreadFactor: number;
+  isAllNotesView?: boolean;
+  toggleShowAllPoints: () => void;
+  handleMatchThresholdChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleSpreadFactorChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
 export const EmbeddingsVisualization = ({
@@ -25,6 +31,10 @@ export const EmbeddingsVisualization = ({
   showAllPoints,
   matchThreshold,
   spreadFactor,
+  isAllNotesView = false,
+  toggleShowAllPoints,
+  handleMatchThresholdChange,
+  handleSpreadFactorChange,
 }: EmbeddingsVisualizationProps) => {
   const [hoveredPoint, setHoveredPoint] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
@@ -118,6 +128,16 @@ export const EmbeddingsVisualization = ({
         />
         <OrbitControls enableZoom enablePan enableRotate />
       </Canvas>
+
+      <VisualizationControls
+        isAllNotesView={isAllNotesView}
+        showAllPoints={showAllPoints}
+        toggleShowAllPoints={toggleShowAllPoints}
+        matchThreshold={matchThreshold}
+        handleMatchThresholdChange={handleMatchThresholdChange}
+        spreadFactor={spreadFactor}
+        handleSpreadFactorChange={handleSpreadFactorChange}
+      />
     </div>
   );
 };

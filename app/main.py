@@ -54,6 +54,23 @@ def search_post(request: SearchRequest):
     return {"results": results}
 
 
+@app.get("/api/all-notes")
+def get_all_notes():
+    """Return all notes."""
+    global notes
+    if not notes:
+        raise HTTPException(status_code=500, detail="Notes not loaded")
+    
+    # Add a default score of 0 to each note to match the search results format
+    all_notes = []
+    for note in notes:
+        note_with_score = note.copy()
+        note_with_score["score"] = 0.0
+        all_notes.append(note_with_score)
+        
+    return {"notes": all_notes}
+
+
 @app.get("/api/clusters")
 def get_clusters(num_clusters: Optional[int] = None):
     """Return clustered notes."""

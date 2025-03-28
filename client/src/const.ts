@@ -11,6 +11,7 @@ export const API_ROUTES = {
   IMAGE: '/api/image',
   EMBEDDINGS: '/api/embeddings',
   CLUSTERS: '/api/clusters',
+  ALL_NOTES: '/api/all-notes',
 };
 
 export const VIEW_MODES = {

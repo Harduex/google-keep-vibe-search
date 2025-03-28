@@ -6,8 +6,6 @@ import { VIEW_MODES } from '@/const';
 import { NoteCard } from '@/components/NoteCard';
 import { ViewToggle } from '@/components/ViewToggle';
 import { Visualization } from '@/components/Visualization';
-import { NotesClusters } from '@/components/NotesClusters';
-import { ClustersButton } from '@/components/ClustersButton';
 
 interface ResultsProps {
   query: string;
@@ -20,24 +18,19 @@ interface ResultsProps {
 export const Results = memo(
   ({ query, results, isLoading, hasSearched, onShowRelated }: ResultsProps) => {
     const [viewMode, setViewMode] = useState<ViewMode>(VIEW_MODES.LIST);
-    const [showClusters, setShowClusters] = useState<boolean>(false);
     const [showScrollToTop, setShowScrollToTop] = useState<boolean>(false);
     const prevQueryRef = useRef<string>(query);
 
     useEffect(() => {
       if (results.length === 0 || !hasSearched) {
         setViewMode(VIEW_MODES.LIST);
-        setShowClusters(false);
       }
     }, [results.length, hasSearched]);
 
-    // Toggle off clusters tab when query changes (a new search is performed)
+    // Update query reference when it changes
     useEffect(() => {
-      if (prevQueryRef.current !== query && hasSearched) {
-        setShowClusters(false);
-        prevQueryRef.current = query;
-      }
-    }, [query, hasSearched]);
+      prevQueryRef.current = query;
+    }, [query]);
 
     useEffect(() => {
       const handleScroll = () => {
@@ -58,7 +51,6 @@ export const Results = memo(
 
     const handleViewChange = useCallback((newMode: ViewMode) => {
       setViewMode(newMode);
-      setShowClusters(false);
     }, []);
 
     const handleScrollToTop = useCallback(() => {
@@ -90,14 +82,6 @@ export const Results = memo(
       [results]
     );
 
-    const handleToggleClusters = useCallback(() => {
-      setShowClusters(prev => !prev);
-      if (!showClusters) {
-        // Only reset view mode when turning clusters on
-        setViewMode(VIEW_MODES.LIST);
-      }
-    }, [showClusters]);
-
     if (isLoading) {
       return (
         <div className="results-container">
@@ -119,13 +103,14 @@ export const Results = memo(
             )
           )}
 
-          <div className="controls-container">
-            <ClustersButton onClick={handleToggleClusters} isActive={showClusters} />
-            {results.length > 0 && !showClusters && <ViewToggle currentView={viewMode} onChange={handleViewChange} />}
-          </div>
+          {results.length > 0 && (
+            <div className="controls-container">
+              <ViewToggle currentView={viewMode} onChange={handleViewChange} />
+            </div>
+          )}
         </div>
 
-        {!showClusters && viewMode === VIEW_MODES.LIST && hasSearched && results.length > 0 && (
+        {viewMode === VIEW_MODES.LIST && hasSearched && results.length > 0 && (
           <div id="results-list">
             {results.map((note) => (
               <div id={`note-${note.id}`} key={note.id}>
@@ -135,15 +120,9 @@ export const Results = memo(
           </div>
         )}
 
-        {!showClusters && viewMode === VIEW_MODES.VISUALIZATION && hasSearched && results.length > 0 && (
+        {viewMode === VIEW_MODES.VISUALIZATION && hasSearched && results.length > 0 && (
           <div id="results-visualization">
             <Visualization searchResults={results} onSelectNote={handleSelectNote} />
-          </div>
-        )}
-
-        {showClusters && (
-          <div id="results-clusters">
-            <NotesClusters query={query} onShowRelated={onShowRelated} />
           </div>
         )}
 

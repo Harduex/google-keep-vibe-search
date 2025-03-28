@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 
 import { API_ROUTES } from '@/const';
 import { NoteCluster } from '@/types';
@@ -11,7 +11,7 @@ interface UseClustersResult {
   fetchClusters: (numClusters?: number) => Promise<void>;
 }
 
-export const useClusters = (initialNumClusters?: number): UseClustersResult => {
+export const useClusters = (): UseClustersResult => {
   const [clusters, setClusters] = useState<NoteCluster[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { error, handleError, clearError } = useError();
@@ -44,13 +44,6 @@ export const useClusters = (initialNumClusters?: number): UseClustersResult => {
     },
     [clearError, handleError]
   );
-
-  // Fetch clusters on initial load if initialNumClusters is provided
-  useEffect(() => {
-    if (initialNumClusters) {
-      fetchClusters(initialNumClusters);
-    }
-  }, [initialNumClusters, fetchClusters]);
 
   return { clusters, isLoading, error, fetchClusters };
 };

@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { UI_ELEMENTS } from '@/const';
 import { useSearch } from '@/hooks/useSearch';
@@ -10,6 +10,9 @@ import { ErrorDisplay } from '@/components/ErrorDisplay';
 import { Results } from '@/components/Results';
 import { SearchBar } from '@/components/SearchBar';
 import { GalleryProvider, GalleryOverlay } from '@/components/ImageGallery';
+import { TabNavigation, TabId } from '@/components/TabNavigation';
+import { NotesClusters } from '@/components/NotesClusters';
+import { AllNotes } from '@/components/AllNotes';
 
 import './App.css';
 
@@ -17,10 +20,14 @@ const App = () => {
   const { theme, toggleTheme } = useTheme();
   const { stats, error: statsError, refetchStats } = useStats();
   const { query, results, isLoading, hasSearched, performSearch, error: searchError } = useSearch();
+  
+  // Add state for active tab
+  const [activeTab, setActiveTab] = useState<TabId>('search');
 
   const handleSearch = useCallback(
     (searchQuery: string) => {
       performSearch(searchQuery);
+      setActiveTab('search'); // Switch to search tab when performing a search
       scrollToElement('.search-container', UI_ELEMENTS.SEARCH_OFFSET);
     },
     [performSearch]
@@ -53,14 +60,32 @@ const App = () => {
           </button>
         </header>
 
-        <SearchBar onSearch={handleSearch} currentQuery={query} />
-        <Results
-          query={query}
-          results={results}
-          isLoading={isLoading}
-          hasSearched={hasSearched}
-          onShowRelated={handleSearch}
-        />
+        {/* Navigation tabs */}
+        <TabNavigation activeTab={activeTab} onChange={setActiveTab} />
+
+        {/* Show search bar only in search tab */}
+        {activeTab === 'search' && (
+          <SearchBar onSearch={handleSearch} currentQuery={query} />
+        )}
+
+        {/* Show content based on active tab */}
+        {activeTab === 'search' && (
+          <Results
+            query={query}
+            results={results}
+            isLoading={isLoading}
+            hasSearched={hasSearched}
+            onShowRelated={handleSearch}
+          />
+        )}
+
+        {activeTab === 'all-notes' && (
+          <AllNotes onShowRelated={handleSearch} />
+        )}
+
+        {activeTab === 'clusters' && (
+          <NotesClusters query={query} onShowRelated={handleSearch} />
+        )}
 
         <ErrorDisplay error={error} onDismiss={statsError ? refetchStats : () => {}} />
         <GalleryOverlay />

@@ -2,39 +2,81 @@ import { memo, useEffect, useState } from 'react';
 import { useClusters } from '@/hooks/useClusters';
 import { NoteCard } from './NoteCard';
 
-interface NotesClustersProps {
+interface NotesClusterProps {
   onShowRelated: (content: string) => void;
   query: string;
 }
 
-export const NotesClusters = memo(({ onShowRelated, query }: NotesClustersProps) => {
+export const NotesClusters = memo(({ onShowRelated, query }: NotesClusterProps) => {
   const [expandedCluster, setExpandedCluster] = useState<number | null>(null);
+  const [numClusters, setNumClusters] = useState(8);
+  const [pendingClusters, setPendingClusters] = useState(8); // Track the slider value separately
   const { clusters, isLoading, error, fetchClusters } = useClusters();
 
+  // Initial load - fetch default clusters
   useEffect(() => {
-    fetchClusters();
-  }, [fetchClusters]);
-
+    fetchClusters(numClusters);
+  }, []);
+  
   const toggleClusterExpansion = (clusterId: number) => {
     setExpandedCluster(expandedCluster === clusterId ? null : clusterId);
   };
 
+  const handleNumClustersChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPendingClusters(parseInt(e.target.value));
+  };
+
+  const handleGenerateClusters = () => {
+    setNumClusters(pendingClusters);
+    fetchClusters(pendingClusters);
+  };
+
   return (
     <div className="clusters-container">
-
-      {/* show number of clusters */}
       <div className="clusters-header">
-        <h2>Clusters</h2>
-        <span className="clusters-count">{clusters.length}</span>
+        <h2>Note Clusters</h2>
+        <div className="clusters-controls">
+          <div className="cluster-slider">
+            <label htmlFor="cluster-count">Number of clusters: {pendingClusters}</label>
+            <input
+              id="cluster-count"
+              type="range"
+              min="2"
+              max="20"
+              value={pendingClusters}
+              onChange={handleNumClustersChange}
+              className="slider"
+            />
+            <div className="clusters-help-text">
+              More clusters = smaller, more specific groups of notes
+            </div>
+          </div>
+          <button 
+            className="generate-clusters-button"
+            onClick={handleGenerateClusters}
+            disabled={isLoading || pendingClusters === numClusters}
+          >
+            {isLoading ? (
+              <>
+                <span className="material-icons spinning">refresh</span>
+                Generating...
+              </>
+            ) : (
+              <>
+                <span className="material-icons">auto_awesome</span>
+                Generate Clusters
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
-      {isLoading && (
-        <div className="clusters-loading">Generating clusters...</div>
-      )}
+      {isLoading && <div className="clusters-loading">
+        <span className="material-icons spinning">refresh</span>
+        Generating {pendingClusters} clusters...
+      </div>}
       
-      {error && (
-        <div className="clusters-error">Error: {error}</div>
-      )}
+      {error && <div className="clusters-error">Error: {error}</div>}
       
       {!isLoading && !error && clusters.length === 0 && (
         <div className="clusters-empty">No clusters available.</div>

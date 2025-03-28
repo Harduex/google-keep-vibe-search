@@ -91,15 +91,17 @@ async def startup_event():
 
 class SearchRequest(BaseModel):
     query: str
+    semanticWeight: Optional[float] = None
+    threshold: Optional[float] = 0.0
 
 
 @app.get("/api/search")
-def search(q: str = ""):
+def search(q: str = "", semanticWeight: Optional[float] = None, threshold: Optional[float] = 0.0):
     global search_engine
     if not search_engine:
         return {"error": "Search engine not initialized"}
 
-    results = search_engine.search(q)
+    results = search_engine.search(q, semanticWeight=semanticWeight, threshold=threshold)
     return {"results": results}
 
 
@@ -109,7 +111,11 @@ def search_post(request: SearchRequest):
     if not search_engine:
         return {"error": "Search engine not initialized"}
 
-    results = search_engine.search(request.query)
+    results = search_engine.search(
+        request.query, 
+        semanticWeight=request.semanticWeight,
+        threshold=request.threshold
+    )
     return {"results": results}
 
 

@@ -18,7 +18,18 @@ import './App.css';
 const App = () => {
   const { theme, toggleTheme } = useTheme();
   const { stats, error: statsError, refetchStats } = useStats();
-  const { query, results, isLoading, hasSearched, performSearch, error: searchError } = useSearch();
+  const {
+    query,
+    results,
+    isLoading,
+    hasSearched,
+    performSearch,
+    error: searchError,
+    semanticWeight,
+    setSemanticWeight,
+    threshold,
+    setThreshold,
+  } = useSearch();
 
   // Add state for active tab
   const [activeTab, setActiveTab] = useState<TabId>('search');
@@ -69,7 +80,16 @@ const App = () => {
         <TabNavigation activeTab={activeTab} onChange={setActiveTab} />
 
         {/* Show search bar only in search tab */}
-        {activeTab === 'search' && <SearchBar onSearch={handleSearch} currentQuery={query} />}
+        {activeTab === 'search' && (
+          <SearchBar
+            onSearch={handleSearch}
+            currentQuery={query}
+            semanticWeight={semanticWeight}
+            onSemanticWeightChange={setSemanticWeight}
+            threshold={threshold}
+            onThresholdChange={setThreshold}
+          />
+        )}
 
         {/* Show content based on active tab */}
         {activeTab === 'search' && (
@@ -81,9 +101,7 @@ const App = () => {
             onShowRelated={handleSearch}
           />
         )}
-
         {activeTab === 'all-notes' && <AllNotes onShowRelated={handleSearch} />}
-
         {activeTab === 'clusters' && <NotesClusters query={query} onShowRelated={handleSearch} />}
 
         <ErrorDisplay error={error} onDismiss={handleDismissError} />

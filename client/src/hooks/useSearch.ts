@@ -10,6 +10,10 @@ interface UseSearchResult {
   isLoading: boolean;
   hasSearched: boolean;
   error: string | null;
+  semanticWeight: number;
+  setSemanticWeight: (weight: number) => void;
+  threshold: number;
+  setThreshold: (threshold: number) => void;
   performSearch: (searchQuery: string) => Promise<void>;
 }
 
@@ -18,6 +22,8 @@ export const useSearch = (): UseSearchResult => {
   const [results, setResults] = useState<Note[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [semanticWeight, setSemanticWeight] = useState<number>(0.7); // Default to 0.7 (70% semantic, 30% keyword)
+  const [threshold, setThreshold] = useState<number>(0.1); // Default to 0.1 (10% threshold)
   const { error, handleError, clearError } = useError();
 
   const performSearch = useCallback(
@@ -36,7 +42,11 @@ export const useSearch = (): UseSearchResult => {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ query: searchQuery }),
+          body: JSON.stringify({
+            query: searchQuery,
+            semanticWeight: semanticWeight,
+            threshold: threshold,
+          }),
         });
 
         if (!response.ok) {
@@ -53,7 +63,7 @@ export const useSearch = (): UseSearchResult => {
         setIsLoading(false);
       }
     },
-    [clearError, handleError],
+    [clearError, handleError, semanticWeight, threshold],
   );
 
   return {
@@ -62,6 +72,10 @@ export const useSearch = (): UseSearchResult => {
     isLoading,
     hasSearched,
     error,
+    semanticWeight,
+    setSemanticWeight,
+    threshold,
+    setThreshold,
     performSearch,
   };
 };

@@ -26,18 +26,21 @@ class VibeSearch:
     def __init__(self, notes: List[Dict[str, Any]]):
         self.notes = notes
         self.model = SentenceTransformer("all-MiniLM-L6-v2")
-
+        
         # Create document embeddings for all notes
         self.texts = []
         self.note_indices = []
-
+        
+        # Initialize keyword match tracking
+        self.keyword_matches = {}
+        
         for i, note in enumerate(self.notes):
             # Combine title and content for embedding
             text = f"{note['title']} {note['content']}"
             if text.strip():  # Only add non-empty notes
                 self.texts.append(text)
                 self.note_indices.append(i)
-
+                
         # Try to load embeddings from cache or compute new ones
         self.load_or_compute_embeddings()
 
@@ -122,47 +125,81 @@ class VibeSearch:
             # Fall back to computing new embeddings
             self.embeddings = self.model.encode(self.texts)
 
-    def search(self, query: str, max_results: int = MAX_RESULTS) -> List[Dict[str, Any]]:
+    def search(self, query: str, max_results: int = MAX_RESULTS, semanticWeight: float = None, threshold: float = 0.0) -> List[Dict[str, Any]]:
         """
         Search notes using a combination of semantic and keyword search.
 
         Args:
             query: The search query
             max_results: Maximum number of results to return
+            semanticWeight: Optional weight for semantic search (0-1), 
+                            if provided will override the config values
+            threshold: Minimum score threshold (0-1) for results to be included
 
         Returns:
             Sorted list of matching notes
         """
         if not query.strip():
             return []
-
+        
+        # Reset keyword matches for this search
+        self.keyword_matches = {}
+            
+        # Use provided semanticWeight or default from config
+        semantic_weight = semanticWeight if semanticWeight is not None else SEMANTIC_SEARCH_WEIGHT
+        keyword_weight = 1.0 - semantic_weight  # Ensure weights sum to 1
+        
+        # Get keyword search scores (do this first to populate matches)
+        keyword_scores = self._keyword_search(query)
+        
+        # If semantic weight is 0 (100% keyword search), filter by exact keyword matches only
+        if semantic_weight == 0:
+            # Get indices of notes with keyword matches
+            matching_indices = [i for i, text_idx in enumerate(self.note_indices) 
+                                if query.strip().lower() in self.keyword_matches.get(i, [])]
+            
+            # Return only notes with exact keyword matches
+            results = []
+            
+            # Sort by keyword score
+            matches_with_scores = [(i, keyword_scores[i]) for i in matching_indices]
+            matches_with_scores.sort(key=lambda x: x[1], reverse=True)
+            
+            for i, score in matches_with_scores[:max_results]:
+                if score > threshold:  # Only include notes above the threshold
+                    note = self.notes[self.note_indices[i]].copy()
+                    note["score"] = float(score)
+                    results.append(note)
+            
+            return results
+        
+        # Otherwise, proceed with hybrid search
         # Get semantic search scores
         semantic_scores = self._semantic_search(query)
-
-        # Get keyword search scores
-        keyword_scores = self._keyword_search(query)
-
+        
         # Combine scores
         combined_scores = []
         for i in range(len(self.note_indices)):
             note_idx = self.note_indices[i]
             score = (
-                SEMANTIC_SEARCH_WEIGHT * semantic_scores[i]
-                + KEYWORD_SEARCH_WEIGHT * keyword_scores[i]
+                semantic_weight * semantic_scores[i]
+                + keyword_weight * keyword_scores[i]
             )
-            combined_scores.append((note_idx, score))
-
+            
+            # Only include scores above the threshold
+            if score > threshold:
+                combined_scores.append((note_idx, score))
+        
         # Sort by combined score (descending)
         combined_scores.sort(key=lambda x: x[1], reverse=True)
-
+        
         # Return top results
         results = []
         for note_idx, score in combined_scores[:max_results]:
-            if score > 0:  # Only include notes with positive scores
-                note = self.notes[note_idx].copy()
-                note["score"] = float(score)
-                results.append(note)
-
+            note = self.notes[note_idx].copy()
+            note["score"] = float(score)
+            results.append(note)
+                
         return results
 
     def _semantic_search(self, query: str) -> np.ndarray:
@@ -174,33 +211,51 @@ class VibeSearch:
         return similarities
 
     def _keyword_search(self, query: str) -> np.ndarray:
-        """Perform keyword-based search."""
+        """
+        Perform keyword-based search with strict word boundary matching.
+        
+        Only matches whole words, not partial words or substrings.
+        Uses word boundaries to ensure exact matching.
+        """
         scores = np.zeros(len(self.texts))
-
+        
         # Clean up query for regex search
-        query_terms = query.lower().split()
-
+        query_lower = query.lower().strip()
+        query_terms = [term.lower() for term in query_lower.split() if term.strip()]
+        
         for i, text in enumerate(self.texts):
             text_lower = text.lower()
             score = 0
-
-            # Check for exact phrases
-            if query.lower() in text_lower:
-                score += 1.0
-
-            # Check for individual terms
+            matched_terms = []
+            
+            # Check for individual terms with word boundaries
             for term in query_terms:
-                if term in text_lower:
+                if not term.strip():
+                    continue
+                    
+                # Use word boundary regex to match whole words only
+                pattern = r'\b' + re.escape(term) + r'\b'
+                matches = re.findall(pattern, text_lower)
+                if matches:
                     # Add score based on term frequency
-                    term_count = len(re.findall(r"\b" + re.escape(term) + r"\b", text_lower))
-                    score += 0.2 * term_count
-
+                    term_count = len(matches)
+                    score += 0.3 * term_count
+                    matched_terms.append(term)
+            
+            # Extra points for exact phrase match
+            if query_lower in text_lower:
+                score += 1.0
+                matched_terms.append(query_lower)
+            
+            # Store which terms matched for this document
+            self.keyword_matches[i] = matched_terms
+            
             scores[i] = score
-
+        
         # Normalize scores
         if np.max(scores) > 0:
             scores = scores / np.max(scores)
-
+        
         return scores
 
     def get_clusters(self, num_clusters: int = None) -> List[Dict[str, Any]]:

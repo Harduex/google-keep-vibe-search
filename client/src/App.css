@@ -25,7 +25,7 @@
 [data-theme='dark'] {
   /* Dark theme */
   --primary-color: #fbbc04;
-  --secondary-color: #f1f3f4;
+  --secondary-color: #202124;
   --text-color: #e8eaed;
   --light-bg: #2d2e30;
   --border-color: #5f6368;
@@ -76,7 +76,7 @@ header {
 
 h1 {
   font-size: 2.5rem;
-  color: var(--secondary-color);
+  color: var(--note-greentext-color);
   margin-bottom: 0.5rem;
 }
 
@@ -165,7 +165,7 @@ h1 {
   font-size: 1.2rem;
   font-weight: 500;
   margin-bottom: 0.5rem;
-  color: var(--secondary-color);
+  color: var(--text-color);
 }
 
 .note-content {
@@ -727,7 +727,7 @@ h1 {
 
 .cluster-keyword {
   background-color: var(--note-gray);
-  color: var(--secondary-color);
+  color: var(--text-color);
   font-size: 0.8rem;
   padding: 2px 8px;
   border-radius: 12px;

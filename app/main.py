@@ -1,20 +1,29 @@
 import os
 import json
 import time
+import requests
 from typing import Any, Dict, Optional, List
-
 import numpy as np
 import uvicorn
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from sklearn.decomposition import PCA
 
-from app.config import EMBEDDINGS_CACHE_FILE, GOOGLE_KEEP_PATH, HOST, PORT, NOTES_CACHE_FILE, CACHE_DIR
+from app.config import (
+    EMBEDDINGS_CACHE_FILE, 
+    GOOGLE_KEEP_PATH, 
+    HOST, 
+    PORT, 
+    NOTES_CACHE_FILE, 
+    CACHE_DIR,
+    LLM_MODEL
+)
 from app.parser import parse_notes, get_latest_modification_time
 from app.search import VibeSearch
+from app.chatbot import ChatBot
 
 app = FastAPI(title="Google Keep Vibe Search")
 
@@ -22,6 +31,7 @@ app = FastAPI(title="Google Keep Vibe Search")
 # Initialize search on startup
 notes = []
 search_engine = None
+chatbot = None
 
 
 def save_notes_to_cache(notes_data: List[Dict[str, Any]]) -> None:
@@ -69,7 +79,7 @@ def load_notes_from_cache() -> List[Dict[str, Any]]:
 
 @app.on_event("startup")
 async def startup_event():
-    global notes, search_engine
+    global notes, search_engine, chatbot
     
     # Try to load notes from cache first
     cached_notes = load_notes_from_cache()
@@ -87,6 +97,10 @@ async def startup_event():
     
     # Initialize the search engine
     search_engine = VibeSearch(notes)
+
+    # Initialize the chatbot
+    chatbot = ChatBot(search_engine)
+    print(f"Initialized chatbot with model: {LLM_MODEL}")
 
 
 class SearchRequest(BaseModel):
@@ -197,6 +211,113 @@ def get_embeddings():
         return {"embeddings": embeddings_data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating embeddings: {str(e)}")
+
+
+# Chat-related models and endpoints
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+
+class ChatRequest(BaseModel):
+    messages: List[ChatMessage]
+    stream: bool = False
+
+
+class ChatResponse(BaseModel):
+    response: str
+    notes: List[Dict[str, Any]]
+
+
+@app.post("/api/chat")
+async def chat(request: ChatRequest):
+    """Generate a chat response using Ollama."""
+    global chatbot
+    if not chatbot:
+        raise HTTPException(status_code=500, detail="Chatbot not initialized")
+
+    try:
+        # Convert the Pydantic models to dict for the chatbot
+        messages = [msg.dict() for msg in request.messages]
+        
+        if not request.stream:
+            # Non-streaming response - return normal JSON
+            response_text, relevant_notes = chatbot.generate_chat_completion(
+                messages, 
+                stream=False
+            )
+            
+            return ChatResponse(
+                response=response_text,
+                notes=relevant_notes
+            )
+        else:
+            # Streaming response - use StreamingResponse
+            return StreamingResponse(
+                stream_chat_response(chatbot, messages),
+                media_type="application/json"
+            )
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating chat response: {str(e)}")
+
+
+async def stream_chat_response(chatbot_instance, messages):
+    """Stream the chat response from the Ollama API."""
+    try:
+        # Extract the latest user query for finding relevant notes
+        latest_user_message = next((msg["content"] for msg in reversed(messages) 
+                                  if msg["role"] == "user"), "")
+        
+        # Find relevant notes for the latest user query
+        relevant_notes = []
+        if latest_user_message:
+            relevant_notes = chatbot_instance.get_relevant_notes(latest_user_message)
+        
+        # Set up Ollama API request with streaming
+        response = requests.post(
+            f"{chatbot_instance.api_url}/api/chat",
+            headers={"Content-Type": "application/json"},
+            json={
+                "model": chatbot_instance.model,
+                "messages": chatbot_instance.prepare_messages_with_context(messages, relevant_notes),
+                "stream": True
+            },
+            stream=True
+        )
+        
+        response.raise_for_status()
+        
+        # Stream the response chunks
+        accumulated_text = ""
+        for line in response.iter_lines():
+            if line:
+                try:
+                    data = json.loads(line)
+                    if "message" in data and "content" in data["message"]:
+                        chunk = data["message"]["content"]
+                        accumulated_text += chunk
+                        
+                        # Yield the accumulated text and relevant notes
+                        yield json.dumps({
+                            "response": accumulated_text,
+                            "notes": relevant_notes
+                        }).encode() + b"\n"
+                except json.JSONDecodeError:
+                    continue
+                    
+    except Exception as e:
+        # If there's an error, yield it as part of the stream
+        yield json.dumps({
+            "error": str(e),
+            "notes": []
+        }).encode() + b"\n"
+
+
+@app.get("/api/chat/model")
+def get_chat_model():
+    """Return the current LLM model being used."""
+    return {"model": LLM_MODEL}
 
 
 if __name__ == "__main__":

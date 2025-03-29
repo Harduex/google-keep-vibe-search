@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 
 import { AllNotes } from '@/components/AllNotes';
+import { Chat } from '@/components/Chat';
 import { ErrorDisplay } from '@/components/ErrorDisplay';
 import { GalleryProvider, GalleryOverlay } from '@/components/ImageGallery';
 import { NotesClusters } from '@/components/NotesClusters';
@@ -109,6 +110,8 @@ const App = () => {
         {activeTab === 'all-notes' && <AllNotes onShowRelated={handleSearch} />}
 
         {activeTab === 'clusters' && <NotesClusters query={query} onShowRelated={handleSearch} />}
+
+        {activeTab === 'chat' && <Chat query={query} onShowRelated={handleSearch} />}
 
         <ErrorDisplay error={error} onDismiss={handleDismissError} />
         <GalleryOverlay />

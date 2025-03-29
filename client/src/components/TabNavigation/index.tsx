@@ -1,7 +1,7 @@
 import { memo, useCallback } from 'react';
 import './styles.css';
 
-export type TabId = 'search' | 'clusters' | 'all-notes';
+export type TabId = 'search' | 'clusters' | 'all-notes' | 'chat';
 
 interface TabItem {
   id: TabId;
@@ -29,6 +29,11 @@ const TABS: TabItem[] = [
     id: 'clusters',
     label: 'Clusters',
     icon: 'bubble_chart',
+  },
+  {
+    id: 'chat',
+    label: 'Chat',
+    icon: 'chat',
   },
 ];
 

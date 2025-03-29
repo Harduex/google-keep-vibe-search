@@ -17,6 +17,7 @@
     "@react-three/fiber": "^9.1.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-markdown": "^10.1.0",
     "three": "^0.174.0"
   },
   "devDependencies": {

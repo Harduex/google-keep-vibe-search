@@ -12,9 +12,18 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from sklearn.decomposition import PCA
 
-from app.config import EMBEDDINGS_CACHE_FILE, GOOGLE_KEEP_PATH, HOST, PORT, NOTES_CACHE_FILE, CACHE_DIR
+from app.config import (
+    EMBEDDINGS_CACHE_FILE, 
+    GOOGLE_KEEP_PATH, 
+    HOST, 
+    PORT, 
+    NOTES_CACHE_FILE, 
+    CACHE_DIR,
+    LLM_MODEL
+)
 from app.parser import parse_notes, get_latest_modification_time
 from app.search import VibeSearch
+from app.chatbot import ChatBot
 
 app = FastAPI(title="Google Keep Vibe Search")
 
@@ -22,6 +31,7 @@ app = FastAPI(title="Google Keep Vibe Search")
 # Initialize search on startup
 notes = []
 search_engine = None
+chatbot = None
 
 
 def save_notes_to_cache(notes_data: List[Dict[str, Any]]) -> None:
@@ -69,7 +79,7 @@ def load_notes_from_cache() -> List[Dict[str, Any]]:
 
 @app.on_event("startup")
 async def startup_event():
-    global notes, search_engine
+    global notes, search_engine, chatbot
     
     # Try to load notes from cache first
     cached_notes = load_notes_from_cache()
@@ -87,6 +97,10 @@ async def startup_event():
     
     # Initialize the search engine
     search_engine = VibeSearch(notes)
+
+    # Initialize the chatbot
+    chatbot = ChatBot(search_engine)
+    print(f"Initialized chatbot with model: {LLM_MODEL}")
 
 
 class SearchRequest(BaseModel):
@@ -197,6 +211,53 @@ def get_embeddings():
         return {"embeddings": embeddings_data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating embeddings: {str(e)}")
+
+
+# Chat-related models and endpoints
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+
+class ChatRequest(BaseModel):
+    messages: List[ChatMessage]
+    stream: bool = False
+
+
+class ChatResponse(BaseModel):
+    response: str
+    notes: List[Dict[str, Any]]
+
+
+@app.post("/api/chat", response_model=ChatResponse)
+def chat(request: ChatRequest):
+    """Generate a chat response using Ollama."""
+    global chatbot
+    if not chatbot:
+        raise HTTPException(status_code=500, detail="Chatbot not initialized")
+
+    try:
+        # Convert the Pydantic models to dict for the chatbot
+        messages = [msg.dict() for msg in request.messages]
+        
+        # Generate response using the chatbot
+        response_text, relevant_notes = chatbot.generate_chat_completion(
+            messages, 
+            stream=request.stream
+        )
+        
+        return {
+            "response": response_text,
+            "notes": relevant_notes
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating chat response: {str(e)}")
+
+
+@app.get("/api/chat/model")
+def get_chat_model():
+    """Return the current LLM model being used."""
+    return {"model": LLM_MODEL}
 
 
 if __name__ == "__main__":

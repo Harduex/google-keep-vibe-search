@@ -12,6 +12,8 @@ export const API_ROUTES = {
   EMBEDDINGS: '/api/embeddings',
   CLUSTERS: '/api/clusters',
   ALL_NOTES: '/api/all-notes',
+  CHAT: '/api/chat',
+  CHAT_MODEL: '/api/chat/model',
 };
 
 export const VIEW_MODES = {

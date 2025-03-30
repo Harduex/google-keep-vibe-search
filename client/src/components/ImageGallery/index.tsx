@@ -9,6 +9,7 @@ interface ImageGalleryProps {
   images: Array<{
     src: string;
     alt?: string;
+    isMatching?: boolean;
   }>;
 }
 
@@ -19,7 +20,7 @@ const GalleryItem = memo(
     index,
     onItemClick,
   }: {
-    image: { src: string; alt?: string };
+    image: { src: string; alt?: string; isMatching?: boolean };
     index: number;
     onItemClick: (index: number) => void;
   }) => {
@@ -27,7 +28,14 @@ const GalleryItem = memo(
       onItemClick(index);
     }, [index, onItemClick]);
 
-    return <ImageThumbnail src={image.src} alt={image.alt} onClick={handleClick} />;
+    return (
+      <ImageThumbnail
+        src={image.src}
+        alt={image.alt}
+        onClick={handleClick}
+        isMatching={image.isMatching}
+      />
+    );
   },
 );
 

@@ -14,6 +14,7 @@ from sklearn.decomposition import PCA
 
 from app.config import (
     EMBEDDINGS_CACHE_FILE, 
+    ENABLE_IMAGE_SEARCH,
     GOOGLE_KEEP_PATH, 
     HOST, 
     PORT, 
@@ -97,7 +98,13 @@ async def startup_event():
     
     # Initialize the search engine
     search_engine = VibeSearch(notes)
-
+    
+    # Display image search status
+    if ENABLE_IMAGE_SEARCH:
+        print("Image search capability is enabled")
+    else:
+        print("Image search capability is disabled (set ENABLE_IMAGE_SEARCH=true in .env to enable)")
+    
     # Initialize the chatbot
     chatbot = ChatBot(search_engine)
     print(f"Initialized chatbot with model: {LLM_MODEL}")
@@ -160,12 +167,20 @@ def get_clusters(num_clusters: Optional[int] = None):
 
 @app.get("/api/stats")
 def stats():
-    global notes
+    global notes, search_engine
+    
+    image_search_status = {
+        "enabled": ENABLE_IMAGE_SEARCH,
+        "initialized": search_engine and hasattr(search_engine, "image_processor") and search_engine.image_processor is not None,
+        "images_count": len(search_engine.image_note_map) if search_engine and hasattr(search_engine, "image_note_map") else 0
+    }
+    
     return {
         "total_notes": len(notes),
         "archived_notes": sum(1 for note in notes if note.get("archived", False)),
         "pinned_notes": sum(1 for note in notes if note.get("pinned", False)),
         "using_cached_embeddings": os.path.exists(EMBEDDINGS_CACHE_FILE),
+        "image_search": image_search_status
     }
 
 

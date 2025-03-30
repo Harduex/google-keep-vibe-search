@@ -30,7 +30,12 @@ export const NoteCard = memo(
         .map((attachment) => ({
           src: `${API_ROUTES.IMAGE}/${encodeURIComponent(attachment.filePath)}`,
           alt: 'Note attachment',
+          isMatching: note.matched_image === attachment.filePath,
         })) || [];
+
+    // Check if any images match the search query
+    const hasMatchingImages = note.has_matching_images === true;
+    const matchedImage = note.matched_image;
 
     return (
       <div className={`note-card ${note.color !== 'DEFAULT' ? `color-${note.color}` : ''}`}>
@@ -41,6 +46,11 @@ export const NoteCard = memo(
           {scorePercentage ? (
             <span className="note-badge badge-score">{scorePercentage}% match</span>
           ) : null}
+          {hasMatchingImages && (
+            <span className="note-badge badge-image-match">
+              <span className="material-icons">image_search</span> Image match
+            </span>
+          )}
 
           {/* Title */}
           {note.title && (
@@ -51,8 +61,18 @@ export const NoteCard = memo(
         {/* Content */}
         <NoteContent content={note.content} query={query} refinementKeywords={refinementKeywords} />
 
-        {/* Image Gallery */}
-        {galleryImages.length > 0 && <ImageGallery images={galleryImages} />}
+        {/* Image Gallery - with possible match highlight */}
+        {galleryImages.length > 0 && (
+          <div className="note-images-container">
+            <ImageGallery images={galleryImages} />
+            {hasMatchingImages && matchedImage && (
+              <div className="image-match-indicator">
+                <span className="material-icons">image_search</span>
+                Image content matches your search query
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Annotations */}
         {renderAnnotations(note)}

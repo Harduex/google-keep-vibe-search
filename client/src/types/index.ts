@@ -11,6 +11,7 @@ interface Attachment {
   filePath: string;
   mimetype: string;
 }
+
 export interface Note {
   id: string;
   title: string;
@@ -23,6 +24,8 @@ export interface Note {
   score: number;
   annotations?: Annotation[];
   attachments?: Attachment[];
+  has_matching_images?: boolean;
+  matched_image?: string;
 }
 
 export type ViewMode = 'list' | '3d';

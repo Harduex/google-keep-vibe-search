@@ -21,6 +21,7 @@ export const useChat = () => {
   const [error, setError] = useState<string | null>(null);
   const [relevantNotes, setRelevantNotes] = useState<Note[]>([]);
   const [modelName, setModelName] = useState<string | null>(null);
+  const [useNotesContext, setUseNotesContext] = useState<boolean>(true);
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -80,6 +81,7 @@ export const useChat = () => {
       const payload = {
         messages: [...messages, userMessage].map(({ role, content }) => ({ role, content })),
         stream: true,
+        useNotesContext, // Include the context preference in the payload
       };
 
       // Stop any existing stream
@@ -164,7 +166,7 @@ export const useChat = () => {
         setIsLoading(false);
       }
     },
-    [messages, stopGenerating],
+    [messages, stopGenerating, useNotesContext],
   );
 
   const clearChat = useCallback(() => {
@@ -174,14 +176,20 @@ export const useChat = () => {
     setError(null);
   }, [stopGenerating]);
 
+  const toggleNotesContext = useCallback(() => {
+    setUseNotesContext((prev) => !prev);
+  }, []);
+
   return {
     messages,
     isLoading,
     error,
     relevantNotes,
     modelName,
+    useNotesContext,
     sendMessage,
     clearChat,
     stopGenerating,
+    toggleNotesContext,
   };
 };

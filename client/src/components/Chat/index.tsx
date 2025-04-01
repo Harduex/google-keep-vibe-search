@@ -14,8 +14,17 @@ interface ChatProps {
 export const Chat = ({ query, onShowRelated }: ChatProps) => {
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { messages, isLoading, sendMessage, clearChat, stopGenerating, relevantNotes, modelName } =
-    useChat();
+  const {
+    messages,
+    isLoading,
+    sendMessage,
+    clearChat,
+    stopGenerating,
+    relevantNotes,
+    modelName,
+    useNotesContext,
+    toggleNotesContext,
+  } = useChat();
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -74,6 +83,24 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
               Stop Answering
             </button>
           )}
+          <div className="notes-toggle">
+            <label
+              className="toggle-label"
+              title={useNotesContext ? 'Notes context is enabled' : 'Notes context is disabled'}
+            >
+              <input
+                type="checkbox"
+                checked={useNotesContext}
+                onChange={toggleNotesContext}
+                disabled={isLoading}
+              />
+              <span className="toggle-slider"></span>
+              <span className="toggle-text">
+                <span className="material-icons">description</span>
+                Use Notes Context
+              </span>
+            </label>
+          </div>
           <button
             className="clear-button"
             onClick={clearChat}

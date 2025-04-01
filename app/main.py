@@ -237,6 +237,7 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     messages: List[ChatMessage]
     stream: bool = False
+    useNotesContext: bool = True
 
 
 class ChatResponse(BaseModel):
@@ -259,17 +260,18 @@ async def chat(request: ChatRequest):
             # Non-streaming response - return normal JSON
             response_text, relevant_notes = chatbot.generate_chat_completion(
                 messages, 
-                stream=False
+                stream=False,
+                use_notes_context=request.useNotesContext
             )
             
             return ChatResponse(
                 response=response_text,
-                notes=relevant_notes
+                notes=relevant_notes if request.useNotesContext else []
             )
         else:
             # Streaming response - use StreamingResponse
             return StreamingResponse(
-                stream_chat_response(chatbot, messages),
+                stream_chat_response(chatbot, messages, use_notes_context=request.useNotesContext),
                 media_type="application/json"
             )
             
@@ -277,16 +279,16 @@ async def chat(request: ChatRequest):
         raise HTTPException(status_code=500, detail=f"Error generating chat response: {str(e)}")
 
 
-async def stream_chat_response(chatbot_instance, messages):
+async def stream_chat_response(chatbot_instance, messages, use_notes_context=True):
     """Stream the chat response from the Ollama API."""
     try:
         # Extract the latest user query for finding relevant notes
         latest_user_message = next((msg["content"] for msg in reversed(messages) 
                                   if msg["role"] == "user"), "")
         
-        # Find relevant notes for the latest user query
+        # Find relevant notes for the latest user query if useNotesContext is True
         relevant_notes = []
-        if latest_user_message:
+        if latest_user_message and use_notes_context:
             relevant_notes = chatbot_instance.get_relevant_notes(latest_user_message)
         
         # Set up Ollama API request with streaming
@@ -295,7 +297,10 @@ async def stream_chat_response(chatbot_instance, messages):
             headers={"Content-Type": "application/json"},
             json={
                 "model": chatbot_instance.model,
-                "messages": chatbot_instance.prepare_messages_with_context(messages, relevant_notes),
+                "messages": chatbot_instance.prepare_messages_with_context(
+                    messages, 
+                    relevant_notes if use_notes_context else []
+                ),
                 "stream": True
             },
             stream=True
@@ -316,7 +321,7 @@ async def stream_chat_response(chatbot_instance, messages):
                         # Yield the accumulated text and relevant notes
                         yield json.dumps({
                             "response": accumulated_text,
-                            "notes": relevant_notes
+                            "notes": relevant_notes if use_notes_context else []
                         }).encode() + b"\n"
                 except json.JSONDecodeError:
                     continue

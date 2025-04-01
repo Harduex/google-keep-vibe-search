@@ -59,13 +59,29 @@ class ChatBot:
                 prepared_messages[0] = system_message
             else:
                 prepared_messages.insert(0, system_message)
+        else:
+            # Add a generic system message if no notes context is provided
+            system_message = {
+                "role": "system",
+                "content": (
+                    "You are a helpful assistant that answers questions based on your general knowledge. "
+                    "You don't have access to specific notes or personal information unless provided in the conversation."
+                )
+            }
+            
+            # Insert or replace system message at the beginning of the conversation
+            if prepared_messages and prepared_messages[0]["role"] == "system":
+                prepared_messages[0] = system_message
+            else:
+                prepared_messages.insert(0, system_message)
                 
         return prepared_messages
 
     def generate_chat_completion(
         self, 
         messages: List[Dict[str, str]], 
-        stream: bool = False
+        stream: bool = False,
+        use_notes_context: bool = True
     ) -> Tuple[str, List[Dict[str, Any]]]:
         """Generate a chat completion using Ollama API."""
         relevant_notes = []
@@ -74,12 +90,12 @@ class ChatBot:
         latest_user_message = next((msg["content"] for msg in reversed(messages) 
                                   if msg["role"] == "user"), "")
         
-        if latest_user_message:
-            # Find relevant notes for the latest user query
+        if latest_user_message and use_notes_context:
+            # Find relevant notes for the latest user query if notes context is enabled
             relevant_notes = self.get_relevant_notes(latest_user_message)
             
         # Prepare messages with context
-        prepared_messages = self.prepare_messages_with_context(messages, relevant_notes)
+        prepared_messages = self.prepare_messages_with_context(messages, relevant_notes if use_notes_context else [])
         
         # Prepare the API request payload
         payload = {

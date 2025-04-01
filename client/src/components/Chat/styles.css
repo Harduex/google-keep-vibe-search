@@ -153,61 +153,145 @@
   color: var(--primary-color);
 }
 
+/* Chat input with topic toggle */
 .chat-input {
   display: flex;
-  gap: 8px;
-  width: 100%;
-}
-
-.chat-input input {
-  flex: 1;
-  padding: 14px 18px;
+  flex-direction: column;
+  padding: 14px 16px;
   border: 1px solid var(--border-color);
-  border-radius: 24px;
-  background-color: var(--input-bg);
-  color: var(--text-color);
-  font-size: 1rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  border-radius: 12px;
+  background-color: var(--card-bg);
+  position: relative;
+  z-index: 2;
+  margin-top: auto;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
   transition: all 0.2s ease;
 }
 
-.chat-input input:focus {
+.chat-input:focus-within {
+  border-color: var(--primary-color);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+}
+
+.chat-input-controls {
+  display: flex;
+  margin-bottom: 8px;
+}
+
+.topic-toggle-button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background-color: transparent;
+  color: var(--text-color);
+  opacity: 0.7;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.topic-toggle-button:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+  opacity: 1;
+}
+
+.topic-toggle-button .material-icons {
+  font-size: 16px;
+  color: var(--primary-color);
+}
+
+.input-wrapper {
+  display: flex;
+  width: 100%;
+}
+
+.input-wrapper input {
+  flex: 1;
+  padding: 12px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background-color: var(--input-bg);
+  color: var(--text-color);
+  font-size: 1rem;
+  margin-right: 8px;
+  transition: all 0.2s ease;
+}
+
+.input-wrapper input:focus {
   border-color: var(--primary-color);
   box-shadow: 0 0 0 2px rgba(var(--primary-color-rgb), 0.2);
   outline: none;
 }
 
-/* Chat input button size standardization */
-.chat-input button {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  border: none;
+.input-wrapper button {
+  width: 45px;
+  height: 45px;
+  border-radius: 8px;
   background-color: var(--primary-color);
   color: white;
-  cursor: pointer;
+  border: none;
   display: flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 5px rgba(var(--primary-color-rgb), 0.3);
 }
 
-.chat-input button:hover:not(:disabled) {
+.input-wrapper button:hover:not(:disabled) {
   background-color: var(--primary-dark);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(var(--primary-color-rgb), 0.4);
+  transform: translateY(-2px);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
 }
 
-.chat-input button:active:not(:disabled) {
-  transform: translateY(0);
-  box-shadow: 0 2px 3px rgba(var(--primary-color-rgb), 0.3);
-}
-
-.chat-input button:disabled {
-  background-color: var(--border-color);
-  box-shadow: none;
+.input-wrapper button:disabled {
+  opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* Topic input container styles */
+.topic-input-container {
+  margin-bottom: 8px;
+  animation: fade-in 0.3s ease-out;
+  width: 100%;
+  background-color: rgba(var(--bg-color-rgb), 0.5);
+  border-radius: 8px;
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+}
+
+.topic-input-container:focus-within {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(var(--primary-color-rgb), 0.1);
+}
+
+.topic-input-container input {
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: var(--input-bg);
+  color: var(--text-color);
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.topic-input-container input:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(var(--primary-color-rgb), 0.2);
+  outline: none;
+}
+
+.topic-help-text {
+  font-size: 0.75rem;
+  color: var(--text-color);
+  opacity: 0.6;
+  margin-top: 4px;
+  font-style: italic;
 }
 
 .chat-message {
@@ -683,6 +767,23 @@
 
   .toggle-label {
     padding: 0 8px;
+  }
+
+  .topic-input-container {
+    padding: 0;
+  }
+
+  .topic-input-container label {
+    font-size: 0.8rem;
+  }
+
+  .topic-input-container input {
+    padding: 8px 12px;
+    font-size: 0.85rem;
+  }
+
+  .topic-help-text {
+    font-size: 0.7rem;
   }
 }
 

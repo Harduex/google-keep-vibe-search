@@ -238,6 +238,7 @@ class ChatRequest(BaseModel):
     messages: List[ChatMessage]
     stream: bool = False
     useNotesContext: bool = True
+    topic: Optional[str] = None  # Optional topic field for context search
 
 
 class ChatResponse(BaseModel):
@@ -261,7 +262,8 @@ async def chat(request: ChatRequest):
             response_text, relevant_notes = chatbot.generate_chat_completion(
                 messages, 
                 stream=False,
-                use_notes_context=request.useNotesContext
+                use_notes_context=request.useNotesContext,
+                topic=request.topic
             )
             
             return ChatResponse(
@@ -271,7 +273,12 @@ async def chat(request: ChatRequest):
         else:
             # Streaming response - use StreamingResponse
             return StreamingResponse(
-                stream_chat_response(chatbot, messages, use_notes_context=request.useNotesContext),
+                stream_chat_response(
+                    chatbot, 
+                    messages, 
+                    use_notes_context=request.useNotesContext,
+                    topic=request.topic
+                ),
                 media_type="application/json"
             )
             
@@ -279,7 +286,7 @@ async def chat(request: ChatRequest):
         raise HTTPException(status_code=500, detail=f"Error generating chat response: {str(e)}")
 
 
-async def stream_chat_response(chatbot_instance, messages, use_notes_context=True):
+async def stream_chat_response(chatbot_instance, messages, use_notes_context=True, topic=None):
     """Stream the chat response from the Ollama API."""
     try:
         # Extract the latest user query for finding relevant notes
@@ -288,8 +295,11 @@ async def stream_chat_response(chatbot_instance, messages, use_notes_context=Tru
         
         # Find relevant notes for the latest user query if useNotesContext is True
         relevant_notes = []
-        if latest_user_message and use_notes_context:
-            relevant_notes = chatbot_instance.get_relevant_notes(latest_user_message)
+        if use_notes_context:
+            # Use topic for search if provided, otherwise use latest message
+            search_query = topic if topic else latest_user_message
+            if search_query:
+                relevant_notes = chatbot_instance.get_relevant_notes(search_query)
         
         # Set up Ollama API request with streaming
         response = requests.post(

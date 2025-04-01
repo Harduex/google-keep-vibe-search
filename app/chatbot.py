@@ -81,18 +81,23 @@ class ChatBot:
         self, 
         messages: List[Dict[str, str]], 
         stream: bool = False,
-        use_notes_context: bool = True
+        use_notes_context: bool = True,
+        topic: Optional[str] = None
     ) -> Tuple[str, List[Dict[str, Any]]]:
         """Generate a chat completion using Ollama API."""
         relevant_notes = []
         
-        # Extract the latest user query
-        latest_user_message = next((msg["content"] for msg in reversed(messages) 
-                                  if msg["role"] == "user"), "")
-        
-        if latest_user_message and use_notes_context:
-            # Find relevant notes for the latest user query if notes context is enabled
-            relevant_notes = self.get_relevant_notes(latest_user_message)
+        if use_notes_context:
+            # Extract the latest user query
+            latest_user_message = next((msg["content"] for msg in reversed(messages) 
+                                      if msg["role"] == "user"), "")
+            
+            # Use topic for search if provided, otherwise use latest message
+            search_query = topic if topic else latest_user_message
+            
+            if search_query:
+                # Find relevant notes for the search query if notes context is enabled
+                relevant_notes = self.get_relevant_notes(search_query)
             
         # Prepare messages with context
         prepared_messages = self.prepare_messages_with_context(messages, relevant_notes if use_notes_context else [])

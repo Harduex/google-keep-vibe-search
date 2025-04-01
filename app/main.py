@@ -142,10 +142,18 @@ def get_all_notes():
         raise HTTPException(status_code=500, detail="Notes not loaded")
     
     # Add a default score of 0 to each note to match the search results format
+    # and remove any image matching flags from previous searches
     all_notes = []
     for note in notes:
         note_with_score = note.copy()
         note_with_score["score"] = 0.0
+        
+        # Clear any image matching flags that might be present from previous searches
+        if "has_matching_images" in note_with_score:
+            del note_with_score["has_matching_images"]
+        if "matched_image" in note_with_score:
+            del note_with_score["matched_image"]
+            
         all_notes.append(note_with_score)
         
     return {"notes": all_notes}

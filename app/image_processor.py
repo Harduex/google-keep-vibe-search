@@ -39,6 +39,9 @@ class ImageProcessor:
         # Dictionary to store image embeddings
         self.image_embeddings: Dict[str, np.ndarray] = {}
         self.processed_image_paths: Set[str] = set()
+        
+        # CLIP has a maximum context length of 77 tokens, but we'll use a conservative limit
+        self.max_query_length = 75
 
     def process_note_images(self, notes: List[Dict[str, Any]]) -> Dict[str, np.ndarray]:
         """
@@ -86,6 +89,11 @@ class ImageProcessor:
         """
         if not self.image_embeddings:
             return []
+            
+        # Limit query text length for CLIP tokenizer
+        if len(query_text) > self.max_query_length:
+            print(f"Query text truncated from {len(query_text)} to {self.max_query_length} characters")
+            query_text = query_text[:self.max_query_length]
             
         # Encode the text query
         with torch.no_grad():

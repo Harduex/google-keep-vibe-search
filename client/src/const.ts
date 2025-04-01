@@ -8,6 +8,7 @@ export const UI_ELEMENTS = {
 export const API_ROUTES = {
   STATS: '/api/stats',
   SEARCH: '/api/search',
+  SEARCH_BY_IMAGE: '/api/search/image',
   IMAGE: '/api/image',
   EMBEDDINGS: '/api/embeddings',
   CLUSTERS: '/api/clusters',

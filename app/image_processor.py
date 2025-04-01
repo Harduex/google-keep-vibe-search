@@ -113,6 +113,76 @@ class ImageProcessor:
         results.sort(key=lambda x: x[1], reverse=True)
         return results
 
+    def search_with_image(self, image_file, threshold: float = 0.2) -> List[Tuple[str, float]]:
+        """
+        Search for images similar to the uploaded query image.
+        
+        Args:
+            image_file: File-like object or path to the image to search with
+            threshold: Similarity threshold (0-1)
+            
+        Returns:
+            List of tuples containing (image_path, similarity_score)
+        """
+        if not self.image_embeddings:
+            return []
+        
+        try:
+            # Load and preprocess the query image
+            if isinstance(image_file, str):
+                # If a path was provided
+                query_image = self.preprocess(Image.open(image_file).convert("RGB")).unsqueeze(0).to(self.device)
+            else:
+                # If a file-like object was provided
+                query_image = self.preprocess(Image.open(image_file).convert("RGB")).unsqueeze(0).to(self.device)
+            
+            # Generate embedding for the query image
+            with torch.no_grad():
+                image_features = self.model.encode_image(query_image)
+                image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+                query_embedding = image_features.cpu().numpy()[0]
+            
+            # Compare against all image embeddings
+            results = []
+            for image_path, embedding in self.image_embeddings.items():
+                # Calculate cosine similarity
+                similarity = np.dot(query_embedding, embedding)
+                if similarity > threshold:
+                    results.append((image_path, float(similarity)))
+            
+            # Sort by similarity score (descending)
+            results.sort(key=lambda x: x[1], reverse=True)
+            return results
+            
+        except Exception as e:
+            print(f"Error processing query image: {str(e)}")
+            return []
+
+    def encode_uploaded_image(self, image_file) -> Optional[np.ndarray]:
+        """
+        Generate an embedding for an uploaded image.
+        
+        Args:
+            image_file: File-like object containing the image
+            
+        Returns:
+            Numpy array containing the image embedding, or None if processing failed
+        """
+        try:
+            # Load and preprocess the image
+            query_image = self.preprocess(Image.open(image_file).convert("RGB")).unsqueeze(0).to(self.device)
+            
+            # Generate embedding
+            with torch.no_grad():
+                image_features = self.model.encode_image(query_image)
+                image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+                embedding = image_features.cpu().numpy()[0]
+                
+            return embedding
+        except Exception as e:
+            print(f"Error encoding uploaded image: {str(e)}")
+            return None
+
     def _get_all_image_paths(self, notes: List[Dict[str, Any]]) -> List[str]:
         """Extract all image paths from notes."""
         image_paths = []

@@ -4,9 +4,11 @@ import { AllNotes } from '@/components/AllNotes';
 import { Chat } from '@/components/Chat';
 import { ErrorDisplay } from '@/components/ErrorDisplay';
 import { GalleryProvider, GalleryOverlay } from '@/components/ImageGallery';
+import { ImageSearchUpload } from '@/components/ImageSearchUpload';
 import { NotesClusters } from '@/components/NotesClusters';
 import { Results } from '@/components/Results';
 import { SearchBar } from '@/components/SearchBar';
+import { SearchModeToggle, type SearchMode } from '@/components/SearchModeToggle';
 import { TabNavigation, TabId } from '@/components/TabNavigation';
 import { UI_ELEMENTS } from '@/const';
 import { formatStatsText, scrollToElement } from '@/helpers';
@@ -15,6 +17,7 @@ import { useStats } from '@/hooks/useStats';
 import { useTheme } from '@/hooks/useTheme';
 
 import './App.css';
+import { Note } from './types';
 
 const App = () => {
   const { theme, toggleTheme } = useTheme();
@@ -30,11 +33,15 @@ const App = () => {
     performSearch,
     refineResults,
     resetRefinement,
+    setResults,
+    setLoading,
     error: searchError,
   } = useSearch();
 
   // Add state for active tab
   const [activeTab, setActiveTab] = useState<TabId>('search');
+  // Add state for search mode
+  const [searchMode, setSearchMode] = useState<SearchMode>('text');
 
   const handleSearch = useCallback(
     (searchQuery: string) => {
@@ -44,6 +51,26 @@ const App = () => {
     },
     [performSearch],
   );
+
+  const handleImageSearchResults = useCallback(
+    (searchResults: Note[]) => {
+      setResults(searchResults);
+      setLoading(false);
+      // Reset any refinement that might have been applied
+      if (isRefined) {
+        resetRefinement();
+      }
+    },
+    [setResults, setLoading, isRefined, resetRefinement],
+  );
+
+  const handleImageSearchStart = useCallback(() => {
+    setLoading(true);
+  }, [setLoading]);
+
+  const handleSearchModeChange = useCallback((mode: SearchMode) => {
+    setSearchMode(mode);
+  }, []);
 
   const handleRefinement = useCallback(
     (keywords: string) => {
@@ -67,6 +94,10 @@ const App = () => {
 
   const error = statsError || searchError;
 
+  const showImageSearchEnabled = useMemo(() => {
+    return stats?.image_search?.enabled || false;
+  }, [stats]);
+
   return (
     <GalleryProvider>
       <div className="container">
@@ -89,7 +120,23 @@ const App = () => {
         <TabNavigation activeTab={activeTab} onChange={setActiveTab} />
 
         {/* Show search bar only in search tab */}
-        {activeTab === 'search' && <SearchBar onSearch={handleSearch} currentQuery={query} />}
+        {activeTab === 'search' && showImageSearchEnabled && (
+          <SearchModeToggle activeMode={searchMode} onChange={handleSearchModeChange} />
+        )}
+
+        {/* Text search */}
+        {activeTab === 'search' && (!showImageSearchEnabled || searchMode === 'text') && (
+          <SearchBar onSearch={handleSearch} currentQuery={query} />
+        )}
+
+        {/* Image search */}
+        {activeTab === 'search' && showImageSearchEnabled && searchMode === 'image' && (
+          <ImageSearchUpload
+            onSearchResults={handleImageSearchResults}
+            onError={handleDismissError}
+            onSearchStart={handleImageSearchStart}
+          />
+        )}
 
         {/* Show content based on active tab */}
         {activeTab === 'search' && (

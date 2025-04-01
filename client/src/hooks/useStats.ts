@@ -8,6 +8,9 @@ interface StatsResponse {
   archived_notes: number;
   pinned_notes: number;
   using_cached_embeddings: boolean;
+  image_search: {
+    enabled: boolean;
+  };
 }
 
 interface UseStatsResult {

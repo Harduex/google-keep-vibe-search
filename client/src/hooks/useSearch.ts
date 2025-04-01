@@ -17,6 +17,8 @@ interface UseSearchResult {
   performSearch: (searchQuery: string) => Promise<void>;
   refineResults: (keywords: string) => void;
   resetRefinement: () => void;
+  setResults: (results: Note[]) => void; // New method to set results directly
+  setLoading: (loading: boolean) => void; // New method to manage loading state
 }
 
 export const useSearch = (): UseSearchResult => {
@@ -77,6 +79,17 @@ export const useSearch = (): UseSearchResult => {
     setRefinementKeywords('');
   }, []);
 
+  // New method to set results directly (useful for image search)
+  const setResults = useCallback((results: Note[]) => {
+    setOriginalResults(results);
+    setHasSearched(true);
+  }, []);
+
+  // New method to control loading state externally
+  const setLoading = useCallback((loading: boolean) => {
+    setIsLoading(loading);
+  }, []);
+
   return {
     query,
     results,
@@ -89,5 +102,7 @@ export const useSearch = (): UseSearchResult => {
     performSearch,
     refineResults,
     resetRefinement,
+    setResults,
+    setLoading,
   };
 };

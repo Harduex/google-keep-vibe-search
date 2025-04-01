@@ -2,7 +2,7 @@ import hashlib
 import json
 import os
 import re
-from typing import Any, Dict, List, Tuple, Set
+from typing import Any, Dict, List, Tuple, Set, Optional, BinaryIO, Union
 
 import nltk
 from nltk.corpus import stopwords
@@ -229,6 +229,54 @@ class VibeSearch:
                         note_scores[note_idx] = score
                         
         return note_scores
+
+    def search_by_image(self, image_file: Union[str, BinaryIO], max_results: int = MAX_RESULTS) -> List[Dict[str, Any]]:
+        """
+        Search notes using an image as a query.
+        
+        Args:
+            image_file: Image file path or file-like object to search with
+            max_results: Maximum number of results to return
+            
+        Returns:
+            Sorted list of matching notes
+        """
+        # If image search isn't enabled or processor isn't initialized, return empty result
+        if not ENABLE_IMAGE_SEARCH or not self.image_processor:
+            return []
+        
+        # Get matching images from the CLIP model
+        image_matches = self.image_processor.search_with_image(image_file, threshold=IMAGE_SEARCH_THRESHOLD)
+        
+        if not image_matches:
+            return []
+            
+        # Map image matches to notes and combine scores
+        note_scores = {}
+        for image_path, score in image_matches:
+            # Find notes containing this image
+            if image_path in self.image_note_map:
+                for note_idx in self.image_note_map[image_path]:
+                    # Keep highest score if multiple images in the same note match
+                    if note_idx not in note_scores or score > note_scores[note_idx]:
+                        # Store the reason for the match
+                        self.notes[note_idx]["matched_image"] = image_path
+                        note_scores[note_idx] = score
+        
+        # Create results list
+        results = []
+        for note_idx, score in note_scores.items():
+            if score > IMAGE_SEARCH_THRESHOLD:
+                note = self.notes[note_idx].copy()
+                note["score"] = float(score)
+                # Add a flag to indicate this note has matching images
+                note["has_matching_images"] = True
+                results.append(note)
+                
+        # Sort by score (descending)
+        results.sort(key=lambda x: x["score"], reverse=True)
+        
+        return results[:max_results]
 
     def search(self, query: str, max_results: int = MAX_RESULTS) -> List[Dict[str, Any]]:
         """

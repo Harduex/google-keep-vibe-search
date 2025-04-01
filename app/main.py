@@ -5,7 +5,7 @@ import requests
 from typing import Any, Dict, Optional, List
 import numpy as np
 import uvicorn
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request, UploadFile, File
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -132,6 +132,52 @@ def search_post(request: SearchRequest):
 
     results = search_engine.search(request.query)
     return {"results": results}
+
+
+@app.post("/api/search/image")
+async def search_by_image(file: UploadFile = File(...)):
+    """
+    Search notes using an uploaded image as the query.
+    
+    Args:
+        file: The uploaded image file
+        
+    Returns:
+        JSON response with search results
+    """
+    global search_engine
+    
+    if not search_engine:
+        raise HTTPException(status_code=500, detail="Search engine not initialized")
+        
+    if not ENABLE_IMAGE_SEARCH:
+        raise HTTPException(status_code=400, detail="Image search is not enabled")
+        
+    if not search_engine.image_processor:
+        raise HTTPException(status_code=500, detail="Image processor not initialized")
+    
+    # Check if the uploaded file is an image
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Uploaded file is not an image")
+    
+    try:
+        # Get file content
+        contents = await file.read()
+        
+        # Create a temporary file for the image processor to read
+        temp_file_path = os.path.join(CACHE_DIR, "temp_search_image")
+        with open(temp_file_path, "wb") as f:
+            f.write(contents)
+        
+        # Search using the temporary file
+        results = search_engine.search_by_image(temp_file_path)
+        
+        # Clean up the temporary file
+        os.remove(temp_file_path)
+        
+        return {"results": results}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error searching by image: {str(e)}")
 
 
 @app.get("/api/all-notes")

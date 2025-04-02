@@ -104,6 +104,48 @@
   transform: translateY(-50%);
 }
 
+/* New Find Similar Images button styles */
+.gallery-find-similar {
+  position: absolute;
+  bottom: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(251, 188, 4, 0.9);
+  color: #202124;
+  border: none;
+  border-radius: 20px;
+  padding: 8px 16px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  z-index: 1001;
+}
+
+.gallery-find-similar:hover:not(:disabled) {
+  background-color: rgba(249, 171, 0, 0.9);
+}
+
+.gallery-find-similar:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.gallery-find-similar.loading .material-icons {
+  animation: spin 1.5s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
 .gallery-counter {
   position: absolute;
   bottom: 20px;
@@ -132,5 +174,11 @@
   .gallery-close {
     top: 10px;
     right: 10px;
+  }
+
+  .gallery-find-similar {
+    bottom: 60px;
+    padding: 6px 12px;
+    font-size: 12px;
   }
 }

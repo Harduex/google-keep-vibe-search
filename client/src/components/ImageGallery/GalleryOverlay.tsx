@@ -1,9 +1,28 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, Dispatch, SetStateAction } from 'react';
 
 import { useGallery } from './GalleryContext';
 
-export const GalleryOverlay: React.FC = () => {
-  const { isOpen, images, currentIndex, closeGallery, nextImage, prevImage } = useGallery();
+interface GalleryOverlayProps {
+  onSearchSimilarResults?: (results: any) => void;
+  onError?: (error: string) => void;
+  onSwitchTab?: Dispatch<SetStateAction<string>>;
+}
+
+export const GalleryOverlay: React.FC<GalleryOverlayProps> = ({
+  onSearchSimilarResults,
+  onError,
+  onSwitchTab,
+}) => {
+  const {
+    isOpen,
+    images,
+    currentIndex,
+    isSearchingSimilar,
+    closeGallery,
+    nextImage,
+    prevImage,
+    findSimilarImages,
+  } = useGallery();
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -25,6 +44,12 @@ export const GalleryOverlay: React.FC = () => {
     },
     [isOpen, closeGallery, nextImage, prevImage],
   );
+
+  const handleFindSimilar = useCallback(() => {
+    if (onSearchSimilarResults && onError) {
+      findSimilarImages(onSearchSimilarResults, onError, onSwitchTab);
+    }
+  }, [findSimilarImages, onSearchSimilarResults, onError, onSwitchTab]);
 
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown);
@@ -59,6 +84,19 @@ export const GalleryOverlay: React.FC = () => {
         {images.length > 1 && (
           <button className="gallery-next" onClick={nextImage}>
             <span className="material-icons">chevron_right</span>
+          </button>
+        )}
+
+        {onSearchSimilarResults && onError && (
+          <button
+            className={`gallery-find-similar ${isSearchingSimilar ? 'loading' : ''}`}
+            onClick={handleFindSimilar}
+            disabled={isSearchingSimilar}
+          >
+            <span className="material-icons">
+              {isSearchingSimilar ? 'hourglass_top' : 'image_search'}
+            </span>
+            {isSearchingSimilar ? 'Searching...' : 'Find Similar Images'}
           </button>
         )}
 

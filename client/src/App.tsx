@@ -161,7 +161,11 @@ const App = () => {
         {activeTab === 'chat' && <Chat query={query} onShowRelated={handleSearch} />}
 
         <ErrorDisplay error={error} onDismiss={handleDismissError} />
-        <GalleryOverlay />
+        <GalleryOverlay
+          onSearchSimilarResults={handleImageSearchResults}
+          onError={handleDismissError}
+          onSwitchTab={setActiveTab}
+        />
       </div>
     </GalleryProvider>
   );

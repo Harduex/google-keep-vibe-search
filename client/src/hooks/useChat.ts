@@ -9,9 +9,17 @@ export interface ChatMessage {
   timestamp?: number;
 }
 
+interface AgentInfo {
+  enabled: boolean;
+  active: boolean;
+  notes_added?: number;
+  error?: string;
+}
+
 interface StreamResponse {
   response: string;
   notes: Note[];
+  agent_info?: AgentInfo;
   error?: string;
 }
 
@@ -22,17 +30,21 @@ export const useChat = () => {
   const [relevantNotes, setRelevantNotes] = useState<Note[]>([]);
   const [modelName, setModelName] = useState<string | null>(null);
   const [useNotesContext, setUseNotesContext] = useState<boolean>(true);
+  const [useAgentMode, setUseAgentMode] = useState<boolean>(true);
+  const [agentEnabled, setAgentEnabled] = useState<boolean>(false);
+  const [agentInfo, setAgentInfo] = useState<AgentInfo | null>(null);
   const [topic, setTopic] = useState<string>('');
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Fetch the model name on mount
+  // Fetch the model name and agent status on mount
   useEffect(() => {
     const fetchModelInfo = async () => {
       try {
         const response = await fetch(API_ROUTES.CHAT_MODEL);
         const data = await response.json();
         setModelName(data.model);
+        setAgentEnabled(data.agent_mode_enabled || false);
       } catch (err) {
         // eslint-disable-next-line no-console
         console.error('Error fetching model info:', err);
@@ -66,6 +78,7 @@ export const useChat = () => {
       setMessages((prev) => [...prev, userMessage]);
       setIsLoading(true);
       setError(null);
+      setAgentInfo(null);
 
       // Create a placeholder for the assistant's response with a guaranteed unique timestamp
       // Ensure it's different from the user message timestamp by adding 1ms
@@ -84,6 +97,7 @@ export const useChat = () => {
         stream: true,
         useNotesContext, // Include the context preference in the payload
         topic: topic.trim() || undefined, // Only include if not empty
+        useAgentMode, // Include the agent mode preference in the payload
       };
 
       // Stop any existing stream
@@ -151,6 +165,11 @@ export const useChat = () => {
               if (data.notes && data.notes.length > 0) {
                 setRelevantNotes(data.notes);
               }
+
+              // Update agent info if provided
+              if (data.agent_info) {
+                setAgentInfo(data.agent_info);
+              }
             } catch (e) {
               // eslint-disable-next-line no-console
               console.error('Error parsing stream chunk:', e, line);
@@ -168,7 +187,7 @@ export const useChat = () => {
         setIsLoading(false);
       }
     },
-    [messages, stopGenerating, useNotesContext, topic],
+    [messages, stopGenerating, useNotesContext, topic, useAgentMode],
   );
 
   const clearChat = useCallback(() => {
@@ -176,11 +195,16 @@ export const useChat = () => {
     setMessages([]);
     setRelevantNotes([]);
     setError(null);
+    setAgentInfo(null);
     // Don't clear topic when clearing chat
   }, [stopGenerating]);
 
   const toggleNotesContext = useCallback(() => {
     setUseNotesContext((prev) => !prev);
+  }, []);
+
+  const toggleAgentMode = useCallback(() => {
+    setUseAgentMode((prev) => !prev);
   }, []);
 
   return {
@@ -190,11 +214,15 @@ export const useChat = () => {
     relevantNotes,
     modelName,
     useNotesContext,
+    useAgentMode,
+    agentEnabled,
+    agentInfo,
     topic,
     setTopic,
     sendMessage,
     clearChat,
     stopGenerating,
     toggleNotesContext,
+    toggleAgentMode,
   };
 };

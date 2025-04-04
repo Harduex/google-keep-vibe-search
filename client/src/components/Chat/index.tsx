@@ -1,9 +1,10 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 
+import { AgentInfo } from '@/components/Chat/AgentInfo';
+import { AgentModeToggle } from '@/components/Chat/AgentModeToggle';
 import { ChatMessage } from '@/components/Chat/ChatMessage';
 import { ChatNotes } from '@/components/Chat/ChatNotes';
 import { useChat } from '@/hooks/useChat';
-
 import './styles.css';
 
 interface ChatProps {
@@ -15,6 +16,7 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
   const [inputValue, setInputValue] = useState('');
   const [showTopicInput, setShowTopicInput] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
   const {
     messages,
     isLoading,
@@ -25,6 +27,10 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
     modelName,
     useNotesContext,
     toggleNotesContext,
+    useAgentMode,
+    toggleAgentMode,
+    agentEnabled,
+    agentInfo,
     topic,
     setTopic,
   } = useChat();
@@ -40,7 +46,6 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
       if (!inputValue.trim() || isLoading) {
         return;
       }
-
       sendMessage(inputValue.trim());
       setInputValue('');
     },
@@ -115,6 +120,17 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
               </span>
             </label>
           </div>
+
+          {/* Add AI Agent Mode Toggle */}
+          {useNotesContext && (
+            <AgentModeToggle
+              agentEnabled={agentEnabled}
+              useAgentMode={useAgentMode}
+              toggleAgentMode={toggleAgentMode}
+              isLoading={isLoading}
+            />
+          )}
+
           <button
             className="clear-button"
             onClick={clearChat}
@@ -142,6 +158,9 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
             <div ref={messagesEndRef} />
           </div>
 
+          {/* Display Agent Info when applicable */}
+          {agentInfo && <AgentInfo agentInfo={agentInfo} />}
+
           <form className="chat-input" onSubmit={handleSubmit}>
             <div className="chat-input-controls">
               {useNotesContext && (
@@ -159,7 +178,6 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
                 </button>
               )}
             </div>
-
             {useNotesContext && showTopicInput && (
               <div className="topic-input-container">
                 <input
@@ -175,7 +193,6 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
                 </div>
               </div>
             )}
-
             <div className="input-wrapper">
               <input
                 type="text"
@@ -195,7 +212,6 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
             </div>
           </form>
         </div>
-
         <div className="notes-container">
           <ChatNotes notes={relevantNotes} query={query} onShowRelated={onShowRelated} />
         </div>

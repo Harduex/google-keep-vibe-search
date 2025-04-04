@@ -15,6 +15,7 @@ from sklearn.decomposition import PCA
 from app.config import (
     EMBEDDINGS_CACHE_FILE, 
     ENABLE_IMAGE_SEARCH,
+    ENABLE_AI_AGENT_MODE,
     GOOGLE_KEEP_PATH, 
     HOST, 
     PORT, 
@@ -108,6 +109,12 @@ async def startup_event():
     # Initialize the chatbot
     chatbot = ChatBot(search_engine)
     print(f"Initialized chatbot with model: {LLM_MODEL}")
+    
+    # Display AI agent status
+    if ENABLE_AI_AGENT_MODE:
+        print("AI Agent mode is enabled")
+    else:
+        print("AI Agent mode is disabled (set ENABLE_AI_AGENT_MODE=true in .env to enable)")
 
 
 class SearchRequest(BaseModel):
@@ -229,12 +236,18 @@ def stats():
         "images_count": len(search_engine.image_note_map) if search_engine and hasattr(search_engine, "image_note_map") else 0
     }
     
+    ai_agent_status = {
+        "enabled": ENABLE_AI_AGENT_MODE,
+        "initialized": chatbot and hasattr(chatbot, "agent") and chatbot.agent is not None
+    }
+    
     return {
         "total_notes": len(notes),
         "archived_notes": sum(1 for note in notes if note.get("archived", False)),
         "pinned_notes": sum(1 for note in notes if note.get("pinned", False)),
         "using_cached_embeddings": os.path.exists(EMBEDDINGS_CACHE_FILE),
-        "image_search": image_search_status
+        "image_search": image_search_status,
+        "ai_agent": ai_agent_status
     }
 
 
@@ -293,11 +306,13 @@ class ChatRequest(BaseModel):
     stream: bool = False
     useNotesContext: bool = True
     topic: Optional[str] = None  # Optional topic field for context search
+    useAgentMode: bool = True  # Toggle for AI Agent mode
 
 
 class ChatResponse(BaseModel):
     response: str
     notes: List[Dict[str, Any]]
+    agent_info: Optional[Dict[str, Any]] = None
 
 
 @app.post("/api/chat")
@@ -313,16 +328,18 @@ async def chat(request: ChatRequest):
         
         if not request.stream:
             # Non-streaming response - return normal JSON
-            response_text, relevant_notes = chatbot.generate_chat_completion(
+            response_text, relevant_notes, agent_info = chatbot.generate_chat_completion(
                 messages, 
                 stream=False,
                 use_notes_context=request.useNotesContext,
-                topic=request.topic
+                topic=request.topic,
+                use_agent_mode=request.useAgentMode
             )
             
             return ChatResponse(
                 response=response_text,
-                notes=relevant_notes if request.useNotesContext else []
+                notes=relevant_notes if request.useNotesContext else [],
+                agent_info=agent_info
             )
         else:
             # Streaming response - use StreamingResponse
@@ -331,7 +348,8 @@ async def chat(request: ChatRequest):
                     chatbot, 
                     messages, 
                     use_notes_context=request.useNotesContext,
-                    topic=request.topic
+                    topic=request.topic,
+                    use_agent_mode=request.useAgentMode
                 ),
                 media_type="application/json"
             )
@@ -340,7 +358,7 @@ async def chat(request: ChatRequest):
         raise HTTPException(status_code=500, detail=f"Error generating chat response: {str(e)}")
 
 
-async def stream_chat_response(chatbot_instance, messages, use_notes_context=True, topic=None):
+async def stream_chat_response(chatbot_instance, messages, use_notes_context=True, topic=None, use_agent_mode=True):
     """Stream the chat response from the Ollama API."""
     try:
         # Extract the latest user query for finding relevant notes
@@ -349,11 +367,37 @@ async def stream_chat_response(chatbot_instance, messages, use_notes_context=Tru
         
         # Find relevant notes for the latest user query if useNotesContext is True
         relevant_notes = []
+        agent_info = None
+        
         if use_notes_context:
             # Use topic for search if provided, otherwise use latest message
             search_query = topic if topic else latest_user_message
+            
             if search_query:
-                relevant_notes = chatbot_instance.get_relevant_notes(search_query)
+                if chatbot_instance.agent and use_agent_mode:
+                    # When AI Agent mode is enabled, let the agent find all notes from scratch
+                    # Process the query with the AI Agent - now returns actions too
+                    relevant_notes, agent_actions = chatbot_instance.agent.process_query(search_query, [])
+                    
+                    # Create agent info object with action details
+                    agent_info = {
+                        "enabled": True,
+                        "active": True,
+                        "notes_added": sum(1 for note in relevant_notes if note.get("added_by_agent", False)),
+                        "actions": agent_actions  # Include the agent's actions in the response
+                    }
+                    
+                    # Log if no notes were found
+                    if not relevant_notes:
+                        if agent_info:
+                            agent_info["error"] = "No relevant notes found"
+                else:
+                    # Use standard search when agent mode is disabled
+                    relevant_notes = chatbot_instance.get_relevant_notes(search_query)
+                    agent_info = {
+                        "enabled": ENABLE_AI_AGENT_MODE,
+                        "active": False
+                    }
         
         # Set up Ollama API request with streaming
         response = requests.post(
@@ -382,10 +426,11 @@ async def stream_chat_response(chatbot_instance, messages, use_notes_context=Tru
                         chunk = data["message"]["content"]
                         accumulated_text += chunk
                         
-                        # Yield the accumulated text and relevant notes
+                        # Yield the accumulated text, relevant notes, and agent info
                         yield json.dumps({
                             "response": accumulated_text,
-                            "notes": relevant_notes if use_notes_context else []
+                            "notes": relevant_notes if use_notes_context else [],
+                            "agent_info": agent_info
                         }).encode() + b"\n"
                 except json.JSONDecodeError:
                     continue
@@ -394,14 +439,18 @@ async def stream_chat_response(chatbot_instance, messages, use_notes_context=Tru
         # If there's an error, yield it as part of the stream
         yield json.dumps({
             "error": str(e),
-            "notes": []
+            "notes": [],
+            "agent_info": {"enabled": ENABLE_AI_AGENT_MODE, "active": False, "error": str(e)}
         }).encode() + b"\n"
 
 
 @app.get("/api/chat/model")
 def get_chat_model():
-    """Return the current LLM model being used."""
-    return {"model": LLM_MODEL}
+    """Return the current LLM model being used and agent status."""
+    return {
+        "model": LLM_MODEL,
+        "agent_mode_enabled": ENABLE_AI_AGENT_MODE
+    }
 
 
 if __name__ == "__main__":

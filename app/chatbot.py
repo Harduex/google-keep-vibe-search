@@ -3,12 +3,17 @@ Chatbot functionality for interacting with Ollama to answer queries about notes.
 """
 
 import json
+import logging
 import requests
 from typing import Dict, List, Any, Optional, Tuple
 
-from app.config import OLLAMA_API_URL, LLM_MODEL, CHAT_CONTEXT_NOTES
+from app.config import OLLAMA_API_URL, LLM_MODEL, CHAT_CONTEXT_NOTES, ENABLE_AI_AGENT_MODE
 from app.search import VibeSearch
+from app.agent import AIAgent
 
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("chatbot")
 
 class ChatBot:
     """A chatbot that uses Ollama to generate responses based on user notes."""
@@ -18,10 +23,15 @@ class ChatBot:
         self.search_engine = search_engine
         self.api_url = OLLAMA_API_URL
         self.model = LLM_MODEL
+        self.agent = AIAgent(search_engine) if ENABLE_AI_AGENT_MODE else None
+        logger.info(f"Initialized ChatBot with API URL: {self.api_url} and model: {self.model}")
 
     def get_relevant_notes(self, query: str, max_notes: int = CHAT_CONTEXT_NOTES) -> List[Dict[str, Any]]:
         """Find notes relevant to the query."""
-        return self.search_engine.search(query, max_results=max_notes)
+        logger.debug(f"Searching for notes with query: '{query}', max_notes: {max_notes}")
+        results = self.search_engine.search(query, max_results=max_notes)
+        logger.debug(f"Found {len(results)} relevant notes")
+        return results
 
     def format_notes_for_context(self, notes: List[Dict[str, Any]]) -> str:
         """Format notes into a string to use as context for the LLM."""
@@ -30,9 +40,15 @@ class ChatBot:
         for i, note in enumerate(notes):
             title = note.get("title", "Untitled Note")
             content = note.get("content", "")
-            formatted_notes.append(f"Note {i+1}: {title}\n{content}\n")
+            # Add a tag if this note was added by the AI Agent
+            added_by_agent = note.get("added_by_agent", False)
+            agent_tag = " [Added by AI Agent] " if added_by_agent else ""
+            
+            formatted_notes.append(f"Note {i+1}{agent_tag}: {title}\n{content}\n")
         
-        return "\n".join(formatted_notes)
+        formatted_context = "\n".join(formatted_notes)
+        logger.debug(f"Formatted {len(notes)} notes into a context of {len(formatted_context)} characters")
+        return formatted_context
 
     def prepare_messages_with_context(self, messages: List[Dict[str, str]], relevant_notes: List[Dict[str, Any]]) -> List[Dict[str, str]]:
         """Prepare messages with context from relevant notes."""
@@ -82,10 +98,14 @@ class ChatBot:
         messages: List[Dict[str, str]], 
         stream: bool = False,
         use_notes_context: bool = True,
-        topic: Optional[str] = None
-    ) -> Tuple[str, List[Dict[str, Any]]]:
+        topic: Optional[str] = None,
+        use_agent_mode: bool = True
+    ) -> Tuple[str, List[Dict[str, Any]], Optional[Dict[str, Any]]]:
         """Generate a chat completion using Ollama API."""
+        logger.info(f"Generating chat completion: stream={stream}, use_notes_context={use_notes_context}, agentMode={use_agent_mode}")
         relevant_notes = []
+        agent_info = None
+        agent_actions = []
         
         if use_notes_context:
             # Extract the latest user query
@@ -94,10 +114,35 @@ class ChatBot:
             
             # Use topic for search if provided, otherwise use latest message
             search_query = topic if topic else latest_user_message
+            logger.debug(f"Using search query: '{search_query}'")
             
             if search_query:
-                # Find relevant notes for the search query if notes context is enabled
-                relevant_notes = self.get_relevant_notes(search_query)
+                if self.agent and use_agent_mode:
+                    # When AI Agent mode is enabled, let the agent find all notes from scratch
+                    # without providing any initial context
+                    logger.info("Using agent mode for chat completion")
+                    logger.info(f"Generating agent response for query: '{search_query}'")
+                    
+                    # Process the query with the AI Agent - now returns actions too
+                    relevant_notes, agent_actions = self.agent.process_query(search_query, [])
+                    
+                    # Create agent info object with action details
+                    agent_info = {
+                        "enabled": True,
+                        "active": True,
+                        "notes_added": sum(1 for note in relevant_notes if note.get("added_by_agent", False)),
+                        "actions": agent_actions  # Include the agent's actions
+                    }
+                    
+                    # Log if no notes were returned
+                    if not relevant_notes:
+                        logger.warning("AI Agent didn't find any relevant notes for the query")
+                        if agent_info:
+                            agent_info["error"] = "No relevant notes found"
+                else:
+                    # If agent mode is not enabled, use the standard search
+                    logger.debug(f"Using standard search for '{search_query}'")
+                    relevant_notes = self.get_relevant_notes(search_query)
             
         # Prepare messages with context
         prepared_messages = self.prepare_messages_with_context(messages, relevant_notes if use_notes_context else [])
@@ -121,14 +166,15 @@ class ChatBot:
             response.raise_for_status()
             
             if stream:
-                return self._handle_streaming_response(response), relevant_notes
+                return self._handle_streaming_response(response), relevant_notes, agent_info
             else:
                 response_data = response.json()
-                return response_data.get("message", {}).get("content", ""), relevant_notes
+                return response_data.get("message", {}).get("content", ""), relevant_notes, agent_info
                 
         except requests.RequestException as e:
             error_message = f"Error calling Ollama API: {str(e)}"
-            return error_message, relevant_notes
+            logger.error(error_message)
+            return error_message, relevant_notes, agent_info
     
     def _handle_streaming_response(self, response) -> str:
         """Handle a streaming response from the Ollama API."""

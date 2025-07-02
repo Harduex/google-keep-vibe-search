@@ -2,10 +2,12 @@ import { memo, useState, useCallback, useMemo, useEffect } from 'react';
 
 import { NoteCard } from '@/components/NoteCard';
 import { ScrollToTop } from '@/components/ScrollToTop';
+import { TagFilter } from '@/components/TagFilter';
 import { ViewToggle } from '@/components/ViewToggle';
 import { Visualization } from '@/components/Visualization';
 import { VIEW_MODES } from '@/const';
 import { useAllNotes } from '@/hooks/useAllNotes';
+import { useTags } from '@/hooks/useTags';
 import { ViewMode } from '@/types';
 import './styles.css';
 
@@ -15,17 +17,24 @@ interface AllNotesProps {
 
 export const AllNotes = memo(({ onShowRelated }: AllNotesProps) => {
   const { notes, isLoading, error } = useAllNotes();
+  const { tags } = useTags();
   const [viewMode, setViewMode] = useState<ViewMode>(VIEW_MODES.LIST);
   const [sortBy, setSortBy] = useState<'edited' | 'created'>('edited');
   const [filterArchived, setFilterArchived] = useState<boolean>(false);
   const [filterPinned, setFilterPinned] = useState<boolean>(false);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [visibleNotesCount, setVisibleNotesCount] = useState<number>(20);
 
   // Sort and filter notes
   const filteredNotes = useMemo(() => {
     let filtered = [...notes];
 
-    // Apply filters
+    // Apply tag filter (if any tags are selected, show only notes with those tags)
+    if (selectedTags.length > 0) {
+      filtered = filtered.filter((note) => note.tag && selectedTags.includes(note.tag));
+    }
+
+    // Apply other filters
     if (filterArchived) {
       filtered = filtered.filter((note) => note.archived);
     }
@@ -42,7 +51,7 @@ export const AllNotes = memo(({ onShowRelated }: AllNotesProps) => {
     });
 
     return filtered;
-  }, [notes, sortBy, filterArchived, filterPinned]);
+  }, [notes, sortBy, filterArchived, filterPinned, selectedTags]);
 
   const visibleNotes = useMemo(
     () => filteredNotes.slice(0, visibleNotesCount),
@@ -80,6 +89,10 @@ export const AllNotes = memo(({ onShowRelated }: AllNotesProps) => {
     setVisibleNotesCount((prev) => prev + 20);
   }, []);
 
+  const handleTagsChange = useCallback((newSelectedTags: string[]) => {
+    setSelectedTags(newSelectedTags);
+  }, []);
+
   useEffect(() => {
     const handleScroll = () => {
       if (
@@ -104,9 +117,24 @@ export const AllNotes = memo(({ onShowRelated }: AllNotesProps) => {
 
   return (
     <div className="all-notes-container">
+      {/* Tag Filter */}
+      {tags.length > 0 && (
+        <TagFilter
+          tags={tags}
+          selectedTags={selectedTags}
+          onUpdateSelectedTags={handleTagsChange}
+        />
+      )}
+
       <div className="all-notes-header">
         <div className="all-notes-count">
           {filteredNotes.length} note{filteredNotes.length === 1 ? '' : 's'}
+          {selectedTags.length > 0 && (
+            <span className="tag-filter-status">
+              {' '}
+              (filtered by {selectedTags.length} tag{selectedTags.length === 1 ? '' : 's'})
+            </span>
+          )}
         </div>
 
         <div className="all-notes-controls">

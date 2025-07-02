@@ -14,6 +14,11 @@
   color: #5f6368;
 }
 
+.tag-filter-status {
+  color: var(--accent-color);
+  font-weight: 500;
+}
+
 .all-notes-controls {
   display: flex;
   gap: 16px;

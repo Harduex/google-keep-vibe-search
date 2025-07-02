@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { API_ROUTES } from '@/const';
 import { Tag, TagsResponse, ExcludedTagsResponse } from '@/types';
 
-export const useTags = () => {
+export const useTags = (onNotesChanged?: () => void) => {
   const [tags, setTags] = useState<Tag[]>([]);
   const [excludedTags, setExcludedTags] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -111,6 +111,12 @@ export const useTags = () => {
 
         // Refresh tags after successful removal
         await fetchTags();
+
+        // Notify that notes have changed if callback is provided
+        if (onNotesChanged) {
+          onNotesChanged();
+        }
+
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred');
@@ -118,7 +124,43 @@ export const useTags = () => {
         setIsLoading(false);
       }
     },
-    [fetchTags],
+    [fetchTags, onNotesChanged],
+  );
+
+  const removeTagFromAllNotes = useCallback(
+    async (tagName: string) => {
+      try {
+        setIsLoading(true);
+        const response = await fetch(API_ROUTES.REMOVE_TAG_FROM_ALL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            tag_name: tagName,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to remove tag from all notes');
+        }
+
+        // Refresh tags after successful removal
+        await fetchTags();
+
+        // Notify that notes have changed if callback is provided
+        if (onNotesChanged) {
+          onNotesChanged();
+        }
+
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An error occurred');
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [fetchTags, onNotesChanged],
   );
 
   useEffect(() => {
@@ -134,6 +176,7 @@ export const useTags = () => {
     tagNotes,
     updateExcludedTags,
     removeTagFromNote,
+    removeTagFromAllNotes,
     refetchTags: fetchTags,
     refetchExcludedTags: fetchExcludedTags,
   };

@@ -19,6 +19,7 @@ export const API_ROUTES = {
   TAG_NOTES: '/api/notes/tag',
   EXCLUDED_TAGS: '/api/tags/excluded',
   REMOVE_TAG: '/api/notes',
+  REMOVE_TAG_FROM_ALL: '/api/tags/remove',
 };
 
 export const VIEW_MODES = {

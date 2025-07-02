@@ -14,6 +14,7 @@ interface NoteCardProps {
   isSelected?: boolean;
   onShowRelated: (content: string) => void;
   onSelectNote?: (noteId: string, isSelected: boolean) => void;
+  onRemoveTag?: (noteId: string) => void;
 }
 
 export const NoteCard = memo(
@@ -25,6 +26,7 @@ export const NoteCard = memo(
     isSelected = false,
     onShowRelated,
     onSelectNote,
+    onRemoveTag,
   }: NoteCardProps) => {
     const scorePercentage = calculateScorePercentage(note.score);
     const highlightedTitle = highlightMatches(note.title, query, refinementKeywords);
@@ -42,6 +44,18 @@ export const NoteCard = memo(
         }
       },
       [note.id, isSelected, onSelectNote],
+    );
+
+    const handleRemoveTag = useCallback(
+      (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (onRemoveTag && note.tag) {
+          if (window.confirm(`Remove tag "${note.tag}" from this note?`)) {
+            onRemoveTag(note.id);
+          }
+        }
+      },
+      [note.id, note.tag, onRemoveTag],
     );
 
     const handleCardClick = useCallback(() => {
@@ -83,7 +97,22 @@ export const NoteCard = memo(
           {/* Badges */}
           {note.pinned && <span className="note-badge badge-pinned">Pinned</span>}
           {note.archived && <span className="note-badge badge-archived">Archived</span>}
-          {note.tag && <span className="note-badge badge-tag">{note.tag}</span>}
+          {note.tag && (
+            <span className="note-badge badge-tag" title={`Tagged: ${note.tag}`}>
+              <span className="material-icons">label</span>
+              {note.tag}
+              {onRemoveTag && (
+                <button
+                  className="tag-remove-button"
+                  onClick={handleRemoveTag}
+                  title="Remove tag"
+                  aria-label={`Remove tag ${note.tag}`}
+                >
+                  <span className="material-icons">close</span>
+                </button>
+              )}
+            </span>
+          )}
           {scorePercentage ? (
             <span className="note-badge badge-score">{scorePercentage}% match</span>
           ) : null}

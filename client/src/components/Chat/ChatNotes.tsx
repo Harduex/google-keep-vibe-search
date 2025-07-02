@@ -1,6 +1,7 @@
 import { memo } from 'react';
 
 import { NoteCard } from '@/components/NoteCard';
+import { useTags } from '@/hooks/useTags';
 import { Note } from '@/types';
 
 import './styles.css';
@@ -12,6 +13,8 @@ interface ChatNotesProps {
 }
 
 export const ChatNotes = memo(({ notes, query, onShowRelated }: ChatNotesProps) => {
+  const { removeTagFromNote } = useTags();
+
   if (!notes || notes.length === 0) {
     return (
       <div className="chat-notes">
@@ -34,7 +37,13 @@ export const ChatNotes = memo(({ notes, query, onShowRelated }: ChatNotesProps) 
       </h3>
       <div className="notes-list">
         {notes.map((note) => (
-          <NoteCard key={note.id} note={note} query={query} onShowRelated={onShowRelated} />
+          <NoteCard
+            key={note.id}
+            note={note}
+            query={query}
+            onShowRelated={onShowRelated}
+            onRemoveTag={removeTagFromNote}
+          />
         ))}
       </div>
     </div>

@@ -84,10 +84,15 @@
 }
 
 .tag-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
   border-bottom: 1px solid var(--border-color);
 }
 
 .tag-item:last-child {
+  margin-bottom: 0;
   border-bottom: none;
 }
 
@@ -199,4 +204,27 @@
 [data-theme='dark'] .checkmark {
   border-color: var(--border-color);
   background: var(--bg-secondary);
+}
+
+.remove-tag-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 8px;
+}
+
+.remove-tag-button:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.remove-tag-button .material-icons {
+  font-size: 18px;
 }

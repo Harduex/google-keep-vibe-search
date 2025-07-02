@@ -190,6 +190,10 @@ class TagManagementRequest(BaseModel):
     excluded_tags: List[str]
 
 
+class RemoveTagRequest(BaseModel):
+    tag_name: str
+
+
 @app.get("/api/search")
 def search(q: str = ""):
     global search_engine
@@ -553,6 +557,27 @@ def remove_note_tag(note_id: str):
     save_tags_to_cache(note_tags)
     
     return {"message": f"Removed tag '{removed_tag}' from note {note_id}"}
+
+
+@app.post("/api/tags/remove")
+def remove_tag_from_all_notes(request: RemoveTagRequest):
+    """Remove a specific tag from all notes that have it."""
+    global note_tags
+    
+    # Find all note IDs that have this tag
+    notes_to_update = [note_id for note_id, tag_name in note_tags.items() if tag_name == request.tag_name]
+    
+    if not notes_to_update:
+        raise HTTPException(status_code=404, detail=f"No notes found with tag '{request.tag_name}'")
+    
+    # Remove the tag from all notes that have it
+    for note_id in notes_to_update:
+        del note_tags[note_id]
+    
+    # Save to cache
+    save_tags_to_cache(note_tags)
+    
+    return {"message": f"Removed tag '{request.tag_name}' from {len(notes_to_update)} notes"}
 
 
 if __name__ == "__main__":

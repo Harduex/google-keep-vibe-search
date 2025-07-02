@@ -8,9 +8,15 @@ interface TagManagerProps {
   tags: Tag[];
   excludedTags: string[];
   onUpdateExcludedTags: (excludedTags: string[]) => void;
+  onRemoveTagFromAll?: (tagName: string) => void;
 }
 
-export const TagManager = ({ tags, excludedTags, onUpdateExcludedTags }: TagManagerProps) => {
+export const TagManager = ({
+  tags,
+  excludedTags,
+  onUpdateExcludedTags,
+  onRemoveTagFromAll,
+}: TagManagerProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const handleToggleExpanded = useCallback(() => {
@@ -40,6 +46,23 @@ export const TagManager = ({ tags, excludedTags, onUpdateExcludedTags }: TagMana
   const createTagChangeHandler = useCallback(
     (tagName: string) => () => handleTagToggle(tagName),
     [handleTagToggle],
+  );
+
+  const handleRemoveTagFromAll = useCallback(
+    (tagName: string) => {
+      if (
+        onRemoveTagFromAll &&
+        window.confirm(`Are you sure you want to remove the tag "${tagName}" from all notes?`)
+      ) {
+        onRemoveTagFromAll(tagName);
+      }
+    },
+    [onRemoveTagFromAll],
+  );
+
+  const createRemoveTagHandler = useCallback(
+    (tagName: string) => () => handleRemoveTagFromAll(tagName),
+    [handleRemoveTagFromAll],
   );
 
   if (tags.length === 0) {
@@ -89,6 +112,14 @@ export const TagManager = ({ tags, excludedTags, onUpdateExcludedTags }: TagMana
                       <span className="tag-count">({tag.count} notes)</span>
                     </span>
                   </label>
+                  {onRemoveTagFromAll && (
+                    <button
+                      className="remove-tag-button"
+                      onClick={createRemoveTagHandler(tag.name)}
+                    >
+                      <span className="material-icons">remove_circle</span>
+                    </button>
+                  )}
                 </div>
               );
             })}
@@ -98,7 +129,8 @@ export const TagManager = ({ tags, excludedTags, onUpdateExcludedTags }: TagMana
             <span className="material-icons">info</span>
             <span>
               Excluded tags will be hidden from search results. Use this to progressively categorize
-              your notes.
+              your notes. Click the red button to permanently remove a tag from all notes that have
+              it.
             </span>
           </div>
         </div>

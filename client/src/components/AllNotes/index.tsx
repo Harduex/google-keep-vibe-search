@@ -16,8 +16,8 @@ interface AllNotesProps {
 }
 
 export const AllNotes = memo(({ onShowRelated }: AllNotesProps) => {
-  const { notes, isLoading, error } = useAllNotes();
-  const { tags } = useTags();
+  const { notes, isLoading, error, refetch } = useAllNotes();
+  const { tags, removeTagFromNote } = useTags(refetch);
   const [viewMode, setViewMode] = useState<ViewMode>(VIEW_MODES.LIST);
   const [sortBy, setSortBy] = useState<'edited' | 'created'>('edited');
   const [filterArchived, setFilterArchived] = useState<boolean>(false);
@@ -172,7 +172,12 @@ export const AllNotes = memo(({ onShowRelated }: AllNotesProps) => {
           ) : (
             visibleNotes.map((note) => (
               <div id={`note-${note.id}`} key={note.id}>
-                <NoteCard note={note} query="" onShowRelated={onShowRelated} />
+                <NoteCard
+                  note={note}
+                  query=""
+                  onShowRelated={onShowRelated}
+                  onRemoveTag={removeTagFromNote}
+                />
               </div>
             ))
           )}

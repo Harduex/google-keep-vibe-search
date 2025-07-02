@@ -46,7 +46,14 @@ export const Results = memo(
     const [isTagDialogOpen, setIsTagDialogOpen] = useState(false);
     const prevQueryRef = useRef<string>(query);
 
-    const { tags, excludedTags, tagNotes, updateExcludedTags } = useTags();
+    const {
+      tags,
+      excludedTags,
+      tagNotes,
+      updateExcludedTags,
+      removeTagFromAllNotes,
+      removeTagFromNote,
+    } = useTags(onResultsUpdate);
 
     useEffect(() => {
       if (results.length === 0 || !hasSearched) {
@@ -166,6 +173,14 @@ export const Results = memo(
       [updateExcludedTags, onResultsUpdate],
     );
 
+    const handleRemoveTagFromAll = useCallback(
+      (tagName: string) => {
+        removeTagFromAllNotes(tagName);
+        // No need to call onResultsUpdate here as it's already passed to useTags
+      },
+      [removeTagFromAllNotes],
+    );
+
     if (isLoading) {
       return (
         <div className="results-container">
@@ -182,6 +197,7 @@ export const Results = memo(
             tags={tags}
             excludedTags={excludedTags}
             onUpdateExcludedTags={handleExcludedTagsUpdate}
+            onRemoveTagFromAll={handleRemoveTagFromAll}
           />
         )}
 
@@ -263,6 +279,7 @@ export const Results = memo(
                   isSelected={selectedNoteIds.includes(note.id)}
                   onShowRelated={onShowRelated}
                   onSelectNote={handleNoteSelection}
+                  onRemoveTag={removeTagFromNote}
                 />
               </div>
             ))}

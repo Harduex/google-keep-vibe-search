@@ -1,6 +1,7 @@
 import { memo, useState, useCallback } from 'react';
 
 import { useClusters } from '@/hooks/useClusters';
+import { useTags } from '@/hooks/useTags';
 
 import { NoteCard } from './NoteCard';
 
@@ -47,6 +48,7 @@ export const NotesClusters = memo(({ onShowRelated, query }: NotesClusterProps) 
   const [expandedCluster, setExpandedCluster] = useState<number | null>(null);
   const [pendingClusters, setPendingClusters] = useState(2);
   const { clusters, isLoading, error, fetchClusters } = useClusters();
+  const { removeTagFromNote } = useTags();
 
   const toggleClusterExpansion = useCallback(
     (clusterId: number) => {
@@ -128,7 +130,12 @@ export const NotesClusters = memo(({ onShowRelated, query }: NotesClusterProps) 
               {expandedCluster === cluster.id &&
                 cluster.notes.map((note) => (
                   <div key={note.id}>
-                    <NoteCard note={note} query={query} onShowRelated={onShowRelated} />
+                    <NoteCard
+                      note={note}
+                      query={query}
+                      onShowRelated={onShowRelated}
+                      onRemoveTag={removeTagFromNote}
+                    />
                   </div>
                 ))}
 

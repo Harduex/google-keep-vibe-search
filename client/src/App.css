@@ -341,6 +341,36 @@ h1 {
   background: var(--accent-color);
   color: white;
   font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.note-badge.badge-tag .material-icons {
+  font-size: 16px;
+}
+
+.tag-remove-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.7);
+  padding: 2px;
+  margin-left: 4px;
+  border-radius: 2px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tag-remove-button:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.tag-remove-button .material-icons {
+  font-size: 14px;
 }
 
 .selection-controls {

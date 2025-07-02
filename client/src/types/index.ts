@@ -26,6 +26,7 @@ export interface Note {
   attachments?: Attachment[];
   has_matching_images?: boolean;
   matched_image?: string;
+  tag?: string;
 }
 
 export type ViewMode = 'list' | '3d';
@@ -35,4 +36,17 @@ export interface NoteCluster {
   keywords: string[];
   notes: Note[];
   size: number;
+}
+
+export interface Tag {
+  name: string;
+  count: number;
+}
+
+export interface TagsResponse {
+  tags: Tag[];
+}
+
+export interface ExcludedTagsResponse {
+  excluded_tags: string[];
 }

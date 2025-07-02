@@ -1,11 +1,11 @@
-import { useEffect, useCallback, Dispatch, SetStateAction } from 'react';
+import { useEffect, useCallback } from 'react';
 
 import { useGallery } from './GalleryContext';
 
 interface GalleryOverlayProps {
   onSearchSimilarResults?: (results: any) => void;
   onError?: (error: string) => void;
-  onSwitchTab?: Dispatch<SetStateAction<string>>;
+  onSwitchTab?: (tab: string) => void;
 }
 
 export const GalleryOverlay: React.FC<GalleryOverlayProps> = ({

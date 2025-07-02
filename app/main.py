@@ -2,7 +2,7 @@ import os
 import json
 import time
 import requests
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, Optional, List, Set
 import numpy as np
 import uvicorn
 from fastapi import FastAPI, HTTPException, Query, Request, UploadFile, File
@@ -33,6 +33,11 @@ app = FastAPI(title="Google Keep Vibe Search")
 notes = []
 search_engine = None
 chatbot = None
+note_tags = {}  # Dict[note_id, tag_name]
+excluded_tags = set()  # Set[tag_name]
+
+TAGS_CACHE_FILE = os.path.join(CACHE_DIR, "tags.json")
+EXCLUDED_TAGS_CACHE_FILE = os.path.join(CACHE_DIR, "excluded_tags.json")
 
 
 def save_notes_to_cache(notes_data: List[Dict[str, Any]]) -> None:
@@ -48,7 +53,6 @@ def save_notes_to_cache(notes_data: List[Dict[str, Any]]) -> None:
     try:
         with open(NOTES_CACHE_FILE, 'w', encoding='utf-8') as f:
             json.dump(cache_data, f)
-        print(f"Notes cached to {NOTES_CACHE_FILE}")
     except Exception as e:
         print(f"Error caching notes: {e}")
 
@@ -78,9 +82,67 @@ def load_notes_from_cache() -> List[Dict[str, Any]]:
         return None
 
 
+def load_tags_from_cache() -> Dict[str, str]:
+    """Load note tags from cache file."""
+    if os.path.exists(TAGS_CACHE_FILE):
+        try:
+            with open(TAGS_CACHE_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            pass
+    return {}
+
+
+def save_tags_to_cache(tags_data: Dict[str, str]) -> None:
+    """Save note tags to cache file."""
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    try:
+        with open(TAGS_CACHE_FILE, 'w', encoding='utf-8') as f:
+            json.dump(tags_data, f)
+    except IOError:
+        pass
+
+
+def load_excluded_tags_from_cache() -> Set[str]:
+    """Load excluded tags from cache file."""
+    if os.path.exists(EXCLUDED_TAGS_CACHE_FILE):
+        try:
+            with open(EXCLUDED_TAGS_CACHE_FILE, 'r', encoding='utf-8') as f:
+                return set(json.load(f))
+        except (json.JSONDecodeError, IOError):
+            pass
+    return set()
+
+
+def save_excluded_tags_to_cache(excluded: Set[str]) -> None:
+    """Save excluded tags to cache file."""
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    try:
+        with open(EXCLUDED_TAGS_CACHE_FILE, 'w', encoding='utf-8') as f:
+            json.dump(list(excluded), f)
+    except IOError:
+        pass
+
+
+def filter_notes_by_excluded_tags(notes_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Filter out notes that have excluded tags."""
+    global note_tags, excluded_tags
+    if not excluded_tags:
+        return notes_list
+    
+    filtered_notes = []
+    for note in notes_list:
+        note_id = note.get("id")
+        note_tag = note_tags.get(note_id)
+        if not note_tag or note_tag not in excluded_tags:
+            filtered_notes.append(note)
+    
+    return filtered_notes
+
+
 @app.on_event("startup")
 async def startup_event():
-    global notes, search_engine, chatbot
+    global notes, search_engine, chatbot, note_tags, excluded_tags
     
     # Try to load notes from cache first
     cached_notes = load_notes_from_cache()
@@ -99,6 +161,10 @@ async def startup_event():
     # Initialize the search engine
     search_engine = VibeSearch(notes)
     
+    # Load tags and excluded tags from cache
+    note_tags = load_tags_from_cache()
+    excluded_tags = load_excluded_tags_from_cache()
+    
     # Display image search status
     if ENABLE_IMAGE_SEARCH:
         print("Image search capability is enabled")
@@ -108,10 +174,20 @@ async def startup_event():
     # Initialize the chatbot
     chatbot = ChatBot(search_engine)
     print(f"Initialized chatbot with model: {LLM_MODEL}")
+    print(f"Loaded {len(note_tags)} note tags and {len(excluded_tags)} excluded tags")
 
 
 class SearchRequest(BaseModel):
     query: str
+
+
+class TagNotesRequest(BaseModel):
+    note_ids: List[str]
+    tag_name: str
+
+
+class TagManagementRequest(BaseModel):
+    excluded_tags: List[str]
 
 
 @app.get("/api/search")
@@ -121,7 +197,9 @@ def search(q: str = ""):
         return {"error": "Search engine not initialized"}
 
     results = search_engine.search(q)
-    return {"results": results}
+    # Filter out notes with excluded tags
+    filtered_results = filter_notes_by_excluded_tags(results)
+    return {"results": filtered_results}
 
 
 @app.post("/api/search")
@@ -131,7 +209,9 @@ def search_post(request: SearchRequest):
         return {"error": "Search engine not initialized"}
 
     results = search_engine.search(request.query)
-    return {"results": results}
+    # Filter out notes with excluded tags
+    filtered_results = filter_notes_by_excluded_tags(results)
+    return {"results": filtered_results}
 
 
 @app.post("/api/search/image")
@@ -183,26 +263,28 @@ async def search_by_image(file: UploadFile = File(...)):
 @app.get("/api/all-notes")
 def get_all_notes():
     """Return all notes."""
-    global notes
-    if not notes:
-        raise HTTPException(status_code=500, detail="Notes not loaded")
-    
-    # Add a default score of 0 to each note to match the search results format
-    # and remove any image matching flags from previous searches
+    global notes, note_tags
     all_notes = []
+    
     for note in notes:
+        # Create a copy of the note data to avoid modifying the original
         note_with_score = note.copy()
-        note_with_score["score"] = 0.0
+        note_with_score["score"] = 1.0  # All notes have full relevance when showing all
         
-        # Clear any image matching flags that might be present from previous searches
-        if "has_matching_images" in note_with_score:
-            del note_with_score["has_matching_images"]
+        # Add tag information if available
+        note_id = note_with_score.get("id")
+        if note_id and note_id in note_tags:
+            note_with_score["tag"] = note_tags[note_id]
+        
+        # Remove matched_image field if it exists (only relevant for search results)
         if "matched_image" in note_with_score:
             del note_with_score["matched_image"]
             
         all_notes.append(note_with_score)
-        
-    return {"notes": all_notes}
+    
+    # Filter out notes with excluded tags
+    filtered_notes = filter_notes_by_excluded_tags(all_notes)
+    return {"notes": filtered_notes}
 
 
 @app.get("/api/clusters")
@@ -402,6 +484,75 @@ async def stream_chat_response(chatbot_instance, messages, use_notes_context=Tru
 def get_chat_model():
     """Return the current LLM model being used."""
     return {"model": LLM_MODEL}
+
+
+@app.post("/api/notes/tag")
+def tag_notes(request: TagNotesRequest):
+    """Tag selected notes with a given tag name."""
+    global note_tags
+    
+    # Validate that all note IDs exist
+    valid_note_ids = {note["id"] for note in notes}
+    invalid_ids = [note_id for note_id in request.note_ids if note_id not in valid_note_ids]
+    
+    if invalid_ids:
+        raise HTTPException(status_code=400, detail=f"Invalid note IDs: {invalid_ids}")
+    
+    # Apply tags to notes
+    for note_id in request.note_ids:
+        note_tags[note_id] = request.tag_name
+    
+    # Save to cache
+    save_tags_to_cache(note_tags)
+    
+    return {"message": f"Tagged {len(request.note_ids)} notes with '{request.tag_name}'"}
+
+
+@app.get("/api/tags")
+def get_all_tags():
+    """Get all available tags and their note counts."""
+    global note_tags
+    
+    tag_counts = {}
+    for tag_name in note_tags.values():
+        tag_counts[tag_name] = tag_counts.get(tag_name, 0) + 1
+    
+    tags = [{"name": tag_name, "count": count} for tag_name, count in tag_counts.items()]
+    tags.sort(key=lambda x: x["name"])
+    
+    return {"tags": tags}
+
+
+@app.get("/api/tags/excluded")
+def get_excluded_tags():
+    """Get currently excluded tags."""
+    global excluded_tags
+    return {"excluded_tags": list(excluded_tags)}
+
+
+@app.post("/api/tags/excluded")
+def set_excluded_tags(request: TagManagementRequest):
+    """Set which tags should be excluded from search results."""
+    global excluded_tags
+    
+    excluded_tags = set(request.excluded_tags)
+    save_excluded_tags_to_cache(excluded_tags)
+    
+    return {"message": f"Updated excluded tags: {list(excluded_tags)}"}
+
+
+@app.delete("/api/notes/{note_id}/tag")
+def remove_note_tag(note_id: str):
+    """Remove tag from a specific note."""
+    global note_tags
+    
+    if note_id not in note_tags:
+        raise HTTPException(status_code=404, detail="Note is not tagged")
+    
+    removed_tag = note_tags.pop(note_id)
+    save_tags_to_cache(note_tags)
+    
+    return {"message": f"Removed tag '{removed_tag}' from note {note_id}"}
 
 
 if __name__ == "__main__":

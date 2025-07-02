@@ -10,11 +10,22 @@ interface NoteCardProps {
   note: Note;
   query: string;
   refinementKeywords?: string;
+  isSelectable?: boolean;
+  isSelected?: boolean;
   onShowRelated: (content: string) => void;
+  onSelectNote?: (noteId: string, isSelected: boolean) => void;
 }
 
 export const NoteCard = memo(
-  ({ note, query, refinementKeywords, onShowRelated }: NoteCardProps) => {
+  ({
+    note,
+    query,
+    refinementKeywords,
+    isSelectable = false,
+    isSelected = false,
+    onShowRelated,
+    onSelectNote,
+  }: NoteCardProps) => {
     const scorePercentage = calculateScorePercentage(note.score);
     const highlightedTitle = highlightMatches(note.title, query, refinementKeywords);
 
@@ -22,6 +33,22 @@ export const NoteCard = memo(
       const noteContent = `${note.title} ${note.content}`;
       onShowRelated(noteContent);
     }, [note.title, note.content, onShowRelated]);
+
+    const handleSelectClick = useCallback(
+      (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (onSelectNote) {
+          onSelectNote(note.id, !isSelected);
+        }
+      },
+      [note.id, isSelected, onSelectNote],
+    );
+
+    const handleCardClick = useCallback(() => {
+      if (isSelectable && onSelectNote) {
+        onSelectNote(note.id, !isSelected);
+      }
+    }, [isSelectable, note.id, isSelected, onSelectNote]);
 
     // Create image gallery data from attachments
     const galleryImages =
@@ -38,11 +65,25 @@ export const NoteCard = memo(
     const matchedImage = note.matched_image;
 
     return (
-      <div className={`note-card ${note.color !== 'DEFAULT' ? `color-${note.color}` : ''}`}>
+      <div
+        className={`note-card ${note.color !== 'DEFAULT' ? `color-${note.color}` : ''} ${
+          isSelectable ? 'selectable' : ''
+        } ${isSelected ? 'selected' : ''}`}
+        onClick={handleCardClick}
+      >
+        {isSelectable && (
+          <div className="note-select-checkbox" onClick={handleSelectClick}>
+            <span className={`material-icons ${isSelected ? 'selected' : ''}`}>
+              {isSelected ? 'check_box' : 'check_box_outline_blank'}
+            </span>
+          </div>
+        )}
+
         <div className="note-header">
           {/* Badges */}
           {note.pinned && <span className="note-badge badge-pinned">Pinned</span>}
           {note.archived && <span className="note-badge badge-archived">Archived</span>}
+          {note.tag && <span className="note-badge badge-tag">{note.tag}</span>}
           {scorePercentage ? (
             <span className="note-badge badge-score">{scorePercentage}% match</span>
           ) : null}

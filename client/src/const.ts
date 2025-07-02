@@ -15,6 +15,10 @@ export const API_ROUTES = {
   ALL_NOTES: '/api/all-notes',
   CHAT: '/api/chat',
   CHAT_MODEL: '/api/chat/model',
+  TAGS: '/api/tags',
+  TAG_NOTES: '/api/notes/tag',
+  EXCLUDED_TAGS: '/api/tags/excluded',
+  REMOVE_TAG: '/api/notes',
 };
 
 export const VIEW_MODES = {

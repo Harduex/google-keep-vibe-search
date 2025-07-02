@@ -293,10 +293,97 @@ h1 {
   box-shadow: var(--card-shadow);
   transition: box-shadow 0.3s;
   text-align: left;
+  position: relative;
 }
 
 .note-card:hover {
   box-shadow: var(--hover-shadow);
+}
+
+.note-card.selectable {
+  cursor: pointer;
+  padding-left: 3rem;
+}
+
+.note-card.selectable:hover {
+  border-color: var(--accent-color);
+}
+
+.note-card.selected {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px rgba(var(--accent-color-rgb, 66, 133, 244), 0.2);
+}
+
+.note-select-checkbox {
+  position: absolute;
+  top: 1rem;
+  left: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.note-select-checkbox .material-icons {
+  font-size: 20px;
+  color: var(--text-secondary);
+  transition: color 0.2s;
+}
+
+.note-select-checkbox .material-icons.selected {
+  color: var(--accent-color);
+}
+
+.note-badge.badge-tag {
+  background: var(--accent-color);
+  color: white;
+  font-weight: 500;
+}
+
+.selection-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 16px;
+}
+
+.selection-toggle-button,
+.tag-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--input-bg);
+  color: var(--text-color);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.selection-toggle-button:hover,
+.tag-button:hover {
+  background: var(--hover-color);
+  border-color: var(--accent-color);
+}
+
+.tag-button {
+  background: var(--accent-color);
+  color: white;
+  border-color: var(--accent-color);
+}
+
+.tag-button:hover {
+  background: var(--accent-hover);
+}
+
+.selection-toggle-button .material-icons,
+.tag-button .material-icons {
+  font-size: 16px;
 }
 
 .note-title {
@@ -382,7 +469,7 @@ h1 {
 }
 
 .badge-pinned {
-  background-color: var(--note-red);
+  background-color: var(--note-yellow);
   color: var(--secondary-color);
 }
 

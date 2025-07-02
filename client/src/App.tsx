@@ -85,6 +85,17 @@ const App = () => {
     }
   }, [statsError, refetchStats]);
 
+  const handleResultsUpdate = useCallback(() => {
+    // Re-perform the current search to get updated results
+    if (query) {
+      performSearch(query);
+    }
+  }, [query, performSearch]);
+
+  const handleTabSwitch = useCallback((tab: string) => {
+    setActiveTab(tab as TabId);
+  }, []);
+
   const statsText = useMemo(() => {
     if (!stats) {
       return 'Loading notes...';
@@ -151,6 +162,7 @@ const App = () => {
             onShowRelated={handleSearch}
             onRefine={handleRefinement}
             onResetRefinement={resetRefinement}
+            onResultsUpdate={handleResultsUpdate}
           />
         )}
 
@@ -164,7 +176,7 @@ const App = () => {
         <GalleryOverlay
           onSearchSimilarResults={handleImageSearchResults}
           onError={handleDismissError}
-          onSwitchTab={setActiveTab}
+          onSwitchTab={handleTabSwitch}
         />
       </div>
     </GalleryProvider>

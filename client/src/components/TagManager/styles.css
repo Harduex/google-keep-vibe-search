@@ -1,0 +1,202 @@
+.tag-manager {
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  margin-bottom: 16px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.tag-manager-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  cursor: pointer;
+  background: var(--bg-secondary);
+  transition: background-color 0.2s;
+}
+
+.tag-manager-header:hover {
+  background: var(--hover-color);
+}
+
+.tag-manager-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: 500;
+  color: var(--text-color);
+}
+
+.tag-manager-title .material-icons {
+  font-size: 20px;
+  color: var(--accent-color);
+}
+
+.excluded-count {
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.expand-icon {
+  color: var(--text-secondary);
+  transition: transform 0.3s ease;
+}
+
+.expand-icon.expanded {
+  transform: rotate(180deg);
+}
+
+.tag-manager-content {
+  padding: 0 20px 20px;
+}
+
+.tag-manager-controls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.control-button {
+  padding: 6px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--input-bg);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.control-button:hover {
+  background: var(--hover-color);
+  color: var(--text-color);
+}
+
+.tag-list {
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--input-bg);
+}
+
+.tag-item {
+  border-bottom: 1px solid var(--border-color);
+}
+
+.tag-item:last-child {
+  border-bottom: none;
+}
+
+.tag-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  width: 100%;
+}
+
+.tag-checkbox:hover {
+  background: var(--hover-color);
+}
+
+.tag-checkbox input[type='checkbox'] {
+  display: none;
+}
+
+.checkmark {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border-color);
+  border-radius: 4px;
+  position: relative;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  background: var(--bg-color);
+}
+
+.tag-checkbox input[type='checkbox']:checked + .checkmark {
+  background: var(--accent-color);
+  border-color: var(--accent-color);
+}
+
+.tag-checkbox input[type='checkbox']:checked + .checkmark::after {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.tag-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.tag-name {
+  color: var(--text-color);
+  font-weight: 500;
+}
+
+.tag-count {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.tag-manager-help {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 12px;
+  background: var(--info-bg, var(--bg-secondary));
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.tag-manager-help .material-icons {
+  font-size: 16px;
+  color: var(--accent-color);
+  margin-top: 1px;
+  flex-shrink: 0;
+}
+
+/* Scrollbar styling for tag list */
+.tag-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.tag-list::-webkit-scrollbar-track {
+  background: var(--bg-color);
+}
+
+.tag-list::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 3px;
+}
+
+.tag-list::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+/* Dark mode adjustments */
+[data-theme='dark'] .tag-manager {
+  border-color: var(--border-color);
+}
+
+[data-theme='dark'] .checkmark {
+  border-color: var(--border-color);
+  background: var(--bg-secondary);
+}

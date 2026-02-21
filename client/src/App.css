@@ -76,7 +76,7 @@ header {
 
 h1 {
   font-size: 2.5rem;
-  color: var(--note-greentext-color);
+  color: var(--text-color);
   margin-bottom: 0.5rem;
 }
 
@@ -574,33 +574,6 @@ h1 {
   background-repeat: no-repeat;
 }
 
-.note-badge {
-  display: inline-block;
-  padding: 0.2rem 0.5rem;
-  border-radius: 4px;
-  margin-right: 0.5rem;
-  font-size: 0.7rem;
-  font-weight: bold;
-  text-transform: uppercase;
-}
-
-.badge-pinned {
-  background-color: var(--note-yellow);
-  color: var(--secondary-color);
-}
-
-.badge-archived {
-  background-color: var(--note-gray);
-  color: var(--secondary-color);
-}
-
-.badge-score {
-  background-color: #4285f4;
-  color: white;
-  margin-left: auto;
-  margin-bottom: 0.5rem;
-}
-
 .collapsed-content {
   max-height: 150px;
   overflow: hidden;
@@ -749,49 +722,6 @@ h1 {
   }
 }
 
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
-}
-
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
-}
-
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
-}
-
-.card {
-  padding: 2em;
-}
-
-.read-the-docs {
-  color: #888;
-}
-
 /* Error display styling */
 .error-container {
   position: fixed;
@@ -933,9 +863,8 @@ h1 {
 
 .clusters-controls {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
-  align-items: flex-start;
+  justify-content: flex-end;
+  margin-bottom: 10px;
 }
 
 .clusters-help-text {
@@ -1009,26 +938,6 @@ h1 {
     justify-content: space-between;
     width: 100%;
   }
-}
-
-.clusters-controls {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 10px;
-}
-
-.cluster-slider {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  width: 200px;
-  text-align: left;
-}
-
-.cluster-slider label {
-  font-size: 0.9rem;
-  color: var(--text-color);
 }
 
 .cluster-group {
@@ -1395,4 +1304,123 @@ mark .refinement-highlight,
 .image-search-separator span {
   padding: 0 10px;
   font-size: 0.9rem;
+}
+
+/* Error boundary fallback */
+.error-boundary-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--text-color);
+  min-height: 200px;
+}
+
+.error-boundary-fallback > .material-icons {
+  font-size: 48px;
+  color: var(--note-red);
+  margin-bottom: 16px;
+}
+
+.error-boundary-fallback p {
+  font-size: 1.1rem;
+  margin-bottom: 12px;
+}
+
+.error-boundary-details {
+  background-color: var(--light-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 0.85rem;
+  max-width: 500px;
+  overflow-x: auto;
+  margin-bottom: 16px;
+  color: var(--text-color);
+  opacity: 0.8;
+}
+
+.error-boundary-retry {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background-color: var(--card-bg);
+  color: var(--text-color);
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+.error-boundary-retry:hover {
+  background-color: var(--light-bg);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.error-boundary-retry .material-icons {
+  font-size: 18px;
+}
+
+/* Skeleton loading */
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  padding: 16px 0;
+}
+
+.skeleton-card {
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.skeleton-line {
+  height: 14px;
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    var(--light-bg) 25%,
+    var(--border-color) 50%,
+    var(--light-bg) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+.skeleton-title {
+  width: 60%;
+  height: 18px;
+}
+
+.skeleton-text {
+  width: 100%;
+}
+
+.skeleton-text.short {
+  width: 75%;
+}
+
+.skeleton-meta {
+  width: 40%;
+  height: 12px;
+  margin-top: 4px;
 }

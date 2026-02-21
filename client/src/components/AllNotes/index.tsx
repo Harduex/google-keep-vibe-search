@@ -1,6 +1,7 @@
 import { memo, useState, useCallback, useMemo, useEffect } from 'react';
 
 import { NoteCard } from '@/components/NoteCard';
+import { NoteSkeleton } from '@/components/NoteSkeleton';
 import { ScrollToTop } from '@/components/ScrollToTop';
 import { TagFilter } from '@/components/TagFilter';
 import { ViewToggle } from '@/components/ViewToggle';
@@ -108,7 +109,11 @@ export const AllNotes = memo(({ onShowRelated }: AllNotesProps) => {
   }, [handleLoadMore]);
 
   if (isLoading) {
-    return <div className="all-notes-loading">Loading notes...</div>;
+    return (
+      <div className="all-notes-container">
+        <NoteSkeleton count={12} />
+      </div>
+    );
   }
 
   if (error) {

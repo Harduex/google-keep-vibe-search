@@ -1,19 +1,43 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 import { API_ROUTES } from '@/const';
-import { Note } from '@/types';
+import { Citation, ChatSessionSummary, Note } from '@/types';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp?: number;
+  citations?: Citation[];
 }
 
-interface StreamResponse {
-  response: string;
+// New incremental streaming protocol types
+interface StreamContextMessage {
+  type: 'context';
   notes: Note[];
-  error?: string;
+  session_id: string;
 }
+
+interface StreamDeltaMessage {
+  type: 'delta';
+  content: string;
+}
+
+interface StreamDoneMessage {
+  type: 'done';
+  citations: Citation[];
+  full_response: string;
+}
+
+interface StreamErrorMessage {
+  type: 'error';
+  error: string;
+}
+
+type StreamMessage =
+  | StreamContextMessage
+  | StreamDeltaMessage
+  | StreamDoneMessage
+  | StreamErrorMessage;
 
 export const useChat = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -23,6 +47,10 @@ export const useChat = () => {
   const [modelName, setModelName] = useState<string | null>(null);
   const [useNotesContext, setUseNotesContext] = useState<boolean>(true);
   const [topic, setTopic] = useState<string>('');
+
+  // Session state
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessions, setSessions] = useState<ChatSessionSummary[]>([]);
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -42,6 +70,107 @@ export const useChat = () => {
     fetchModelInfo();
   }, []);
 
+  // Load sessions on mount
+  useEffect(() => {
+    fetchSessions();
+  }, []);
+
+  const fetchSessions = useCallback(async () => {
+    try {
+      const response = await fetch(API_ROUTES.CHAT_SESSIONS);
+      const data = await response.json();
+      setSessions(data.sessions || []);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Error fetching sessions:', err);
+    }
+  }, []);
+
+  const createSession = useCallback(async (): Promise<string | null> => {
+    try {
+      const response = await fetch(API_ROUTES.CHAT_SESSIONS, { method: 'POST' });
+      const data = await response.json();
+      setSessionId(data.id);
+      await fetchSessions();
+      return data.id;
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Error creating session:', err);
+      return null;
+    }
+  }, [fetchSessions]);
+
+  const loadSession = useCallback(async (id: string) => {
+    try {
+      const response = await fetch(`${API_ROUTES.CHAT_SESSIONS}/${id}`);
+      if (!response.ok) return;
+      const data = await response.json();
+      setSessionId(data.id);
+      setMessages(
+        (data.messages || []).map((m: { role: string; content: string }) => ({
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+        })),
+      );
+      setRelevantNotes([]);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Error loading session:', err);
+    }
+  }, []);
+
+  const deleteSession = useCallback(
+    async (id: string) => {
+      try {
+        await fetch(`${API_ROUTES.CHAT_SESSIONS}/${id}`, { method: 'DELETE' });
+        if (sessionId === id) {
+          setSessionId(null);
+          setMessages([]);
+          setRelevantNotes([]);
+        }
+        await fetchSessions();
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('Error deleting session:', err);
+      }
+    },
+    [sessionId, fetchSessions],
+  );
+
+  const renameSession = useCallback(
+    async (id: string, title: string) => {
+      try {
+        await fetch(`${API_ROUTES.CHAT_SESSIONS}/${id}?title=${encodeURIComponent(title)}`, {
+          method: 'PATCH',
+        });
+        await fetchSessions();
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('Error renaming session:', err);
+      }
+    },
+    [fetchSessions],
+  );
+
+  const saveSessionMessages = useCallback(
+    async (sid: string, msgs: ChatMessage[]) => {
+      try {
+        await fetch(`${API_ROUTES.CHAT_SESSIONS}/${sid}/messages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: msgs.map(({ role, content }) => ({ role, content })),
+          }),
+        });
+        await fetchSessions();
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('Error saving session messages:', err);
+      }
+    },
+    [fetchSessions],
+  );
+
   const stopGenerating = useCallback(() => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -56,6 +185,12 @@ export const useChat = () => {
         return;
       }
 
+      // Auto-create session if none exists
+      let currentSessionId = sessionId;
+      if (!currentSessionId) {
+        currentSessionId = await createSession();
+      }
+
       // Add user message
       const userMessage: ChatMessage = {
         role: 'user',
@@ -67,8 +202,7 @@ export const useChat = () => {
       setIsLoading(true);
       setError(null);
 
-      // Create a placeholder for the assistant's response with a guaranteed unique timestamp
-      // Ensure it's different from the user message timestamp by adding 1ms
+      // Create a placeholder for the assistant's response
       const assistantMessageId = Date.now() + 1;
       const assistantMessage: ChatMessage = {
         role: 'assistant',
@@ -82,23 +216,19 @@ export const useChat = () => {
       const payload = {
         messages: [...messages, userMessage].map(({ role, content }) => ({ role, content })),
         stream: true,
-        useNotesContext, // Include the context preference in the payload
-        topic: topic.trim() || undefined, // Only include if not empty
+        useNotesContext,
+        topic: topic.trim() || undefined,
+        session_id: currentSessionId || undefined,
       };
 
       // Stop any existing stream
       stopGenerating();
-
-      // Create a new abort controller for this request
       abortControllerRef.current = new AbortController();
 
       try {
-        // Start streaming request
         const response = await fetch(API_ROUTES.CHAT, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
           signal: abortControllerRef.current.signal,
         });
@@ -114,8 +244,9 @@ export const useChat = () => {
 
         let accumulatedContent = '';
         const decoder = new TextDecoder();
+        let buffer = '';
 
-        // Process the stream
+        // Process the stream with new protocol
         while (true) {
           const { done, value } = await reader.read();
 
@@ -123,39 +254,78 @@ export const useChat = () => {
             break;
           }
 
-          // Decode and handle the chunk
-          const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split('\n').filter((line) => line.trim());
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          // Keep the last (potentially incomplete) line in the buffer
+          buffer = lines.pop() || '';
 
           for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+
             try {
-              const data: StreamResponse = JSON.parse(line);
+              const data: StreamMessage = JSON.parse(trimmed);
 
-              if (data.error) {
-                setError(data.error);
-                continue;
+              switch (data.type) {
+                case 'context':
+                  // Notes arrive once at the start
+                  if (data.notes && data.notes.length > 0) {
+                    setRelevantNotes(data.notes);
+                  }
+                  break;
+
+                case 'delta':
+                  // Incremental content token
+                  accumulatedContent += data.content;
+                  setMessages((prevMessages) =>
+                    prevMessages.map((msg) =>
+                      msg.timestamp === assistantMessageId && msg.role === 'assistant'
+                        ? { ...msg, content: accumulatedContent }
+                        : msg,
+                    ),
+                  );
+                  break;
+
+                case 'done':
+                  // Final message with citations
+                  setMessages((prevMessages) =>
+                    prevMessages.map((msg) =>
+                      msg.timestamp === assistantMessageId && msg.role === 'assistant'
+                        ? {
+                            ...msg,
+                            content: data.full_response || accumulatedContent,
+                            citations: data.citations,
+                          }
+                        : msg,
+                    ),
+                  );
+                  break;
+
+                case 'error':
+                  setError(data.error);
+                  break;
               }
-
-              // Update the assistant's message, ensuring we only update assistant messages
-              accumulatedContent = data.response;
-
-              setMessages((prevMessages) =>
-                prevMessages.map((msg) =>
-                  msg.timestamp === assistantMessageId && msg.role === 'assistant'
-                    ? { ...msg, content: accumulatedContent }
-                    : msg,
-                ),
-              );
-
-              // Update relevant notes if provided
-              if (data.notes && data.notes.length > 0) {
-                setRelevantNotes(data.notes);
-              }
-            } catch (e) {
+            } catch {
               // eslint-disable-next-line no-console
-              console.error('Error parsing stream chunk:', e, line);
+              console.error('Error parsing stream chunk:', trimmed);
             }
           }
+        }
+
+        // Save session after completion
+        if (currentSessionId) {
+          const finalMessages: ChatMessage[] = [];
+          setMessages((prev) => {
+            finalMessages.push(...prev);
+            return prev;
+          });
+          // Use a small delay to ensure state is settled
+          setTimeout(() => {
+            setMessages((currentMsgs) => {
+              saveSessionMessages(currentSessionId!, currentMsgs);
+              return currentMsgs;
+            });
+          }, 100);
         }
       } catch (err) {
         if ((err as Error).name !== 'AbortError') {
@@ -168,15 +338,23 @@ export const useChat = () => {
         setIsLoading(false);
       }
     },
-    [messages, stopGenerating, useNotesContext, topic],
+    [messages, stopGenerating, useNotesContext, topic, sessionId, createSession, saveSessionMessages],
   );
 
   const clearChat = useCallback(() => {
     stopGenerating();
+    setSessionId(null);
     setMessages([]);
     setRelevantNotes([]);
     setError(null);
-    // Don't clear topic when clearing chat
+  }, [stopGenerating]);
+
+  const newChat = useCallback(() => {
+    stopGenerating();
+    setSessionId(null);
+    setMessages([]);
+    setRelevantNotes([]);
+    setError(null);
   }, [stopGenerating]);
 
   const toggleNotesContext = useCallback(() => {
@@ -196,5 +374,13 @@ export const useChat = () => {
     clearChat,
     stopGenerating,
     toggleNotesContext,
+    // Session management
+    sessionId,
+    sessions,
+    newChat,
+    loadSession,
+    deleteSession,
+    renameSession,
+    fetchSessions,
   };
 };

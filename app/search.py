@@ -11,20 +11,9 @@ from sentence_transformers import SentenceTransformer
 from sklearn.cluster import KMeans
 from sklearn.metrics.pairwise import cosine_similarity
 
-from app.config import (
-    CACHE_DIR,
-    DEFAULT_NUM_CLUSTERS,
-    EMBEDDINGS_CACHE_FILE,
-    ENABLE_IMAGE_SEARCH,
-    IMAGE_SEARCH_THRESHOLD,
-    IMAGE_SEARCH_WEIGHT,
-    MAX_RESULTS,
-    NOTES_HASH_FILE,
-    SEARCH_THRESHOLD,
-)
+from app.core.config import settings
 
-# Conditionally import ImageProcessor for image search capability
-if ENABLE_IMAGE_SEARCH:
+if settings.enable_image_search:
     from app.image_processor import ImageProcessor
 
 
@@ -50,7 +39,7 @@ class VibeSearch:
         # Initialize image processor if enabled
         self.image_processor = None
         self.image_note_map = {}  # Maps image paths to note indices
-        if ENABLE_IMAGE_SEARCH:
+        if settings.enable_image_search:
             self._init_image_search()
 
     def _init_image_search(self):
@@ -85,7 +74,7 @@ class VibeSearch:
     def load_or_compute_embeddings(self):
         """Load embeddings from cache if valid or compute and save new ones."""
         # Ensure cache directory exists
-        os.makedirs(CACHE_DIR, exist_ok=True)
+        os.makedirs(settings.resolved_cache_dir, exist_ok=True)
 
         # Generate hash of current notes to check if cache is valid
         current_hash = self._compute_notes_hash()
@@ -111,11 +100,11 @@ class VibeSearch:
 
     def _is_cache_valid(self, current_hash: str) -> bool:
         """Check if cached embeddings exist and match current notes."""
-        if not os.path.exists(EMBEDDINGS_CACHE_FILE) or not os.path.exists(NOTES_HASH_FILE):
+        if not os.path.exists(settings.embeddings_cache_file) or not os.path.exists(settings.notes_hash_file):
             return False
 
         try:
-            with open(NOTES_HASH_FILE, "r") as f:
+            with open(settings.notes_hash_file, "r") as f:
                 cache_info = json.load(f)
 
             # Check if the number of notes and hash match
@@ -130,7 +119,7 @@ class VibeSearch:
         """Save embeddings and metadata to cache."""
         # Save embeddings
         np.savez_compressed(
-            EMBEDDINGS_CACHE_FILE,
+            settings.embeddings_cache_file,
             embeddings=self.embeddings,
             note_indices=np.array(self.note_indices),
         )
@@ -142,13 +131,13 @@ class VibeSearch:
             "model_name": self.model.get_sentence_embedding_dimension(),
         }
 
-        with open(NOTES_HASH_FILE, "w") as f:
+        with open(settings.notes_hash_file, "w") as f:
             json.dump(cache_info, f)
 
     def _load_embeddings_from_cache(self):
         """Load embeddings from cache."""
         try:
-            data = np.load(EMBEDDINGS_CACHE_FILE)
+            data = np.load(settings.embeddings_cache_file)
             self.embeddings = data["embeddings"]
             cached_indices = data["note_indices"]
 
@@ -207,11 +196,10 @@ class VibeSearch:
             Dictionary mapping note indices to image match scores
         """
         # If image search isn't enabled or processor isn't initialized, return empty result
-        if not ENABLE_IMAGE_SEARCH or not self.image_processor:
+        if not settings.enable_image_search or not self.image_processor:
             return {}
-        
-        # Get matching images from the CLIP model
-        image_matches = self.image_processor.search_images(query, threshold=IMAGE_SEARCH_THRESHOLD)
+
+        image_matches = self.image_processor.search_images(query, threshold=settings.image_search_threshold)
         
         if not image_matches:
             return {}
@@ -230,7 +218,7 @@ class VibeSearch:
                         
         return note_scores
 
-    def search_by_image(self, image_file: Union[str, BinaryIO], max_results: int = MAX_RESULTS) -> List[Dict[str, Any]]:
+    def search_by_image(self, image_file: Union[str, BinaryIO], max_results: int = None) -> List[Dict[str, Any]]:
         """
         Search notes using an image as a query.
         
@@ -242,11 +230,10 @@ class VibeSearch:
             Sorted list of matching notes
         """
         # If image search isn't enabled or processor isn't initialized, return empty result
-        if not ENABLE_IMAGE_SEARCH or not self.image_processor:
+        if not settings.enable_image_search or not self.image_processor:
             return []
-        
-        # Get matching images from the CLIP model
-        image_matches = self.image_processor.search_with_image(image_file, threshold=IMAGE_SEARCH_THRESHOLD)
+
+        image_matches = self.image_processor.search_with_image(image_file, threshold=settings.image_search_threshold)
         
         if not image_matches:
             return []
@@ -266,7 +253,7 @@ class VibeSearch:
         # Create results list
         results = []
         for note_idx, score in note_scores.items():
-            if score > IMAGE_SEARCH_THRESHOLD:
+            if score > settings.image_search_threshold:
                 note = self.notes[note_idx].copy()
                 note["score"] = float(score)
                 # Add a flag to indicate this note has matching images
@@ -276,9 +263,9 @@ class VibeSearch:
         # Sort by score (descending)
         results.sort(key=lambda x: x["score"], reverse=True)
         
-        return results[:max_results]
+        return results[:max_results or settings.max_results]
 
-    def search(self, query: str, max_results: int = MAX_RESULTS) -> List[Dict[str, Any]]:
+    def search(self, query: str, max_results: int = None) -> List[Dict[str, Any]]:
         """
         Search notes using both semantic, keyword, and image search.
         
@@ -318,7 +305,7 @@ class VibeSearch:
             # Add image match boost if applicable
             if image_score > 0:
                 # Combine text and image scores, adjust weights as needed
-                combined_score = (text_score * (1 - IMAGE_SEARCH_WEIGHT)) + (image_score * IMAGE_SEARCH_WEIGHT)
+                combined_score = (text_score * (1 - settings.image_search_weight)) + (image_score * settings.image_search_weight)
                 # Add a flag to indicate this note has matching images
                 self.notes[note_idx]["has_matching_images"] = True
             else:
@@ -329,9 +316,9 @@ class VibeSearch:
             
             # Determine if this note should be included in results
             should_include = (
-                semantic_score > SEARCH_THRESHOLD or 
-                keyword_score > 0 or 
-                image_score > IMAGE_SEARCH_THRESHOLD
+                semantic_score > settings.search_threshold or
+                keyword_score > 0 or
+                image_score > settings.image_search_threshold
             )
             
             scores.append((note_idx, combined_score, should_include))
@@ -341,7 +328,7 @@ class VibeSearch:
 
         # Return top results that meet the threshold
         results = []
-        for note_idx, combined_score, should_include in scores[:max_results]:
+        for note_idx, combined_score, should_include in scores[:max_results or settings.max_results]:
             if should_include:
                 note = self.notes[note_idx].copy()
                 note["score"] = float(combined_score)
@@ -368,7 +355,7 @@ class VibeSearch:
             List of clusters with their notes
         """
         if num_clusters is None:
-            num_clusters = DEFAULT_NUM_CLUSTERS
+            num_clusters = settings.default_num_clusters
 
         # Limit num_clusters to at most 75% of the number of notes to avoid too many singleton clusters
         max_clusters = max(2, int(len(self.note_indices) * 0.75))

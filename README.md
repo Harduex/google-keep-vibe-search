@@ -1,259 +1,239 @@
 # Google Keep Vibe Search
 
-A semantic search application for your Google Keep notes export. This app lets you search through your notes using natural language queries, finding the most relevant notes based on the "vibe" of your search.
+A semantic search and AI chat assistant for your Google Keep notes export. Search by meaning, ask questions across your entire note collection, and surface connections you didn't know existed.
 
 ## Features
 
-- **Semantic Search**: Find notes based on meaning, not just exact keyword matches
-- **AI Chatbot**: Ask questions about your notes and get AI-generated answers powered by Ollama
-- **Clean UI**: Simple, responsive interface inspired by Google Keep
-- **Self-contained**: Easy to set up and run locally
+- **Semantic Search** — Find notes by meaning, not keyword. Powered by `sentence-transformers`.
+- **AI Chat with Citations** — Ask questions about your notes; the LLM answers using retrieved context and cites sources as `[Note #N]`.
+- **Chat Sessions** — Conversations persist across page reloads. Create, rename, and delete sessions from the sidebar.
+- **Multi-Signal RAG** — Retrieval uses your latest message, recent context, and continuity boosting to handle follow-up questions naturally.
+- **Note Chunking** — Long notes are split into chunks for higher-precision retrieval with large collections (2000+ notes).
+- **Image Search** — Find notes by image content using OpenAI CLIP embeddings (optional).
+- **Tag Management** — Assign tags to notes, exclude tags from search results.
+- **Clustering & 3D Visualization** — Group notes into semantic clusters and explore them in an interactive 3D scatter plot.
+- **Any OpenAI-Compatible LLM** — Works with Ollama, LM Studio, OpenAI, Anthropic (via proxy), or any `/v1/chat/completions` endpoint.
 
-## Requirements
+---
 
-- Python 3.8+
-- Google Keep export from Google Takeout
-- Basic understanding of command-line operations
-- Ollama running locally or accessible via network (for AI chat features)
+## Quick Start
 
-## Setup Instructions
+### Prerequisites
+
+- Python 3.9+
+- Node.js 18+
+- A [Google Takeout](https://takeout.google.com/) export with Keep selected
+- An LLM endpoint (Ollama recommended for local use)
 
 ### 1. Export your Google Keep notes
 
 1. Go to [Google Takeout](https://takeout.google.com/)
-2. Select only "Keep" from the list of Google products
-3. Click "Next step" and choose your delivery method
-4. Create export and download the ZIP file
-5. Extract the ZIP file to a location on your computer
+2. Select only **Keep**
+3. Download and extract the ZIP file
 
-### 2. Set up the Python environment
+### 2. Run the setup script
 
+**Linux / macOS:**
 ```bash
-# Clone this repository or download and extract the ZIP file
-git clone https://github.com/Harduex/google-keep-vibe-search.git
-cd google-keep-vibe-search
-
-# Create a virtual environment
-python -m venv venv
-
-# Activate the virtual environment
-# On Windows:
-venv\Scripts\activate
-# On macOS/Linux:
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# For development, set up pre-commit hooks
-pip install pre-commit
-pre-commit install
+bash scripts/setup.sh
 ```
 
-### 3. Set up Ollama (required for chat features)
+**Windows (PowerShell):**
+```powershell
+.\scripts\setup.ps1
+```
 
-1. Install Ollama from the [official website](https://ollama.ai/)
-2. Start the Ollama service
-3. Pull your preferred model (e.g., `ollama pull llama3`)
+This creates a Python virtual environment, installs all dependencies, installs frontend packages, and copies `.env.example` → `.env` on first run.
 
-### 4. Configure the application
+### 3. Edit `.env`
 
-Copy the provided `.env.example` file to create a `.env` file:
+Open `.env` and set at minimum:
 
+```env
+GOOGLE_KEEP_PATH=/home/user/Takeout/Keep   # or C:\Users\user\Takeout\Keep on Windows
+LLM_MODEL=llama3                            # model name available in your LLM provider
+```
+
+See [Configuration](#configuration) for all options.
+
+### 4. Start the development servers
+
+**Linux / macOS:**
 ```bash
-# On Windows
-copy .env.example .env
-
-# On macOS/Linux
-cp .env.example .env
+bash scripts/dev.sh
 ```
 
-Then edit the .env file to set your Google Keep export path and Ollama settings:
-
-```
-# Path to Google Keep export
-GOOGLE_KEEP_PATH=D:\\Takeout\\Keep  # On Windows
-# Or
-GOOGLE_KEEP_PATH=/home/user/Downloads/Takeout/Keep  # On macOS/Linux
-
-# Ollama settings (for chatbot)
-OLLAMA_API_URL=http://localhost:11434
-LLM_MODEL=llama3  # Or any other model you've pulled with Ollama
-CHAT_CONTEXT_NOTES=5  # Number of relevant notes to use for context
+**Windows (PowerShell):**
+```powershell
+.\scripts\dev.ps1
 ```
 
-### 5. Run the backend API
+| Service  | URL                       |
+|----------|---------------------------|
+| Frontend | http://localhost:5173      |
+| Backend  | http://localhost:8000      |
+| API docs | http://localhost:8000/docs |
 
-```bash
-# Make sure your virtual environment is activated
-python -m app.main
-```
+---
 
-The application should now be running at http://127.0.0.1:8000
+## LLM Providers
 
-### 6. Run the React client
+Set `LLM_API_BASE_URL` and `LLM_MODEL` in your `.env` to point at any OpenAI-compatible endpoint.
 
-```bash
-# Navigate to the client directory
-cd client
+| Provider     | `LLM_API_BASE_URL`                  | `LLM_API_KEY`       |
+|--------------|-------------------------------------|---------------------|
+| Ollama (default) | *(leave empty, uses `OLLAMA_API_URL`/v1)* | *(empty)*       |
+| LM Studio    | `http://localhost:1234/v1`          | *(empty)*           |
+| OpenAI       | `https://api.openai.com/v1`         | your OpenAI key     |
+| Anthropic proxy | your proxy URL                   | your key            |
 
-# Install dependencies (first time only)
-npm install
+---
 
-# Start the development server
-npm run dev
-```
+## Configuration
 
-The React client should now be running at http://localhost:3000 and will automatically connect to the backend API.
+All settings are read from `.env`. Copy `.env.example` to get started.
 
-### 7. Example Usage
+| Variable | Default | Description |
+|---|---|---|
+| `GOOGLE_KEEP_PATH` | *(required)* | Path to your Google Keep export folder |
+| `MAX_RESULTS` | `300` | Maximum search results returned |
+| `SEARCH_THRESHOLD` | `0.3` | Minimum similarity score (0.0–1.0). Lower = more results |
+| `DEFAULT_NUM_CLUSTERS` | `20` | Number of clusters for the Clusters tab |
+| `HOST` | `127.0.0.1` | Backend bind address |
+| `PORT` | `8000` | Backend port |
+| `LLM_API_BASE_URL` | *(empty)* | OpenAI-compatible API base URL. If empty, derived from `OLLAMA_API_URL` |
+| `LLM_API_KEY` | *(empty)* | API key (leave empty for local providers) |
+| `LLM_MODEL` | `llama3` | Model name to use for chat |
+| `CHAT_CONTEXT_NOTES` | `10` | Number of notes injected as context per chat message |
+| `CHAT_MAX_RECENT_MESSAGES` | `6` | Number of recent messages kept verbatim in context window |
+| `CHAT_SUMMARIZATION_THRESHOLD` | `12` | Total messages before older ones are summarized |
+| `OLLAMA_API_URL` | `http://localhost:11434` | Ollama server URL (fallback if `LLM_API_BASE_URL` is empty) |
+| `ENABLE_IMAGE_SEARCH` | `true` | Enable CLIP-based image search (downloads ~350 MB model on first run) |
+| `IMAGE_SEARCH_THRESHOLD` | `0.2` | Minimum image similarity score |
+| `IMAGE_SEARCH_WEIGHT` | `0.3` | Weight of image score vs. text score in combined results |
+| `CACHE_DIR` | `./cache/` | Directory for embeddings and session cache |
 
-You can use the Vibe Search to ask questions to your notes and receive very accurate results. Here is an example of how to use the search functionality:
+---
 
-1. Open your browser and go to [http://127.0.0.1:8000](http://127.0.0.1:8000).
-2. In the search bar, enter a query such as "meeting notes from last week" or "ideas for project".
-3. Click the "Search" button.
-4. The results will display matching notes sorted by relevance based on the "vibe" of your search.
-
-For example, if you have a note with the content "Discussed project milestones in the meeting last week", and you search for "What are my meeting notes from the last week?", the Vibe Search will find and display this note as a relevant result.
-
-#### Using the AI Chat
-
-1. Click on the "Chat" tab in the navigation bar
-2. Type your question in the chat input (e.g., "What were the main topics discussed in last month's meetings?")
-3. The AI will retrieve relevant notes from your collection and use them to generate a detailed answer
-4. You can see which notes were used as context for the AI's response in the right panel
-
-Feel free to experiment with different queries to see how well the Vibe Search can find the most relevant notes based on the meaning of your search terms.
-
-### Find Related Notes
-
-Each note in the search results has a "Show related" button that helps you discover connections between your notes:
-
-1. When you click the "Show related" button on a note, the system performs a new search using that note's content
-2. This reveals other notes that share similar topics, ideas, or themes
-3. It's a great way to rediscover forgotten notes and see connections between different ideas
-
-## Docker Setup
-
-This application can be run using Docker containers, which simplifies setup and ensures consistent environments.
-
-### Prerequisites
-
-- [Docker](https://docs.docker.com/get-docker/)
-- [Docker Compose](https://docs.docker.com/compose/install/)
-- Google Keep export from Google Takeout (as mentioned in the Setup Instructions)
-- Ollama service (for chat features)
-
-### Running with Docker
-
-1. Create a `.env` file from the example:
+## Docker
 
 ```bash
 cp .env.example .env
-```
-
-2. Edit the `.env` file to set your Google Keep export path and Ollama settings:
-
-```
-GOOGLE_KEEP_PATH=/path/to/your/Takeout/Keep
-OLLAMA_API_URL=http://host.docker.internal:11434  # Access host Ollama from container
-LLM_MODEL=llama3
-```
-
-3. Build and start the containers:
-
-```bash
+# Edit .env: set GOOGLE_KEEP_PATH and LLM settings
 docker compose up -d
 ```
 
-4. Access the application at http://localhost
+Access the app at http://localhost (port 80 → frontend, port 8000 → backend API).
 
-### Troubleshooting
+**Ollama networking in Docker:**
 
-- If the backend can't find your notes, check that the volume mapping in `docker-compose.yml` is correct for your Google Keep export path.
-- If you encounter permission issues with the cache directory, run `chmod -R 777 cache` on your host machine.
-- If the chatbot isn't working, ensure Ollama is running and accessible from the container using the correct URL.
+| Setup | `OLLAMA_API_URL` |
+|---|---|
+| Native Ollama + Docker Desktop | `http://host.docker.internal:11434` |
+| Native Ollama + Linux Docker | `http://172.17.0.1:11434` |
+| Ollama in same Compose stack | `http://ollama:11434` |
+
+---
 
 ## Development
 
-### Code Formatting
+### Project structure
 
-This project uses automatic code formatting to maintain consistent code style:
+```
+app/                    # FastAPI backend
+  core/
+    config.py           # Pydantic BaseSettings (all env vars)
+    lifespan.py         # App startup/shutdown
+    dependencies.py     # FastAPI Depends() injection
+    exceptions.py       # Custom exception handlers
+  models/               # Pydantic request/response models
+  services/
+    note_service.py     # Note loading, tag CRUD
+    cache_service.py    # Embedding and note cache I/O
+    search_service.py   # Wraps VibeSearch
+    chat_service.py     # LLM calls, streaming, RAG retrieval
+    session_service.py  # Chat session persistence (JSON files)
+    chunking_service.py # Note → chunks for high-precision retrieval
+    citation_service.py # Parse [Note #N] citations from responses
+  routes/               # One file per API route group
+  prompts/
+    system_prompts.py   # LLM system prompt templates
+  search.py             # VibeSearch: embedding + scoring
+  parser.py             # Google Keep JSON → Note objects
+  image_processor.py    # CLIP image embeddings
 
-- Python code is formatted with Black and isort
-- JavaScript/TypeScript code is formatted with Prettier
+client/                 # React + TypeScript frontend (Vite)
+  src/
+    components/
+      Chat/             # Chat tab: sessions sidebar, messages, context panel
+      NoteCard/         # Note display with tag chips and actions
+      AllNotes/         # Browse all notes with filtering
+      Clusters/         # Cluster view
+      Results/          # Search results grid
+    hooks/              # useSearch, useChat, useTags, ...
 
-#### VS Code Setup
+tests/                  # pytest backend tests
+  conftest.py
+  test_parser.py
+  test_citation_service.py
+  test_session_service.py
+  test_chunking_service.py
+```
 
-If you're using VS Code, we've included settings that will automatically format your code on save.
-Just install the recommended extensions when prompted.
+### Running tests
 
-#### Manual Formatting
+**Backend:**
+```bash
+venv/bin/pytest          # Linux/macOS
+venv\Scripts\pytest      # Windows
+```
 
-You can manually format the code using:
+**Frontend:**
+```bash
+cd client
+npm test
+```
+
+### Code formatting
 
 ```bash
-# For Python files
-black app/
-isort app/
+# Python
+venv/bin/black app/
+venv/bin/isort app/
 
-# For JavaScript/TypeScript files
-cd client
-npm run format
+# TypeScript
+cd client && npm run format
 ```
+
+---
 
 ## How it works
 
-The application uses semantic search to find relevant notes:
+1. **Startup** — Notes are parsed from Google Keep JSON files, passed through `sentence-transformers` to produce embeddings, and cached to `./cache/`. Subsequent loads skip re-embedding unchanged notes.
 
-**Semantic Search**: Uses the `sentence-transformers` model to convert your notes and queries into vector embeddings and finds similar content based on meaning.
+2. **Semantic search** — Your query is embedded with the same model. Cosine similarity ranks notes. An optional keyword overlap score is blended in for better precision on exact matches.
 
-**AI Chatbot**: Uses Ollama's LLM capabilities to generate responses based on your notes. The system:
-1. Searches for notes relevant to your question
-2. Formats them as context for the LLM
-3. Sends both your question and the context to Ollama
-4. Returns the generated response along with the source notes used
+3. **Image search** — If enabled, attached images are embedded with OpenAI CLIP. Image similarity scores are merged with text scores using `IMAGE_SEARCH_WEIGHT`.
 
-This approach allows you to find notes that are conceptually related to your query even if they don't contain the exact same words.
+4. **Chat / RAG** — On each message, the backend runs multi-signal retrieval (latest message + recent context + topic + chunk-level search + continuity boost), injects the top notes into a structured system prompt, and streams the LLM response token-by-token. The final `done` event includes parsed `[Note #N]` citations.
 
-## Customization
+5. **Chunking** — Notes longer than 500 characters are split into paragraph-level chunks that are embedded independently, enabling higher-precision retrieval in large collections.
 
-You can adjust the following settings in your `.env` file:
+6. **Sessions** — Chat histories are persisted as JSON in `./cache/chat_sessions/`. The session sidebar lets you switch, rename, and delete conversations.
 
-- `MAX_RESULTS`: Maximum number of results to return
-- `SEARCH_THRESHOLD`: Minimum relevance score (0.0 - 1.0) for search results
-  - 0.0: Show all results (default)
-  - 0.5: Show moderately relevant results
-  - 0.7: Show highly relevant results
-  - 1.0: Show only perfect matches
-- `HOST` and `PORT`: Server binding settings
-- `OLLAMA_API_URL`: URL to your Ollama API service
-- `LLM_MODEL`: The specific model to use with Ollama (must be available in your Ollama installation)
-- `CHAT_CONTEXT_NOTES`: Number of relevant notes to include as context for the LLM
+---
 
 ## Troubleshooting
 
-### No notes are being loaded
+**No notes loaded** — Check `GOOGLE_KEEP_PATH` points to the folder that contains `.json` files (not the parent Takeout folder).
 
-- Check that the `GOOGLE_KEEP_PATH` in your `.env` file points to the correct location
-- Ensure the folder contains `.json` files from your Google Keep export
+**Slow first start** — Embedding all notes and (if enabled) images takes a few minutes on first run. Subsequent starts load from cache.
 
-### App loads slow
+**Chat not responding** — Verify your LLM endpoint is reachable: `curl http://localhost:11434/v1/models` for Ollama. Check that `LLM_MODEL` matches an available model.
 
-- The first load might take longer as the model loads and computes embeddings
-- Subsequent loads should be faster
+**Image search disabled** — Set `ENABLE_IMAGE_SEARCH=true`. The CLIP model (~350 MB) downloads automatically on first use.
 
-### Missing dependencies
-
-- Ensure you're using the virtual environment and have installed all requirements
-
-### Chatbot not working
-
-- Verify that Ollama is running (`ollama serve`)
-- Check the Ollama API URL in your .env file
-- Ensure the model specified in `LLM_MODEL` is available in your Ollama installation
-- Look at the console logs for any API connection errors
+---
 
 ## License
 

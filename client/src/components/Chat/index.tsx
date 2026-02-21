@@ -2,6 +2,7 @@ import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 
 import { ChatMessage } from '@/components/Chat/ChatMessage';
 import { ChatNotes } from '@/components/Chat/ChatNotes';
+import { SessionList } from '@/components/Chat/SessionList';
 import { useChat } from '@/hooks/useChat';
 
 import './styles.css';
@@ -14,7 +15,9 @@ interface ChatProps {
 export const Chat = ({ query, onShowRelated }: ChatProps) => {
   const [inputValue, setInputValue] = useState('');
   const [showTopicInput, setShowTopicInput] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const {
     messages,
     isLoading,
@@ -27,12 +30,27 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
     toggleNotesContext,
     topic,
     setTopic,
+    // Session management
+    sessionId,
+    sessions,
+    newChat,
+    loadSession,
+    deleteSession,
+    renameSession,
   } = useChat();
 
   // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 150)}px`;
+    }
+  }, [inputValue]);
 
   const handleSubmit = useCallback(
     (e: FormEvent) => {
@@ -47,7 +65,7 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
     [inputValue, isLoading, sendMessage],
   );
 
-  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInputValue(e.target.value);
   }, []);
 
@@ -77,10 +95,23 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
     [inputValue, isLoading, sendMessage],
   );
 
+  const toggleSidebar = useCallback(() => {
+    setSidebarOpen((prev) => !prev);
+  }, []);
+
   return (
     <div className="chat-container">
       <div className="chat-header">
         <h2>
+          <button
+            className="sidebar-toggle-btn"
+            onClick={toggleSidebar}
+            title={sidebarOpen ? 'Hide sessions' : 'Show sessions'}
+          >
+            <span className="material-icons">
+              {sidebarOpen ? 'menu_open' : 'menu'}
+            </span>
+          </button>
           <span className="material-icons">chat</span>
           AI Assistant
           {modelName && <span className="model-info">Using {modelName}</span>}
@@ -129,6 +160,19 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
       </div>
 
       <div className="chat-layout">
+        {sidebarOpen && (
+          <div className="sessions-sidebar">
+            <SessionList
+              sessions={sessions}
+              activeSessionId={sessionId}
+              onNewChat={newChat}
+              onLoadSession={loadSession}
+              onDeleteSession={deleteSession}
+              onRenameSession={renameSession}
+            />
+          </div>
+        )}
+
         <div className="chat-messages-container">
           <div className="chat-messages">
             {messages.length === 0 ? (
@@ -177,13 +221,14 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
             )}
 
             <div className="input-wrapper">
-              <input
-                type="text"
+              <textarea
+                ref={textareaRef}
                 value={inputValue}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
-                placeholder="Type your message..."
+                placeholder="Type your message... (Enter to send, Shift+Enter for new line)"
                 disabled={isLoading}
+                rows={1}
               />
               <button type="submit" disabled={!inputValue.trim() || isLoading}>
                 {isLoading ? (

@@ -5,7 +5,7 @@ import time
 from datetime import datetime
 from typing import Any, Dict, List
 
-from app.config import GOOGLE_KEEP_PATH
+from app.core.config import settings
 
 
 def get_latest_modification_time(directory: str) -> float:
@@ -30,7 +30,7 @@ def parse_timestamp(usec: int) -> str:
 
 def parse_notes() -> List[Dict[str, Any]]:
     """Parse all Google Keep notes from the export directory."""
-    json_files = glob.glob(os.path.join(GOOGLE_KEEP_PATH, "*.json"))
+    json_files = glob.glob(os.path.join(settings.google_keep_path, "*.json"))
     notes = []
 
     for file_path in json_files:

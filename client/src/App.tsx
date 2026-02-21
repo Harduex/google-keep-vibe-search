@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 
 import { AllNotes } from '@/components/AllNotes';
 import { Chat } from '@/components/Chat';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ErrorDisplay } from '@/components/ErrorDisplay';
 import { GalleryProvider, GalleryOverlay } from '@/components/ImageGallery';
 import { ImageSearchUpload } from '@/components/ImageSearchUpload';
@@ -151,26 +152,40 @@ const App = () => {
 
         {/* Show content based on active tab */}
         {activeTab === 'search' && (
-          <Results
-            query={query}
-            results={results}
-            originalResults={originalResults}
-            refinementKeywords={refinementKeywords}
-            isLoading={isLoading}
-            hasSearched={hasSearched}
-            isRefined={isRefined}
-            onShowRelated={handleSearch}
-            onRefine={handleRefinement}
-            onResetRefinement={resetRefinement}
-            onResultsUpdate={handleResultsUpdate}
-          />
+          <ErrorBoundary fallbackLabel="Search">
+            <Results
+              query={query}
+              results={results}
+              originalResults={originalResults}
+              refinementKeywords={refinementKeywords}
+              isLoading={isLoading}
+              hasSearched={hasSearched}
+              isRefined={isRefined}
+              onShowRelated={handleSearch}
+              onRefine={handleRefinement}
+              onResetRefinement={resetRefinement}
+              onResultsUpdate={handleResultsUpdate}
+            />
+          </ErrorBoundary>
         )}
 
-        {activeTab === 'all-notes' && <AllNotes onShowRelated={handleSearch} />}
+        {activeTab === 'all-notes' && (
+          <ErrorBoundary fallbackLabel="All Notes">
+            <AllNotes onShowRelated={handleSearch} />
+          </ErrorBoundary>
+        )}
 
-        {activeTab === 'clusters' && <NotesClusters query={query} onShowRelated={handleSearch} />}
+        {activeTab === 'clusters' && (
+          <ErrorBoundary fallbackLabel="Clusters">
+            <NotesClusters query={query} onShowRelated={handleSearch} />
+          </ErrorBoundary>
+        )}
 
-        {activeTab === 'chat' && <Chat query={query} onShowRelated={handleSearch} />}
+        {activeTab === 'chat' && (
+          <ErrorBoundary fallbackLabel="Chat">
+            <Chat query={query} onShowRelated={handleSearch} />
+          </ErrorBoundary>
+        )}
 
         <ErrorDisplay error={error} onDismiss={handleDismissError} />
         <GalleryOverlay

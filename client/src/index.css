@@ -1,3 +1,29 @@
+@import 'tailwindcss';
+
+@theme {
+  /* Map app CSS variables to Tailwind theme tokens */
+  --color-primary: var(--primary-color);
+  --color-primary-dark: var(--primary-dark);
+  --color-secondary: var(--secondary-color);
+  --color-surface: var(--card-bg);
+  --color-surface-alt: var(--light-bg);
+  --color-border: var(--border-color);
+  --color-input: var(--input-bg);
+  --color-text: var(--text-color);
+  --color-bg: var(--bg-color);
+
+  /* Google Keep note colors */
+  --color-note-red: var(--note-red);
+  --color-note-orange: var(--note-orange);
+  --color-note-yellow: var(--note-yellow);
+  --color-note-green: var(--note-green);
+  --color-note-teal: var(--note-teal);
+  --color-note-blue: var(--note-blue);
+  --color-note-purple: var(--note-purple);
+  --color-note-brown: var(--note-brown);
+  --color-note-gray: var(--note-gray);
+}
+
 :root {
   font-family:
     system-ui,
@@ -13,10 +39,6 @@
     sans-serif;
   line-height: 1.5;
   font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -35,8 +57,6 @@ a:hover {
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
   min-width: 320px;
   min-height: 100vh;
 }
@@ -44,25 +64,6 @@ body {
 h1 {
   font-size: 3.2em;
   line-height: 1.1;
-}
-
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
 }
 
 /* Reset styles for mark elements */
@@ -74,17 +75,4 @@ mark {
 
 [data-theme='dark'] mark {
   background-color: rgba(255, 208, 77, 0.4);
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
 }

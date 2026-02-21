@@ -1,6 +1,7 @@
 import { memo, useState, useEffect, useCallback, useRef } from 'react';
 
 import { NoteCard } from '@/components/NoteCard';
+import { NoteSkeleton } from '@/components/NoteSkeleton';
 import { RefinementSearchBar } from '@/components/RefinementSearchBar';
 import { TagDialog } from '@/components/TagDialog';
 import { TagManager } from '@/components/TagManager';
@@ -184,7 +185,7 @@ export const Results = memo(
     if (isLoading) {
       return (
         <div className="results-container">
-          <div id="loading">Searching...</div>
+          <NoteSkeleton count={6} />
         </div>
       );
     }

@@ -50,3 +50,16 @@ export interface TagsResponse {
 export interface ExcludedTagsResponse {
   excluded_tags: string[];
 }
+
+export interface Citation {
+  note_number: number;
+  note_id: string;
+  note_title: string;
+}
+
+export interface ChatSessionSummary {
+  id: string;
+  title: string;
+  message_count: number;
+  updated_at: string;
+}

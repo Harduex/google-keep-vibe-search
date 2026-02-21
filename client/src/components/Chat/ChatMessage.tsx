@@ -7,10 +7,11 @@ import './styles.css';
 
 interface ChatMessageProps {
   message: ChatMessageType;
+  onCitationClick?: (noteNumber: number) => void;
 }
 
-export const ChatMessage = memo(({ message }: ChatMessageProps) => {
-  const { role, content, timestamp } = message;
+export const ChatMessage = memo(({ message, onCitationClick }: ChatMessageProps) => {
+  const { role, content, timestamp, citations } = message;
   const [isThinkingExpanded, setIsThinkingExpanded] = useState(false);
 
   const formattedTime = timestamp
@@ -96,6 +97,22 @@ export const ChatMessage = memo(({ message }: ChatMessageProps) => {
         {processedContent && (
           <div className="message-text">
             <ReactMarkdown>{processedContent}</ReactMarkdown>
+          </div>
+        )}
+
+        {citations && citations.length > 0 && (
+          <div className="citations-section">
+            <span className="citations-label">Sources:</span>
+            {citations.map((c) => (
+              <button
+                key={c.note_id}
+                className="citation-chip"
+                onClick={() => onCitationClick?.(c.note_number)}
+                title={c.note_title}
+              >
+                Note #{c.note_number}
+              </button>
+            ))}
           </div>
         )}
       </div>

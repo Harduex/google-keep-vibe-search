@@ -129,6 +129,8 @@ celerybeat.pid
 
 # Environments
 .env
+.env.*
+!.env.example
 .venv
 env/
 venv/
@@ -201,5 +203,9 @@ dist-ssr
 *.sln
 *.sw?
 
+# AI ephemeral workspace
+.ai-workspace/
+
 # Other
 *.fuse_hidden*
+tmpclaude-*

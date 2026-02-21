@@ -12,12 +12,7 @@ from tqdm import tqdm
 # Import CLIP model (installed via requirements.txt)
 import clip
 
-from app.config import (
-    CACHE_DIR,
-    GOOGLE_KEEP_PATH,
-    IMAGE_EMBEDDINGS_CACHE_FILE,
-    IMAGE_HASH_FILE,
-)
+from app.core.config import settings
 
 # Suppress warnings that might come from PIL or CLIP
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -54,7 +49,7 @@ class ImageProcessor:
             Dictionary mapping image paths to their embeddings
         """
         # Create cache directory if it doesn't exist
-        os.makedirs(CACHE_DIR, exist_ok=True)
+        os.makedirs(settings.resolved_cache_dir, exist_ok=True)
 
         # Get all unique image paths from notes
         image_paths = self._get_all_image_paths(notes)
@@ -199,7 +194,7 @@ class ImageProcessor:
         """Process a list of images and store their embeddings."""
         for image_path in tqdm(image_paths, desc="Generating image embeddings"):
             try:
-                full_path = os.path.join(GOOGLE_KEEP_PATH, image_path)
+                full_path = os.path.join(settings.google_keep_path, image_path)
                 if not os.path.exists(full_path):
                     print(f"Warning: Image not found: {full_path}")
                     continue
@@ -245,7 +240,7 @@ class ImageProcessor:
             
         # Save embeddings array
         np.savez_compressed(
-            IMAGE_EMBEDDINGS_CACHE_FILE,
+            settings.image_embeddings_cache_file,
             paths=np.array(paths, dtype=object),
             embeddings=np.array(embeddings),
         )
@@ -256,20 +251,20 @@ class ImageProcessor:
             "count": len(self.image_embeddings),
         }
         
-        with open(IMAGE_HASH_FILE, "w") as f:
+        with open(settings.image_hash_file, "w") as f:
             json.dump(hash_info, f)
             
         print(f"Saved {len(self.image_embeddings)} image embeddings to cache")
 
     def _load_embeddings_from_cache(self) -> None:
         """Load image embeddings from cache if available."""
-        if not os.path.exists(IMAGE_EMBEDDINGS_CACHE_FILE) or not os.path.exists(IMAGE_HASH_FILE):
+        if not os.path.exists(settings.image_embeddings_cache_file) or not os.path.exists(settings.image_hash_file):
             print("No image embeddings cache found")
             return
             
         try:
             # Load embeddings
-            data = np.load(IMAGE_EMBEDDINGS_CACHE_FILE, allow_pickle=True)
+            data = np.load(settings.image_embeddings_cache_file, allow_pickle=True)
             paths = data["paths"].tolist()
             embeddings = data["embeddings"]
             

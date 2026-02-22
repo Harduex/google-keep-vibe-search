@@ -32,7 +32,13 @@ def _load_notes():
         sys.exit(1)
 
     with open(cache_file, "r", encoding="utf-8") as f:
-        notes = json.load(f)
+        data = json.load(f)
+
+    # Handle both formats: bare list or {"timestamp": ..., "notes": [...]}
+    if isinstance(data, dict):
+        notes = data.get("notes", [])
+    else:
+        notes = data
 
     print(f"Loaded {len(notes)} notes from {cache_file}")
     return notes

@@ -64,7 +64,8 @@ app/                            # FastAPI backend
     graph_service.py            # GraphRAG: PropertyGraphIndex (opt-in, ENABLE_GRAPHRAG=true)
     raptor_service.py           # RAPTOR hierarchical summaries (opt-in, ENABLE_RAPTOR=true)
     router_agent.py             # Intent classification (FACTUAL/RELATIONAL/SUMMARY/MIXED) + dispatch
-  routes/                       # One file per route group (search, chat, notes, tags, …)
+  routes/                       # One file per route group (search, chat, notes, tags, health, …)
+    health.py                   # GET /api/health — readiness probe (works during startup)
   prompts/
     system_prompts.py           # Legacy LLM prompts ([Note #N] format)
     grounded_prompts.py         # Strict grounded prompt (requires [citation:id], no fabrication)
@@ -89,6 +90,7 @@ client/
       NoteCard/                 # Single note card with tag chips
       TagFilter/ TagManager/ TagDialog/
     hooks/
+      useBackendHealth.ts         # Health polling: auto-retry connection, readiness gate
       useChat.ts                # Chat state, NDJSON stream parsing, document viewer callbacks
       useSearch.ts              # Semantic + keyword search
       useTags.ts                # Tag fetch + exclude management
@@ -165,7 +167,7 @@ All values loaded from `.env` (copy from `.env.example`).
 | `LLM_API_KEY` | *(empty)* | API key (empty for local providers) |
 | `LLM_MODEL` | `llama3` | Model name |
 | `OLLAMA_API_URL` | `http://localhost:11434` | Fallback Ollama URL |
-| `CHAT_CONTEXT_NOTES` | `10` | Context chunks injected per message |
+| `CHAT_CONTEXT_NOTES` | `15` | Top-N context chunks injected per message |
 | `CHAT_MAX_RECENT_MESSAGES` | `6` | Recent messages kept verbatim in context window |
 | `CHAT_SUMMARIZATION_THRESHOLD` | `12` | Message count before history summarisation |
 
@@ -190,12 +192,14 @@ All values loaded from `.env` (copy from `.env.example`).
 
 ## Service Wiring (Lifespan)
 
-`app/core/lifespan.py` starts up in four stages:
+`app/core/lifespan.py` starts up in four stages (each phase logs timing and progress to stdout):
 
 1. **Notes + Search** — Parse Google Keep notes (or load from cache) → `VibeSearch` → `SearchService`
 2. **Chunking** — Branch on `CHUNKING_STRATEGY`: `DoclingChunkingService` or legacy `ChunkingService`
 3. **LlamaIndex + Vector DB** — `LlamaIndexService` (embed model + LLM) → `LanceDBService` → optionally `GraphRAGService` + `RAPTORService` (gracefully skip if disabled or unavailable)
 4. **Chat** — `RouterAgent` → `ChatService(search, chunking, graph, raptor, lancedb)` → `SessionService`
+
+The `/api/health` endpoint (registered before other routers) returns readiness status even while startup is in progress, allowing the frontend to distinguish "backend starting" from "backend down".
 
 All services are stored on `app.state`. `app/core/dependencies.py` exposes them as `Depends()` getters.
 
@@ -206,7 +210,7 @@ All services are stored on `app.state`. `app/core/dependencies.py` exposes them 
 `ChatService.stream_chat_with_protocol()` emits newline-delimited JSON:
 
 ```
-{"type": "context", "items": [...GroundedContext], "intent": "factual", "session_id": "..."}
+{"type": "context", "items": [...GroundedContext], "intent": "factual", "session_id": "...", "total_notes": 847, "notes": [...]}
 {"type": "delta",   "content": "partial token text"}
 {"type": "delta",   "content": "more text"}
 {"type": "done",    "citations": [...GroundedCitation], "full_response": "..."}
@@ -217,7 +221,7 @@ All services are stored on `app.state`. `app/core/dependencies.py` exposes them 
 
 **GroundedCitation** fields: `citation_id`, `note_id`, `note_title`, `start_char_idx`, `end_char_idx`, `text_snippet`
 
-The frontend (`useChat.ts`) parses `context` to populate the context sidebar and document viewer state; `done` to attach deduplicated citations to the completed message.
+The frontend (`useChat.ts`) parses `context` to populate the context sidebar and document viewer state; `done` to attach deduplicated citations to the completed message. The `total_notes` field in `context` gives the total note count in the database so the UI can show "Top N of X notes". The `notes` array is a legacy flat list for backward compatibility.
 
 ---
 
@@ -250,6 +254,7 @@ Backward compat: responses with `[Note #N]` markers are handled by the legacy pa
 
 | Method | Path | Description |
 |--------|------|-------------|
+| GET    | `/api/health` | Readiness probe: returns service status even during startup |
 | POST   | `/api/chat` | Streaming chat (NDJSON) or non-streaming |
 | GET    | `/api/chat/model` | Configured model name |
 | GET/POST | `/api/chat/sessions` | List / create sessions |

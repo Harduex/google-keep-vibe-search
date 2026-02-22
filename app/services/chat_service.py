@@ -299,6 +299,7 @@ class ChatService:
             context_items, intent = self._get_grounded_context(messages, topic)
 
         # Emit context message with GroundedContext items
+        total_notes = len(self.search_service.notes) if hasattr(self.search_service, "notes") else 0
         context_payload = {
             "type": "context",
             "items": [
@@ -307,6 +308,7 @@ class ChatService:
             ],
             "intent": intent,
             "session_id": session_id or "",
+            "total_notes": total_notes,
             # Legacy: also include flat notes list for backward compatibility
             "notes": [
                 {

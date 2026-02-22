@@ -65,20 +65,22 @@ class GoogleKeepDoclingAdapter:
 
             lines = block_text.strip().split("\n")
             if all(self.LIST_ITEM_RE.match(line.strip()) for line in lines if line.strip()):
-                list_group = doc.add_list_group()
+                first_ref = None
                 for line in lines:
                     line = line.strip()
                     if not line:
                         continue
                     m = self.LIST_ITEM_RE.match(line)
                     item_text = m.group(1) if m else line
-                    ref = doc.add_list_item(text=item_text, parent=list_group)
+                    ref = doc.add_list_item(text=item_text)
+                    if first_ref is None:
+                        first_ref = ref
                 offsets.append(
                     ParagraphOffset(
                         text=block_text.strip(),
                         start=start_idx,
                         end=end_idx,
-                        item_ref=list_group,
+                        item_ref=first_ref,
                     )
                 )
                 continue

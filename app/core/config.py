@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     llm_api_base_url: str = ""
     llm_api_key: str = ""
     llm_model: str = "llama3"
-    chat_context_notes: int = 5
+    chat_context_notes: int = 15
 
     # Legacy Ollama (used as fallback for llm_api_base_url)
     ollama_api_url: str = "http://localhost:11434"

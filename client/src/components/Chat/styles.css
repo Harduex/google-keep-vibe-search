@@ -1369,6 +1369,62 @@
   margin-left: 8px;
 }
 
+.notes-header-text {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.notes-count-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-color);
+  opacity: 0.6;
+  white-space: nowrap;
+}
+
+.context-info-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-color);
+  opacity: 0.5;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: opacity 0.2s;
+}
+
+.context-info-toggle:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.context-info-panel {
+  background: var(--light-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--text-color);
+  opacity: 0.85;
+}
+
+.context-info-panel p {
+  margin: 0;
+}
+
+.empty-notes-hint {
+  font-size: 0.85rem !important;
+  opacity: 0.6;
+  font-style: italic;
+}
+
 .context-items-list {
   display: flex;
   flex-direction: column;

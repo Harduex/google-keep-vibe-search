@@ -15,8 +15,18 @@ else
   echo "Virtual environment already exists."
 fi
 
+echo "Upgrading pip..."
+venv/bin/python -m pip install --upgrade pip -q
+
 echo "Installing Python dependencies..."
-venv/bin/pip install -q -r requirements.txt
+if ! venv/bin/pip install -q -r requirements.txt; then
+  echo ""
+  echo "ERROR: pip install failed. Check the output above for dependency conflicts."
+  echo "You may need to delete the venv folder and try again:"
+  echo "  rm -rf venv"
+  echo "  ./scripts/setup.sh"
+  exit 1
+fi
 
 # 2. Node.js dependencies
 echo "Installing frontend dependencies..."

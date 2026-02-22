@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.core.lifespan import lifespan
-from app.routes import chat, embeddings, images, notes, search, stats, tags
+from app.routes import chat, embeddings, health, images, notes, search, stats, tags
 
 app = FastAPI(title="Google Keep Vibe Search", lifespan=lifespan)
 
@@ -16,6 +16,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(health.router)
 app.include_router(search.router)
 app.include_router(chat.router)
 app.include_router(notes.router)

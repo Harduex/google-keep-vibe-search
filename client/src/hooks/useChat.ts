@@ -19,6 +19,7 @@ interface StreamContextMessage {
   items: GroundedContext[];
   intent: string;
   session_id: string;
+  total_notes: number;
   /** Legacy flat notes list for backward compatibility. */
   notes: Note[];
 }
@@ -57,6 +58,7 @@ export const useChat = () => {
   // Grounded context state
   const [contextItems, setContextItems] = useState<GroundedContext[]>([]);
   const [retrievalIntent, setRetrievalIntent] = useState<string>('factual');
+  const [totalNotes, setTotalNotes] = useState<number>(0);
 
   // Document viewer state
   const [activeCitationId, setActiveCitationId] = useState<string | null>(null);
@@ -328,6 +330,9 @@ export const useChat = () => {
                   if (data.intent) {
                     setRetrievalIntent(data.intent);
                   }
+                  if (data.total_notes) {
+                    setTotalNotes(data.total_notes);
+                  }
                   // Legacy: also set notes for backward compat
                   if (data.notes && data.notes.length > 0) {
                     setRelevantNotes(data.notes);
@@ -452,6 +457,7 @@ export const useChat = () => {
     // Grounded context
     contextItems,
     retrievalIntent,
+    totalNotes,
     // Document viewer
     activeCitationId,
     activeDocument,

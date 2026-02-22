@@ -41,6 +41,7 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
     // Grounded context
     contextItems,
     retrievalIntent,
+    totalNotes,
     // Document viewer
     activeDocument,
     openDocumentViewer,
@@ -261,6 +262,7 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
             onShowRelated={onShowRelated}
             contextItems={contextItems}
             intent={retrievalIntent}
+            totalNotes={totalNotes}
           />
         </div>
 

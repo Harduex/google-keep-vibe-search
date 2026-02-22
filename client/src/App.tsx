@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { AllNotes } from '@/components/AllNotes';
 import { Chat } from '@/components/Chat';
@@ -13,6 +13,7 @@ import { SearchModeToggle, type SearchMode } from '@/components/SearchModeToggle
 import { TabNavigation, TabId } from '@/components/TabNavigation';
 import { UI_ELEMENTS } from '@/const';
 import { formatStatsText, scrollToElement } from '@/helpers';
+import { useBackendHealth } from '@/hooks/useBackendHealth';
 import { useSearch } from '@/hooks/useSearch';
 import { useStats } from '@/hooks/useStats';
 import { useTheme } from '@/hooks/useTheme';
@@ -22,6 +23,7 @@ import { Note } from './types';
 
 const App = () => {
   const { theme, toggleTheme } = useTheme();
+  const { isConnected, isReady } = useBackendHealth();
   const { stats, error: statsError, refetchStats } = useStats();
   const {
     query,
@@ -109,6 +111,34 @@ const App = () => {
   const showImageSearchEnabled = useMemo(() => {
     return stats?.image_search?.enabled || false;
   }, [stats]);
+
+  // Refetch stats once backend becomes ready
+  useEffect(() => {
+    if (isReady && !stats) {
+      refetchStats();
+    }
+  }, [isReady, stats, refetchStats]);
+
+  if (!isReady) {
+    return (
+      <div className="backend-connecting-overlay">
+        <div className="backend-connecting-content">
+          <span className="material-icons spinning">sync</span>
+          <h2>{isConnected ? 'Starting up...' : 'Connecting to backend...'}</h2>
+          <p>
+            {isConnected
+              ? 'The backend is loading notes and building search indexes. This may take a moment on first run.'
+              : 'Waiting for the backend server at localhost:8000. Make sure it is running.'}
+          </p>
+          <div className="connecting-dots">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <GalleryProvider>

@@ -6,6 +6,7 @@ export const UI_ELEMENTS = {
 };
 
 export const API_ROUTES = {
+  HEALTH: '/api/health',
   STATS: '/api/stats',
   SEARCH: '/api/search',
   SEARCH_BY_IMAGE: '/api/search/image',

@@ -11,6 +11,7 @@ A semantic search and AI chat assistant for your Google Keep notes export — re
 - **Document Viewer** — Click any citation to open the full note in a side panel with the cited passage highlighted. Uses the [CSS Custom Highlight API](https://developer.mozilla.org/en-US/docs/Web/API/CSS_Custom_Highlight_API) (Chrome 105+) with `<mark>` fallback for Firefox.
 - **Docling Chunking** — Long notes are chunked with Docling's `HierarchicalChunker`, injecting character offsets into every chunk so citations highlight exact passages.
 - **Chat Sessions** — Conversations persist across reloads. Create, rename, and delete sessions from the sidebar.
+- **Connection Resilience** — The frontend auto-retries when the backend is starting up, showing a live status overlay. A `/api/health` endpoint lets the UI distinguish "backend loading" from "backend down".
 - **Image Search** — Find notes by image content using OpenAI CLIP embeddings (optional).
 - **Tag Management** — Assign tags to notes, exclude tags from search results.
 - **Clustering & 3D Visualization** — Group notes into semantic clusters and explore them in an interactive 3D scatter plot.
@@ -115,7 +116,7 @@ All settings are read from `.env`. Copy `.env.example` to get started.
 | `LLM_API_KEY` | *(empty)* | API key (leave empty for local providers) |
 | `LLM_MODEL` | `llama3` | Model name to use for chat |
 | `OLLAMA_API_URL` | `http://localhost:11434` | Ollama server URL (fallback if `LLM_API_BASE_URL` is empty) |
-| `CHAT_CONTEXT_NOTES` | `10` | Number of context chunks injected per chat message |
+| `CHAT_CONTEXT_NOTES` | `15` | Number of top-N context chunks injected per chat message |
 | `CHAT_MAX_RECENT_MESSAGES` | `6` | Number of recent messages kept verbatim in context window |
 | `CHAT_SUMMARIZATION_THRESHOLD` | `12` | Total messages before older ones are summarized |
 
@@ -190,6 +191,7 @@ app/                          # FastAPI backend
     raptor_service.py         # RAPTOR: hierarchical summary tree (opt-in)
     router_agent.py           # Query intent classification + dispatch
   routes/                     # One file per API route group
+    health.py                 # GET /api/health readiness probe
   prompts/
     system_prompts.py         # Legacy system prompt templates
     grounded_prompts.py       # Strict citation-grounded system prompt
@@ -207,6 +209,7 @@ client/                       # React + TypeScript frontend (Vite)
         CitationInline.tsx    # Superscript citation chip + tooltip
         DocumentViewer.tsx    # Full-note side panel with highlight
     hooks/
+      useBackendHealth.ts       # Health polling + connection readiness gate
       useChat.ts              # Chat state, streaming, document viewer
     utils/
       citationParser.ts       # Parse [citation:id] markers → segments
@@ -268,7 +271,7 @@ Notes are parsed from Google Keep JSON files. Depending on `CHUNKING_STRATEGY`:
 - **`docling`** (default): Notes are converted to `DoclingDocument` objects and chunked with `HierarchicalChunker`. Each chunk carries `start_char_idx` / `end_char_idx` offsets into the original note text.
 - **`legacy`**: Notes are split into paragraph-level chunks without offset tracking.
 
-Chunks are embedded with `all-MiniLM-L6-v2` and stored in LanceDB (`chunks` table). Full-note embeddings go into the `notes` table. Everything is cached; subsequent starts skip re-embedding unchanged notes.
+Chunks are embedded with `all-MiniLM-L6-v2` and stored in LanceDB (`chunks` table). Full-note embeddings go into the `notes` table. Everything is cached; subsequent starts skip re-embedding unchanged notes. Each startup phase logs timing to the console (e.g. `[Startup] Phase 1/4: Loaded 847 notes (2.3s)`).
 
 If `ENABLE_GRAPHRAG=true` or `ENABLE_RAPTOR=true`, those indexes are loaded from their persist directories (build them separately with the indexing scripts before first use).
 
@@ -331,6 +334,8 @@ The old numpy cache is not deleted; you can switch back with `CHUNKING_STRATEGY=
 **Slow first start** — Embedding all notes takes a few minutes on first run. Building GraphRAG or RAPTOR indexes requires LLM calls and should be done as a separate step. Subsequent starts load from cache.
 
 **Chat not responding** — Verify your LLM endpoint is reachable: `curl http://localhost:11434/v1/models` for Ollama. Check that `LLM_MODEL` matches an available model.
+
+**"Connecting to backend" spinner** — The frontend polls `/api/health` and shows a connection overlay while the backend starts up. This is normal on first launch (embedding all notes may take several minutes). Check the backend console for phased progress logs like `[Startup] Phase 1/4: Loading notes...`.
 
 **Citations not highlighted** — Character-offset highlighting requires `CHUNKING_STRATEGY=docling` (default). If you migrated from `legacy`, re-index your notes by deleting the LanceDB cache and restarting.
 

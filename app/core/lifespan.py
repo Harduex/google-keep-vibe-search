@@ -1,4 +1,5 @@
 import os
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -38,7 +39,7 @@ def _create_llama_index_service():
             return service
         return None
     except Exception as e:
-        print(f"[Lifespan] Could not initialize LlamaIndexService: {e}")
+        print(f"[Startup] Could not initialize LlamaIndexService: {e}")
         return None
 
 
@@ -57,7 +58,7 @@ def _create_lancedb_service(llama_service):
             return service
         return None
     except Exception as e:
-        print(f"[Lifespan] Could not initialize LanceDBService: {e}")
+        print(f"[Startup] Could not initialize LanceDBService: {e}")
         return None
 
 
@@ -78,7 +79,7 @@ def _create_graph_service(llama_service):
         )
         return service
     except Exception as e:
-        print(f"[Lifespan] Could not initialize GraphRAGService: {e}")
+        print(f"[Startup] Could not initialize GraphRAGService: {e}")
         return None
 
 
@@ -99,30 +100,44 @@ def _create_raptor_service(llama_service):
         )
         return service
     except Exception as e:
-        print(f"[Lifespan] Could not initialize RAPTORService: {e}")
+        print(f"[Startup] Could not initialize RAPTORService: {e}")
         return None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    startup_start = time.time()
+
+    # --- Phase 1: Notes + Search -------------------------------------------
+    print("[Startup] Phase 1/4: Loading notes...")
+    t0 = time.time()
     note_service = NoteService()
     note_service.load_notes()
     note_service.load_tags()
+    print(f"[Startup] Phase 1/4: Loaded {len(note_service.notes)} notes ({time.time() - t0:.1f}s)")
 
+    t0 = time.time()
     search_engine = VibeSearch(note_service.notes)
     search_service = SearchService(search_engine)
+    print(f"[Startup] Phase 1/4: Search engine ready ({time.time() - t0:.1f}s)")
 
     if settings.enable_image_search:
-        print("Image search capability is enabled")
+        print("[Startup] Image search capability is enabled")
     else:
-        print("Image search capability is disabled (set ENABLE_IMAGE_SEARCH=true to enable)")
+        print("[Startup] Image search is disabled (set ENABLE_IMAGE_SEARCH=true to enable)")
 
-    # Build chunk-level embeddings for enhanced RAG context retrieval
+    # --- Phase 2: Chunking -------------------------------------------------
+    print("[Startup] Phase 2/4: Building chunk embeddings...")
+    t0 = time.time()
     chunking_service = _create_chunking_service(search_engine.model)
     chunking_service.build_chunks(note_service.notes)
+    chunk_count = len(chunking_service.chunks) if hasattr(chunking_service, "chunks") else 0
     chunking_service.load_or_compute_embeddings()
+    print(f"[Startup] Phase 2/4: Chunking complete — {chunk_count} chunks ({time.time() - t0:.1f}s)")
 
-    # --- Phase 2: LlamaIndex + LanceDB + optional GraphRAG/RAPTOR ----------
+    # --- Phase 3: LlamaIndex + LanceDB + optional GraphRAG/RAPTOR ----------
+    print("[Startup] Phase 3/4: Initializing vector database...")
+    t0 = time.time()
     llama_service = _create_llama_index_service()
     lancedb_service = _create_lancedb_service(llama_service)
 
@@ -132,21 +147,23 @@ async def lifespan(app: FastAPI):
             chunks=chunking_service.chunks if hasattr(chunking_service, "chunks") else [],
             embed_dimension=llama_service.embed_dimension,
         )
-        # Wire LanceDB into the search engine for hybrid retrieval
         search_engine.set_lancedb_service(lancedb_service)
+    print(f"[Startup] Phase 3/4: Vector database ready ({time.time() - t0:.1f}s)")
 
     graph_service = _create_graph_service(llama_service)
     if graph_service is not None:
         if not graph_service.load():
-            print("[Lifespan] No persisted graph found. "
+            print("[Startup] No persisted graph found. "
                   "Run graph build separately (expensive LLM operation).")
 
     raptor_service = _create_raptor_service(llama_service)
     if raptor_service is not None:
         if not raptor_service.load():
-            print("[Lifespan] No persisted RAPTOR tree found. "
+            print("[Startup] No persisted RAPTOR tree found. "
                   "Run tree build separately (expensive LLM operation).")
 
+    # --- Phase 4: Chat + Sessions ------------------------------------------
+    print("[Startup] Phase 4/4: Wiring services...")
     chat_service = ChatService(
         search_service,
         chunking_service,
@@ -154,10 +171,8 @@ async def lifespan(app: FastAPI):
         raptor_service=raptor_service,
         lancedb_service=lancedb_service,
     )
-    print(f"Initialized chat service with model: {settings.llm_model}")
 
     session_service = SessionService()
-    print(f"Initialized session service at: {settings.chat_sessions_dir}")
 
     app.state.note_service = note_service
     app.state.search_service = search_service
@@ -167,6 +182,10 @@ async def lifespan(app: FastAPI):
     app.state.lancedb_service = lancedb_service
     app.state.graph_service = graph_service
     app.state.raptor_service = raptor_service
+
+    total_time = time.time() - startup_start
+    print(f"[Startup] All services ready — {len(note_service.notes)} notes, "
+          f"model={settings.llm_model} ({total_time:.1f}s total)")
 
     yield
 

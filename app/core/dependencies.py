@@ -1,3 +1,5 @@
+from typing import Optional
+
 from fastapi import Request
 
 from app.services.chat_service import ChatService
@@ -20,3 +22,19 @@ def get_chat_service(request: Request) -> ChatService:
 
 def get_session_service(request: Request) -> SessionService:
     return request.app.state.session_service
+
+
+def get_llama_service(request: Request) -> Optional[object]:
+    return getattr(request.app.state, "llama_service", None)
+
+
+def get_lancedb_service(request: Request) -> Optional[object]:
+    return getattr(request.app.state, "lancedb_service", None)
+
+
+def get_graph_service(request: Request) -> Optional[object]:
+    return getattr(request.app.state, "graph_service", None)
+
+
+def get_raptor_service(request: Request) -> Optional[object]:
+    return getattr(request.app.state, "raptor_service", None)

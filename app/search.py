@@ -42,6 +42,14 @@ class VibeSearch:
         if settings.enable_image_search:
             self._init_image_search()
 
+        # Optional LanceDB service for hybrid retrieval (set via lifespan)
+        self.lancedb_service = None
+
+    def set_lancedb_service(self, lancedb_service) -> None:
+        """Attach a LanceDBService for hybrid vector search."""
+        self.lancedb_service = lancedb_service
+        print("[VibeSearch] LanceDB service attached for hybrid retrieval")
+
     def _init_image_search(self):
         """Initialize image search capabilities by processing all images in notes."""
         try:

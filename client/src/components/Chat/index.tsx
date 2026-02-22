@@ -2,6 +2,7 @@ import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 
 import { ChatMessage } from '@/components/Chat/ChatMessage';
 import { ChatNotes } from '@/components/Chat/ChatNotes';
+import { DocumentViewer } from '@/components/Chat/DocumentViewer';
 import { SessionList } from '@/components/Chat/SessionList';
 import { useChat } from '@/hooks/useChat';
 
@@ -37,6 +38,13 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
     loadSession,
     deleteSession,
     renameSession,
+    // Grounded context
+    contextItems,
+    retrievalIntent,
+    // Document viewer
+    activeDocument,
+    openDocumentViewer,
+    closeDocumentViewer,
   } = useChat();
 
   // Scroll to bottom when messages change
@@ -108,9 +116,7 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
             onClick={toggleSidebar}
             title={sidebarOpen ? 'Hide sessions' : 'Show sessions'}
           >
-            <span className="material-icons">
-              {sidebarOpen ? 'menu_open' : 'menu'}
-            </span>
+            <span className="material-icons">{sidebarOpen ? 'menu_open' : 'menu'}</span>
           </button>
           <span className="material-icons">chat</span>
           AI Assistant
@@ -159,7 +165,7 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
         </div>
       </div>
 
-      <div className="chat-layout">
+      <div className={`chat-layout ${activeDocument ? 'with-document-viewer' : ''}`}>
         {sidebarOpen && (
           <div className="sessions-sidebar">
             <SessionList
@@ -181,7 +187,14 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
                 <p>Ask me anything about your notes!</p>
               </div>
             ) : (
-              messages.map((message, index) => <ChatMessage key={index} message={message} />)
+              messages.map((message, index) => (
+                <ChatMessage
+                  key={index}
+                  message={message}
+                  contextItems={contextItems}
+                  onGroundedCitationClick={openDocumentViewer}
+                />
+              ))
             )}
             <div ref={messagesEndRef} />
           </div>
@@ -242,8 +255,26 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
         </div>
 
         <div className="notes-container">
-          <ChatNotes notes={relevantNotes} query={query} onShowRelated={onShowRelated} />
+          <ChatNotes
+            notes={relevantNotes}
+            query={query}
+            onShowRelated={onShowRelated}
+            contextItems={contextItems}
+            intent={retrievalIntent}
+          />
         </div>
+
+        {activeDocument && (
+          <div className="document-viewer-container">
+            <DocumentViewer
+              noteId={activeDocument.noteId}
+              noteTitle={activeDocument.noteTitle}
+              noteContent={activeDocument.noteContent}
+              activeContext={activeDocument.context}
+              onClose={closeDocumentViewer}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

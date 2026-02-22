@@ -51,10 +51,48 @@ export interface ExcludedTagsResponse {
   excluded_tags: string[];
 }
 
+/** Legacy citation format (Note #N). */
 export interface Citation {
   note_number: number;
   note_id: string;
   note_title: string;
+}
+
+/** Grounded context item from the retrieval pipeline. */
+export interface GroundedContext {
+  citation_id: string;
+  note_id: string;
+  note_title: string;
+  text: string;
+  start_char_idx: number | null;
+  end_char_idx: number | null;
+  relevance_score: number;
+  source_type: string;
+  heading_trail: string[];
+}
+
+/** Grounded citation extracted from the LLM response. */
+export interface GroundedCitation {
+  citation_id: string;
+  note_id: string;
+  note_title: string;
+  start_char_idx: number | null;
+  end_char_idx: number | null;
+  text_snippet: string;
+}
+
+/** A parsed segment of text, either plain or a citation reference. */
+export interface ContentSegment {
+  type: 'text' | 'citation';
+  text: string;
+  citationId?: string;
+}
+
+/** Result of parsing an LLM response for citations. */
+export interface ParsedContent {
+  cleanText: string;
+  citations: GroundedCitation[];
+  segments: ContentSegment[];
 }
 
 export interface ChatSessionSummary {

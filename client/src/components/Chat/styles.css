@@ -922,7 +922,9 @@
   border: 1px solid rgba(var(--primary-color-rgb), 0.25);
   border-radius: 12px;
   cursor: pointer;
-  transition: background 0.15s, transform 0.1s;
+  transition:
+    background 0.15s,
+    transform 0.1s;
 }
 
 .citation-chip:hover {
@@ -1104,7 +1106,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: color 0.15s, background 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s;
 }
 
 .session-action-btn .material-icons {
@@ -1138,4 +1142,372 @@
 
 [data-theme='dark'] .session-action-btn:hover {
   background: rgba(255, 255, 255, 0.08);
+}
+
+/* ================================================
+   Inline citation chips (CitationInline)
+   ================================================ */
+.citation-inline-wrapper {
+  position: relative;
+  display: inline;
+}
+
+.citation-inline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(var(--primary-color-rgb), 0.12);
+  color: var(--primary-color);
+  border: none;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  cursor: pointer;
+  vertical-align: super;
+  line-height: 1;
+  margin: 0 1px;
+  transition:
+    background 0.15s,
+    transform 0.1s;
+}
+
+.citation-inline:hover {
+  background: rgba(var(--primary-color-rgb), 0.25);
+  transform: translateY(-1px);
+}
+
+.citation-fallback {
+  font-size: 0.75em;
+  color: var(--primary-color);
+  font-weight: 600;
+}
+
+/* Citation tooltip on hover */
+.citation-tooltip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 8px 12px;
+  min-width: 200px;
+  max-width: 300px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  z-index: 100;
+  pointer-events: none;
+  animation: fade-in 0.15s ease-out;
+}
+
+.citation-tooltip-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-color);
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.citation-tooltip-snippet {
+  font-size: 0.75rem;
+  color: var(--text-color);
+  opacity: 0.75;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ================================================
+   Document Viewer (side panel)
+   ================================================ */
+.document-viewer-container {
+  width: 35%;
+  min-width: 280px;
+  max-width: 500px;
+  flex-shrink: 0;
+  height: 100%;
+  animation: slide-in-right 0.25s ease-out;
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.document-viewer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background-color: var(--card-bg);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+.document-viewer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+  background: rgba(var(--primary-color-rgb), 0.04);
+  flex-shrink: 0;
+}
+
+.document-viewer-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text-color);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.document-viewer-title span:last-child {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.document-viewer-title .material-icons {
+  color: var(--primary-color);
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.document-viewer-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  color: var(--text-color);
+  opacity: 0.6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    opacity 0.15s,
+    background 0.15s;
+  flex-shrink: 0;
+}
+
+.document-viewer-close:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.document-viewer-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  color: var(--text-color);
+}
+
+/* Layout adjustment when document viewer is open */
+.chat-layout.with-document-viewer .notes-container {
+  display: none;
+}
+
+.chat-layout.with-document-viewer .chat-messages-container {
+  flex: 1;
+}
+
+/* Highlight styles for the document viewer (mark fallback) */
+.document-viewer-content mark,
+.document-viewer-content .citation-highlight {
+  background-color: rgba(255, 213, 79, 0.4);
+  border-bottom: 2px solid #f9a825;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+/* CSS Custom Highlight API styles */
+::highlight(citation-active) {
+  background-color: rgba(255, 213, 79, 0.4);
+  color: inherit;
+}
+
+::highlight(citation-hover) {
+  background-color: rgba(255, 213, 79, 0.2);
+}
+
+/* ================================================
+   Context Items (ChatNotes sidebar)
+   ================================================ */
+.context-intent-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: rgba(var(--primary-color-rgb), 0.1);
+  color: var(--primary-color);
+  border-radius: 10px;
+  margin-left: 8px;
+}
+
+.context-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.context-note-group {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: rgba(var(--bg-color-rgb), 0.3);
+}
+
+.context-note-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-color);
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.context-score {
+  margin-left: auto;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--primary-color);
+  background: rgba(var(--primary-color-rgb), 0.08);
+  padding: 1px 6px;
+  border-radius: 8px;
+}
+
+.context-item {
+  padding: 6px 0;
+}
+
+.context-item + .context-item {
+  border-top: 1px dashed rgba(0, 0, 0, 0.06);
+  padding-top: 8px;
+}
+
+.context-item-text {
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--text-color);
+  opacity: 0.85;
+}
+
+.context-item-trail {
+  font-size: 0.72rem;
+  color: var(--primary-color);
+  margin-top: 3px;
+  opacity: 0.8;
+}
+
+.context-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 0.68rem;
+  color: var(--text-color);
+  opacity: 0.5;
+}
+
+.context-item-source {
+  background: rgba(0, 0, 0, 0.05);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.context-item-id {
+  font-family: monospace;
+  font-size: 0.65rem;
+}
+
+/* ================================================
+   Dark mode overrides
+   ================================================ */
+[data-theme='dark'] .citation-tooltip {
+  background: #2a2a2a;
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme='dark'] .document-viewer-close:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme='dark'] .document-viewer-content mark,
+[data-theme='dark'] .document-viewer-content .citation-highlight {
+  background-color: rgba(255, 183, 77, 0.3);
+  border-bottom-color: #ffb74d;
+}
+
+[data-theme='dark'] .context-note-title {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme='dark'] .context-item + .context-item {
+  border-top-color: rgba(255, 255, 255, 0.06);
+}
+
+[data-theme='dark'] .context-item-source {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* ================================================
+   Responsive: document viewer
+   ================================================ */
+@media (max-width: 1200px) {
+  .document-viewer-container {
+    width: 40%;
+    min-width: 250px;
+  }
+}
+
+@media (max-width: 900px) {
+  .document-viewer-container {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 85%;
+    max-width: none;
+    height: 100vh;
+    z-index: 1000;
+    border-radius: 0;
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.15);
+  }
+
+  .document-viewer {
+    border-radius: 0;
+    height: 100vh;
+  }
+
+  .chat-layout.with-document-viewer .notes-container {
+    display: none;
+  }
 }

@@ -1,20 +1,26 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 import { API_ROUTES } from '@/const';
-import { Citation, ChatSessionSummary, Note } from '@/types';
+import { Citation, ChatSessionSummary, GroundedCitation, GroundedContext, Note } from '@/types';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp?: number;
+  /** Legacy citations. */
   citations?: Citation[];
+  /** New grounded citations with character offsets. */
+  groundedCitations?: GroundedCitation[];
 }
 
 // New incremental streaming protocol types
 interface StreamContextMessage {
   type: 'context';
-  notes: Note[];
+  items: GroundedContext[];
+  intent: string;
   session_id: string;
+  /** Legacy flat notes list for backward compatibility. */
+  notes: Note[];
 }
 
 interface StreamDeltaMessage {
@@ -24,7 +30,7 @@ interface StreamDeltaMessage {
 
 interface StreamDoneMessage {
   type: 'done';
-  citations: Citation[];
+  citations: GroundedCitation[];
   full_response: string;
 }
 
@@ -47,6 +53,19 @@ export const useChat = () => {
   const [modelName, setModelName] = useState<string | null>(null);
   const [useNotesContext, setUseNotesContext] = useState<boolean>(true);
   const [topic, setTopic] = useState<string>('');
+
+  // Grounded context state
+  const [contextItems, setContextItems] = useState<GroundedContext[]>([]);
+  const [retrievalIntent, setRetrievalIntent] = useState<string>('factual');
+
+  // Document viewer state
+  const [activeCitationId, setActiveCitationId] = useState<string | null>(null);
+  const [activeDocument, setActiveDocument] = useState<{
+    noteId: string;
+    noteTitle: string;
+    noteContent: string;
+    context: GroundedContext | null;
+  } | null>(null);
 
   // Session state
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -113,6 +132,9 @@ export const useChat = () => {
         })),
       );
       setRelevantNotes([]);
+      setContextItems([]);
+      setActiveDocument(null);
+      setActiveCitationId(null);
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('Error loading session:', err);
@@ -127,6 +149,9 @@ export const useChat = () => {
           setSessionId(null);
           setMessages([]);
           setRelevantNotes([]);
+          setContextItems([]);
+          setActiveDocument(null);
+          setActiveCitationId(null);
         }
         await fetchSessions();
       } catch (err) {
@@ -177,6 +202,34 @@ export const useChat = () => {
       abortControllerRef.current = null;
       setIsLoading(false);
     }
+  }, []);
+
+  /**
+   * Open the document viewer for a specific citation.
+   */
+  const openDocumentViewer = useCallback(
+    (citationId: string) => {
+      setActiveCitationId(citationId);
+
+      // Find the matching context item
+      const ctx = contextItems.find((c) => c.citation_id === citationId);
+      if (!ctx) return;
+
+      // Find the full note content from relevantNotes
+      const note = relevantNotes.find((n) => n.id === ctx.note_id);
+      setActiveDocument({
+        noteId: ctx.note_id,
+        noteTitle: ctx.note_title,
+        noteContent: note?.content || ctx.text,
+        context: ctx,
+      });
+    },
+    [contextItems, relevantNotes],
+  );
+
+  const closeDocumentViewer = useCallback(() => {
+    setActiveDocument(null);
+    setActiveCitationId(null);
   }, []);
 
   const sendMessage = useCallback(
@@ -267,12 +320,20 @@ export const useChat = () => {
               const data: StreamMessage = JSON.parse(trimmed);
 
               switch (data.type) {
-                case 'context':
-                  // Notes arrive once at the start
+                case 'context': {
+                  // Store grounded context items
+                  if (data.items && data.items.length > 0) {
+                    setContextItems(data.items);
+                  }
+                  if (data.intent) {
+                    setRetrievalIntent(data.intent);
+                  }
+                  // Legacy: also set notes for backward compat
                   if (data.notes && data.notes.length > 0) {
                     setRelevantNotes(data.notes);
                   }
                   break;
+                }
 
                 case 'delta':
                   // Incremental content token
@@ -287,14 +348,14 @@ export const useChat = () => {
                   break;
 
                 case 'done':
-                  // Final message with citations
+                  // Final message with grounded citations
                   setMessages((prevMessages) =>
                     prevMessages.map((msg) =>
                       msg.timestamp === assistantMessageId && msg.role === 'assistant'
                         ? {
                             ...msg,
                             content: data.full_response || accumulatedContent,
-                            citations: data.citations,
+                            groundedCitations: data.citations,
                           }
                         : msg,
                     ),
@@ -346,6 +407,9 @@ export const useChat = () => {
     setSessionId(null);
     setMessages([]);
     setRelevantNotes([]);
+    setContextItems([]);
+    setActiveDocument(null);
+    setActiveCitationId(null);
     setError(null);
   }, [stopGenerating]);
 
@@ -354,6 +418,9 @@ export const useChat = () => {
     setSessionId(null);
     setMessages([]);
     setRelevantNotes([]);
+    setContextItems([]);
+    setActiveDocument(null);
+    setActiveCitationId(null);
     setError(null);
   }, [stopGenerating]);
 
@@ -382,5 +449,13 @@ export const useChat = () => {
     deleteSession,
     renameSession,
     fetchSessions,
+    // Grounded context
+    contextItems,
+    retrievalIntent,
+    // Document viewer
+    activeCitationId,
+    activeDocument,
+    openDocumentViewer,
+    closeDocumentViewer,
   };
 };

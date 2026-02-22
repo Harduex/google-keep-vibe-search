@@ -4,17 +4,26 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 import httpx
 
 from app.core.config import settings
-from app.prompts.system_prompts import (
-    CONVERSATION_SUMMARY_PROMPT,
-    NO_NOTES_SYSTEM_PROMPT,
-    NOTES_CHAT_SYSTEM_PROMPT,
+from app.prompts.grounded_prompts import (
+    GROUNDED_CONVERSATION_SUMMARY_PROMPT,
+    GROUNDED_NO_CONTEXT_PROMPT,
+    GROUNDED_SYSTEM_PROMPT,
+    format_grounded_context,
 )
-from app.services.chunking_service import ChunkingService
-from app.services.citation_service import extract_citations
+from app.prompts.system_prompts import CONVERSATION_SUMMARY_PROMPT
+from app.services.citation_service import extract_citations, extract_grounded_citations
+from app.services.router_agent import RouterAgent
 
 
 class ChatService:
-    def __init__(self, search_service, chunking_service: Optional[ChunkingService] = None):
+    def __init__(
+        self,
+        search_service,
+        chunking_service=None,
+        graph_service=None,
+        raptor_service=None,
+        lancedb_service=None,
+    ):
         self.search_service = search_service
         self.chunking_service = chunking_service
         self.model = settings.llm_model
@@ -31,6 +40,15 @@ class ChatService:
             base_url=self.api_base_url,
             headers=headers,
             timeout=httpx.Timeout(connect=10.0, read=120.0, write=10.0, pool=10.0),
+        )
+
+        # Initialize Router Agent for agentic retrieval
+        self.router = RouterAgent(
+            search_service=search_service,
+            chunking_service=chunking_service,
+            graph_service=graph_service,
+            raptor_service=raptor_service,
+            lancedb_service=getattr(search_service, "lancedb_service", None) or lancedb_service,
         )
 
     def get_relevant_notes(
@@ -56,21 +74,42 @@ class ChatService:
 
         return "\n\n".join(formatted)
 
-    def prepare_messages_with_context(
+    def _get_grounded_context(
+        self, messages: List[Dict[str, str]], topic: Optional[str] = None
+    ):
+        """Use RouterAgent for intent-based retrieval and grounding."""
+        latest_message = ""
+        for msg in reversed(messages):
+            if msg.get("role") == "user":
+                latest_message = msg["content"]
+                break
+
+        if not latest_message and not topic:
+            return [], "factual"
+
+        query = latest_message or topic or ""
+        intent = self.router.classify_intent(query)
+        context_items = self.router.retrieve_and_ground(
+            query, max_results=self.max_context_notes, intent=intent
+        )
+        return context_items, intent.value
+
+    def prepare_messages_with_grounded_context(
         self,
         messages: List[Dict[str, str]],
-        relevant_notes: List[Dict[str, Any]],
+        context_items,
     ) -> List[Dict[str, str]]:
+        """Build message list with grounded system prompt."""
         prepared = [m for m in messages if m.get("role") != "system"]
 
-        if relevant_notes:
-            formatted_notes = self.format_notes_for_context(relevant_notes)
-            system_content = NOTES_CHAT_SYSTEM_PROMPT.format(
-                note_count=len(relevant_notes),
-                formatted_notes=formatted_notes,
+        if context_items:
+            formatted = format_grounded_context(context_items)
+            system_content = GROUNDED_SYSTEM_PROMPT.format(
+                context_count=len(context_items),
+                formatted_context=formatted,
             )
         else:
-            system_content = NO_NOTES_SYSTEM_PROMPT
+            system_content = GROUNDED_NO_CONTEXT_PROMPT
 
         prepared.insert(0, {"role": "system", "content": system_content})
         return prepared
@@ -81,6 +120,7 @@ class ChatService:
         topic: Optional[str] = None,
         previous_note_ids: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
+        """Legacy context retrieval -- still used for backward compatibility."""
         latest_message = ""
         for msg in reversed(messages):
             if msg.get("role") == "user":
@@ -90,7 +130,6 @@ class ChatService:
         if not latest_message and not topic:
             return []
 
-        # Note-level search (existing behavior)
         primary_results = self.get_relevant_notes(
             latest_message, max_notes=self.max_context_notes + 5
         ) if latest_message else []
@@ -105,7 +144,6 @@ class ChatService:
         if topic:
             topic_results = self.get_relevant_notes(topic, max_notes=5)
 
-        # Chunk-level search for more precise retrieval on long notes
         chunk_results = []
         if self.chunking_service and latest_message:
             chunk_results = self.chunking_service.search_chunks(
@@ -146,7 +184,6 @@ class ChatService:
             else:
                 seen[nid] = {"note": note, "score": note.get("score", 0) * 0.6}
 
-        # Chunk-level results boost precision for long notes
         if chunk_results:
             for note in chunk_results:
                 nid = note.get("id", "")
@@ -187,7 +224,7 @@ class ChatService:
         conversation = "\n".join(
             f"{m.get('role', 'user').title()}: {m.get('content', '')}" for m in messages
         )
-        prompt_text = CONVERSATION_SUMMARY_PROMPT.format(conversation=conversation)
+        prompt_text = GROUNDED_CONVERSATION_SUMMARY_PROMPT.format(conversation=conversation)
 
         try:
             response = await self.client.post(
@@ -220,9 +257,16 @@ class ChatService:
             relevant_notes = self.get_conversation_aware_context(messages, topic)
 
         windowed = await self._maybe_summarize_window(messages)
-        prepared = self.prepare_messages_with_context(
-            windowed, relevant_notes if use_notes_context else []
-        )
+        prepared = self.prepare_messages_with_grounded_context(windowed, [])
+        # For non-streaming, use legacy note context
+        if relevant_notes:
+            formatted_notes = self.format_notes_for_context(relevant_notes)
+            from app.prompts.system_prompts import NOTES_CHAT_SYSTEM_PROMPT, NO_NOTES_SYSTEM_PROMPT
+            system_content = NOTES_CHAT_SYSTEM_PROMPT.format(
+                note_count=len(relevant_notes),
+                formatted_notes=formatted_notes,
+            )
+            prepared[0] = {"role": "system", "content": system_content}
 
         try:
             response = await self.client.post(
@@ -248,21 +292,37 @@ class ChatService:
         topic: Optional[str] = None,
         session_id: Optional[str] = None,
     ) -> AsyncGenerator[bytes, None]:
-        relevant_notes = []
-        if use_notes_context:
-            relevant_notes = self.get_conversation_aware_context(messages, topic)
+        context_items = []
+        intent = "factual"
 
-        yield json.dumps(
-            {
-                "type": "context",
-                "notes": relevant_notes,
-                "session_id": session_id or "",
-            }
-        ).encode() + b"\n"
+        if use_notes_context:
+            context_items, intent = self._get_grounded_context(messages, topic)
+
+        # Emit context message with GroundedContext items
+        context_payload = {
+            "type": "context",
+            "items": [
+                item.to_stream_dict() if hasattr(item, "to_stream_dict") else item
+                for item in context_items
+            ],
+            "intent": intent,
+            "session_id": session_id or "",
+            # Legacy: also include flat notes list for backward compatibility
+            "notes": [
+                {
+                    "id": item.note_id if hasattr(item, "note_id") else item.get("note_id", ""),
+                    "title": item.note_title if hasattr(item, "note_title") else item.get("note_title", ""),
+                    "content": item.text if hasattr(item, "text") else item.get("text", ""),
+                    "score": item.relevance_score if hasattr(item, "relevance_score") else item.get("relevance_score", 0),
+                }
+                for item in context_items
+            ],
+        }
+        yield json.dumps(context_payload).encode() + b"\n"
 
         windowed = await self._maybe_summarize_window(messages)
-        prepared = self.prepare_messages_with_context(
-            windowed, relevant_notes if use_notes_context else []
+        prepared = self.prepare_messages_with_grounded_context(
+            windowed, context_items if use_notes_context else []
         )
 
         try:
@@ -301,7 +361,8 @@ class ChatService:
                         except json.JSONDecodeError:
                             continue
 
-            citations = extract_citations(full_response, relevant_notes)
+            # Extract grounded citations from response
+            citations = extract_grounded_citations(full_response, context_items)
             yield json.dumps(
                 {"type": "done", "citations": citations, "full_response": full_response}
             ).encode() + b"\n"

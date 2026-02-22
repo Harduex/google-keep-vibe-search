@@ -33,6 +33,20 @@ class Settings(BaseSettings):
     # Image search
     enable_image_search: bool = True
 
+    # Chunking
+    chunking_strategy: str = "docling"  # "docling" or "legacy"
+
+    # LanceDB
+    lancedb_path: str = ""  # defaults to cache_dir/lancedb
+
+    # GraphRAG (opt-in)
+    enable_graphrag: bool = False
+    graph_persist_dir: str = ""  # defaults to cache_dir/graph
+
+    # RAPTOR (opt-in)
+    enable_raptor: bool = False
+    raptor_persist_dir: str = ""  # defaults to cache_dir/raptor
+
     # Cache
     cache_dir: str = ""
 

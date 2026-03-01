@@ -183,9 +183,12 @@ export const Results = memo(
     );
 
     if (isLoading) {
+      // choose skeleton style based on the current view mode so the
+      // loading animation doesn't jump when the user toggles views
+      const layout = viewMode === VIEW_MODES.LIST ? 'list' : 'grid';
       return (
         <div className="results-container">
-          <NoteSkeleton count={6} />
+          <NoteSkeleton count={6} layout={layout} />
         </div>
       );
     }

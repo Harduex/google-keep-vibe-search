@@ -1419,6 +1419,20 @@ mark .refinement-highlight,
   width: 75%;
 }
 
+/* list variant used by the "all notes" screen so the loading
+   animation follows the vertical flow instead of a masonry grid */
+.skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 0;
+}
+
+/* ensure cards stretch in list mode */
+.skeleton-list .skeleton-card {
+  width: 100%;
+}
+
 .skeleton-meta {
   width: 40%;
   height: 12px;

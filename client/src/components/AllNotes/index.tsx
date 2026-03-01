@@ -111,7 +111,9 @@ export const AllNotes = memo(({ onShowRelated }: AllNotesProps) => {
   if (isLoading) {
     return (
       <div className="all-notes-container">
-        <NoteSkeleton count={12} />
+        {/* layout=list ensures the skeleton matches the vertical list that will
+            be rendered once data arrives */}
+        <NoteSkeleton count={12} layout="list" />
       </div>
     );
   }

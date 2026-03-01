@@ -20,7 +20,7 @@ if settings.enable_image_search:
 class VibeSearch:
     def __init__(self, notes: List[Dict[str, Any]], force_refresh: bool = False):
         self.notes = notes
-        self.model = SentenceTransformer("all-MiniLM-L6-v2")
+        self.model = SentenceTransformer("all-MiniLM-L6-v2").to("cuda")
 
         # Create document embeddings for all notes
         self.texts = []
@@ -35,7 +35,7 @@ class VibeSearch:
 
         # Try to load embeddings from cache or compute new ones
         self.load_or_compute_embeddings(force_refresh)
-        
+
         # Initialize image processor if enabled
         self.image_processor = None
         self.image_note_map = {}  # Maps image paths to note indices
@@ -47,13 +47,13 @@ class VibeSearch:
         try:
             # Create image processor
             self.image_processor = ImageProcessor()
-            
+
             # Process all note images and get their embeddings
             self.image_processor.process_note_images(self.notes)
-            
+
             # Create a mapping of image paths to the notes that contain them
             self._build_image_note_map()
-            
+
             print("Image search functionality initialized")
         except Exception as e:
             print(f"Failed to initialize image search: {e}")
@@ -106,7 +106,9 @@ class VibeSearch:
 
     def _is_cache_valid(self, current_hash: str) -> bool:
         """Check if cached embeddings exist and match current notes."""
-        if not os.path.exists(settings.embeddings_cache_file) or not os.path.exists(settings.notes_hash_file):
+        if not os.path.exists(settings.embeddings_cache_file) or not os.path.exists(
+            settings.notes_hash_file
+        ):
             return False
 
         try:
@@ -114,9 +116,9 @@ class VibeSearch:
                 cache_info = json.load(f)
 
             # Check if the number of notes and hash match
-            return cache_info.get("hash") == current_hash and cache_info.get("note_count") == len(
-                self.note_indices
-            )
+            return cache_info.get("hash") == current_hash and cache_info.get(
+                "note_count"
+            ) == len(self.note_indices)
         except Exception as e:
             print(f"Error checking cache validity: {e}")
             return False
@@ -161,43 +163,43 @@ class VibeSearch:
     def _keyword_search(self, query: str) -> List[Tuple[int, float]]:
         """
         Perform keyword-based search.
-        
+
         Args:
             query: The search query
-            
+
         Returns:
             List of tuples with (note_index, score)
         """
         # Break query into keywords
         keywords = query.lower().split()
         results = []
-        
+
         # Score for each note based on keyword matches
         for i, note_idx in enumerate(self.note_indices):
             note = self.notes[note_idx]
             text = f"{note['title']} {note['content']}".lower()
-            
+
             # Count exact keyword matches
             match_count = 0
             for keyword in keywords:
                 # Only count keywords with length >= 3 to avoid common words like "a", "an", "the"
                 if len(keyword) >= 3 and keyword in text:
                     match_count += 1
-            
+
             # Calculate score based on proportion of matching keywords
             if match_count > 0:
                 score = match_count / len(keywords)
                 results.append((note_idx, score))
-                
+
         return results
-    
+
     def _image_search(self, query: str) -> Dict[int, float]:
         """
         Search for notes with images matching the query.
-        
+
         Args:
             query: The search query
-            
+
         Returns:
             Dictionary mapping note indices to image match scores
         """
@@ -205,11 +207,13 @@ class VibeSearch:
         if not settings.enable_image_search or not self.image_processor:
             return {}
 
-        image_matches = self.image_processor.search_images(query, threshold=settings.image_search_threshold)
-        
+        image_matches = self.image_processor.search_images(
+            query, threshold=settings.image_search_threshold
+        )
+
         if not image_matches:
             return {}
-            
+
         # Map image matches to notes and combine scores
         note_scores = {}
         for image_path, score in image_matches:
@@ -221,17 +225,19 @@ class VibeSearch:
                         # Store the reason for the match
                         self.notes[note_idx]["matched_image"] = image_path
                         note_scores[note_idx] = score
-                        
+
         return note_scores
 
-    def search_by_image(self, image_file: Union[str, BinaryIO], max_results: int = None) -> List[Dict[str, Any]]:
+    def search_by_image(
+        self, image_file: Union[str, BinaryIO], max_results: int = None
+    ) -> List[Dict[str, Any]]:
         """
         Search notes using an image as a query.
-        
+
         Args:
             image_file: Image file path or file-like object to search with
             max_results: Maximum number of results to return
-            
+
         Returns:
             Sorted list of matching notes
         """
@@ -239,11 +245,13 @@ class VibeSearch:
         if not settings.enable_image_search or not self.image_processor:
             return []
 
-        image_matches = self.image_processor.search_with_image(image_file, threshold=settings.image_search_threshold)
-        
+        image_matches = self.image_processor.search_with_image(
+            image_file, threshold=settings.image_search_threshold
+        )
+
         if not image_matches:
             return []
-            
+
         # Map image matches to notes and combine scores
         note_scores = {}
         for image_path, score in image_matches:
@@ -255,7 +263,7 @@ class VibeSearch:
                         # Store the reason for the match
                         self.notes[note_idx]["matched_image"] = image_path
                         note_scores[note_idx] = score
-        
+
         # Create results list
         results = []
         for note_idx, score in note_scores.items():
@@ -265,16 +273,16 @@ class VibeSearch:
                 # Add a flag to indicate this note has matching images
                 note["has_matching_images"] = True
                 results.append(note)
-                
+
         # Sort by score (descending)
         results.sort(key=lambda x: x["score"], reverse=True)
-        
-        return results[:max_results or settings.max_results]
+
+        return results[: max_results or settings.max_results]
 
     def search(self, query: str, max_results: int = None) -> List[Dict[str, Any]]:
         """
         Search notes using both semantic, keyword, and image search.
-        
+
         Args:
             query: The search query
             max_results: Maximum number of results to return
@@ -287,16 +295,16 @@ class VibeSearch:
 
         # Get semantic search scores
         semantic_scores = self._semantic_search(query)
-        
+
         # Get keyword search scores
         keyword_matches = self._keyword_search(query)
-        
+
         # Create a map for keyword search scores for quick lookup
         keyword_score_map = {idx: score for idx, score in keyword_matches}
-        
+
         # Get image search scores if enabled
         image_score_map = self._image_search(query)
-        
+
         # Create scores list with combined scores
         scores = []
         for i in range(len(self.note_indices)):
@@ -304,14 +312,16 @@ class VibeSearch:
             semantic_score = semantic_scores[i]
             keyword_score = keyword_score_map.get(note_idx, 0)
             image_score = image_score_map.get(note_idx, 0)
-            
+
             # Basic text-based combined score (70% semantic, 30% keyword)
             text_score = (semantic_score * 0.7) + (keyword_score * 0.3)
-            
+
             # Add image match boost if applicable
             if image_score > 0:
                 # Combine text and image scores, adjust weights as needed
-                combined_score = (text_score * (1 - settings.image_search_weight)) + (image_score * settings.image_search_weight)
+                combined_score = (text_score * (1 - settings.image_search_weight)) + (
+                    image_score * settings.image_search_weight
+                )
                 # Add a flag to indicate this note has matching images
                 self.notes[note_idx]["has_matching_images"] = True
             else:
@@ -319,14 +329,14 @@ class VibeSearch:
                 # Ensure the flag is removed if it was previously set
                 if "has_matching_images" in self.notes[note_idx]:
                     del self.notes[note_idx]["has_matching_images"]
-            
+
             # Determine if this note should be included in results
             should_include = (
-                semantic_score > settings.search_threshold or
-                keyword_score > 0 or
-                image_score > settings.image_search_threshold
+                semantic_score > settings.search_threshold
+                or keyword_score > 0
+                or image_score > settings.image_search_threshold
             )
-            
+
             scores.append((note_idx, combined_score, should_include))
 
         # Sort by combined score (descending)
@@ -334,7 +344,9 @@ class VibeSearch:
 
         # Return top results that meet the threshold
         results = []
-        for note_idx, combined_score, should_include in scores[:max_results or settings.max_results]:
+        for note_idx, combined_score, should_include in scores[
+            : max_results or settings.max_results
+        ]:
             if should_include:
                 note = self.notes[note_idx].copy()
                 note["score"] = float(combined_score)
@@ -390,7 +402,9 @@ class VibeSearch:
         # Sort notes within each cluster by closeness to cluster center
         for cluster_idx in range(num_clusters):
             cluster_center_distances[cluster_idx].sort(key=lambda x: x[1])
-            cluster_notes[cluster_idx] = [item[0] for item in cluster_center_distances[cluster_idx]]
+            cluster_notes[cluster_idx] = [
+                item[0] for item in cluster_center_distances[cluster_idx]
+            ]
 
         # Create cluster objects with notes and extract topics
         clusters_result = []
@@ -399,7 +413,9 @@ class VibeSearch:
                 continue  # Skip empty clusters
 
             # Extract top keywords from cluster
-            cluster_keywords = self._extract_cluster_keywords(cluster_notes[cluster_idx])
+            cluster_keywords = self._extract_cluster_keywords(
+                cluster_notes[cluster_idx]
+            )
 
             clusters_result.append(
                 {
@@ -424,78 +440,99 @@ class VibeSearch:
 
         # Get standard stopwords
         try:
-            standard_stop_words = set(stopwords.words('english'))
+            standard_stop_words = set(stopwords.words("english"))
         except LookupError:
-            nltk.download('stopwords')
-            standard_stop_words = set(stopwords.words('english'))
-            
+            nltk.download("stopwords")
+            standard_stop_words = set(stopwords.words("english"))
+
         # Add custom stopwords
         technical_stop_words = {
             # URLs and web-related
-            'http', 'https', 'www', 'com', 'org', 'net', 
+            "http",
+            "https",
+            "www",
+            "com",
+            "org",
+            "net",
             # Days and months
-            'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
-            'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august',
-            'september', 'october', 'november', 'december'
+            "monday",
+            "tuesday",
+            "wednesday",
+            "thursday",
+            "friday",
+            "saturday",
+            "sunday",
+            "january",
+            "february",
+            "march",
+            "april",
+            "may",
+            "june",
+            "july",
+            "august",
+            "september",
+            "october",
+            "november",
+            "december",
         }
-        
+
         # Combine both stopword sets
         stop_words = standard_stop_words.union(technical_stop_words)
-        
+
         # First, remove URLs completely to avoid partial URL keywords
-        cleaned_text = re.sub(r'https?://\S+|www\.\S+', ' ', all_text)
-        
+        cleaned_text = re.sub(r"https?://\S+|www\.\S+", " ", all_text)
+
         # Tokenize text and find phrases (bigrams and single words)
         words = re.findall(r"\b[a-zA-Z]{3,}\b", cleaned_text.lower())
-        
+
         # Create word counts
         word_counts = {}
-        
+
         # Count single words
         for word in words:
             if word not in stop_words:
                 word_counts[word] = word_counts.get(word, 0) + 1
-        
+
         # Try to extract bigrams (two-word phrases) for more meaningful keywords
         bigrams = []
         for i in range(len(words) - 1):
-            if (words[i] not in stop_words) and (words[i+1] not in stop_words):
-                bigram = f"{words[i]} {words[i+1]}"
+            if (words[i] not in stop_words) and (words[i + 1] not in stop_words):
+                bigram = f"{words[i]} {words[i + 1]}"
                 bigrams.append(bigram)
-        
+
         # Count bigrams
         bigram_counts = {}
         for bigram in bigrams:
             bigram_counts[bigram] = bigram_counts.get(bigram, 0) + 1
-        
+
         # Favor more meaningful phrases by giving bigrams a boost
         for bigram, count in bigram_counts.items():
             if count >= 2:  # Only consider repeated bigrams
                 word_counts[bigram] = count * 1.5  # Apply a boost to bigrams
-        
+
         # Get top keywords, preferring longer words and phrases that are more likely unique/meaningful
         keywords = sorted(
             word_counts.items(),
             key=lambda x: (x[1], len(x[0])),  # Sort by frequency then by length
-            reverse=True
+            reverse=True,
         )
-        
+
         # Return only unique keywords
         unique_keywords = []
         seen_words = set()
-        
+
         for word, _ in keywords:
             # Skip if the word is part of an already selected bigram
             word_parts = word.split()
             if any(part in seen_words for part in word_parts):
                 continue
-                
+
             unique_keywords.append(word)
             # Add individual words to seen_words
             for part in word_parts:
                 seen_words.add(part)
-                
+
             if len(unique_keywords) >= num_keywords:
                 break
-                
+
         return unique_keywords

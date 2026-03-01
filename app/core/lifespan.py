@@ -13,6 +13,8 @@ from app.services.session_service import SessionService
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # ensure ready flag exists and is false until startup finishes
+    app.state.ready = False
     note_service = NoteService()
     note_service.load_notes(force_refresh=settings.force_cache_refresh)
     note_service.load_tags()
@@ -36,10 +38,12 @@ async def lifespan(app: FastAPI):
     session_service = SessionService()
     print(f"Initialized session service at: {settings.chat_sessions_dir}")
 
+    # mark app as ready once all heavy initialization is complete
     app.state.note_service = note_service
     app.state.search_service = search_service
     app.state.chat_service = chat_service
     app.state.session_service = session_service
+    app.state.ready = True
 
     yield
 

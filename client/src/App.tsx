@@ -1,5 +1,8 @@
 import { useCallback, useMemo, useState } from 'react';
 
+import { useBackendReady } from '@/hooks/useBackendReady';
+import { LoadingScreen } from '@/components/LoadingScreen';
+
 import { AllNotes } from '@/components/AllNotes';
 import { Chat } from '@/components/Chat';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -22,7 +25,17 @@ import { Note } from './types';
 
 const App = () => {
   const { theme, toggleTheme } = useTheme();
-  const { stats, error: statsError, refetchStats } = useStats();
+
+  // wait for backend to finish its startup work before rendering the rest of the
+  // application.  useBackendReady will poll `/api/ready` until the server reports
+  // it has finished indexing, at which point we can safely fetch stats and other
+  // resources.
+  const { ready: backendReady, error: backendError } = useBackendReady();
+
+  // fetch stats only after server is ready; the `enabled` flag prevents
+  // useStats from firing too early and producing an error banner during the
+  // initial warm‑up period.
+  const { stats, error: statsError, refetchStats } = useStats(backendReady);
   const {
     query,
     results,
@@ -109,6 +122,14 @@ const App = () => {
   const showImageSearchEnabled = useMemo(() => {
     return stats?.image_search?.enabled || false;
   }, [stats]);
+
+  if (!backendReady) {
+    // backend isn't available yet; show a full screen spinner rather than the
+    // normal chrome so that users don't interact with a half‑initialized
+    // application.  If we have encountered a connection error we surface it
+    // beneath the spinner so the user understands what is going on.
+    return <LoadingScreen message={backendError ?? undefined} />;
+  }
 
   return (
     <GalleryProvider>

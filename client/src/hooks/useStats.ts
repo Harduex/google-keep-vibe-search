@@ -20,7 +20,7 @@ interface UseStatsResult {
   refetchStats: () => Promise<void>;
 }
 
-export const useStats = (): UseStatsResult => {
+export const useStats = (enabled = true): UseStatsResult => {
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { error, handleError, clearError } = useError();
@@ -45,8 +45,10 @@ export const useStats = (): UseStatsResult => {
   }, [clearError, handleError]);
 
   useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
+    if (enabled) {
+      fetchStats();
+    }
+  }, [fetchStats, enabled]);
 
   return { stats, isLoading, error, refetchStats: fetchStats };
 };

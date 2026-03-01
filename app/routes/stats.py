@@ -1,6 +1,6 @@
 import os
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 
 from app.core.config import settings
 from app.core.dependencies import get_note_service, get_search_service
@@ -16,7 +16,7 @@ def stats(
     search_service: SearchService = Depends(get_search_service),
 ):
     image_search_status = {
-        "enabled": settings.enable_image_search,
+            "enabled": settings.enable_image_search,
         "initialized": search_service.image_processor is not None,
         "images_count": len(search_service.image_note_map),
     }
@@ -29,3 +29,16 @@ def stats(
         "using_cached_embeddings": os.path.exists(settings.embeddings_cache_file),
         "image_search": image_search_status,
     }
+
+
+@router.get("/ready")
+def ready(request: Request):
+    """Return whether the application has finished its startup/indexing work.
+
+    The ``lifespan`` handler sets ``app.state.ready`` to ``True`` once all of the
+    expensive initialization (loading notes, computing embeddings, building the
+    chunk index, etc.) has completed.  Clients can poll this endpoint and show a
+    loading screen until the backend is truly usable.
+    """
+
+    return {"ready": bool(getattr(request.app.state, "ready", False))}

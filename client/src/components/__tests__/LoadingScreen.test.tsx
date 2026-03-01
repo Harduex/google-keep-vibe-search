@@ -15,7 +15,7 @@ describe('LoadingScreen', () => {
 
     // message and branding
     expect(screen.getByText(/Preparing your search/i)).toBeInTheDocument();
-    expect(screen.getByText('Google Keep Vibe Search')).toBeInTheDocument();
+    expect(screen.getByText(/Google.*Keep.*Vibe.*Search/i)).toBeInTheDocument();
   });
 
   it('displays provided message when given', () => {

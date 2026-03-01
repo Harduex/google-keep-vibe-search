@@ -30,7 +30,7 @@ const App = () => {
   // application.  useBackendReady will poll `/api/ready` until the server reports
   // it has finished indexing, at which point we can safely fetch stats and other
   // resources.
-  const { ready: backendReady, error: backendError } = useBackendReady();
+  const { ready: backendReady } = useBackendReady();
 
   // fetch stats only after server is ready; the `enabled` flag prevents
   // useStats from firing too early and producing an error banner during the
@@ -128,7 +128,7 @@ const App = () => {
     // normal chrome so that users don't interact with a half‑initialized
     // application.  If we have encountered a connection error we surface it
     // beneath the spinner so the user understands what is going on.
-    return <LoadingScreen message={backendError ?? undefined} />;
+    return <LoadingScreen message="Indexing your notes…" />;
   }
 
   return (

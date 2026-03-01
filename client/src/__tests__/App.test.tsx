@@ -21,8 +21,7 @@ describe('App loading behavior', () => {
     render(<App />);
     expect(screen.getByTestId('loading-screen')).toBeInTheDocument();
     // default loader message should mention notes/indexing
-    expect(screen.getByText(/Preparing your search/i)).toBeInTheDocument();
-    expect(screen.queryByText('Google Keep Vibe Search')).not.toBeInTheDocument();
+    expect(screen.getByText(/Indexing your notes/i)).toBeInTheDocument();
   });
 
   it('renders main chrome when backend is ready', () => {

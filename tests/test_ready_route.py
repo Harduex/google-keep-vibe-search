@@ -41,13 +41,12 @@ def test_ready_endpoint_returns_true(monkeypatch):
             pass
 
     # patch the symbols that are imported in the lifespan module itself
-    monkeypatch.setattr('app.core.lifespan.NoteService', DummyNoteService)
-    monkeypatch.setattr('app.core.lifespan.VibeSearch', DummySearchEngine)
-    monkeypatch.setattr('app.core.lifespan.ChunkingService', DummyChunkingService)
+    monkeypatch.setattr("app.core.lifespan.NoteService", DummyNoteService)
+    monkeypatch.setattr("app.core.lifespan.VibeSearch", DummySearchEngine)
+    monkeypatch.setattr("app.core.lifespan.ChunkingService", DummyChunkingService)
 
     # recreate a fresh app instance so that our monkeypatches are in effect
-    client = TestClient(main.app)
-
-    response = client.get('/api/ready')
-    assert response.status_code == 200
-    assert response.json() == {'ready': True}
+    with TestClient(main.app) as client:
+        response = client.get("/api/ready")
+        assert response.status_code == 200
+        assert response.json() == {"ready": True}

@@ -1,4 +1,5 @@
 """Tests ensuring VibeSearch caching and force-refresh work."""
+
 import numpy as np
 
 from app.core.config import settings
@@ -10,19 +11,22 @@ class DummyModel:
         self.encode_calls = 0
 
     def encode(self, texts):
-        # record and return dummy embeddings
         self.encode_calls += 1
-        # return a zero array with dimension 8 for brevity
         return np.zeros((len(texts), 8))
 
     def get_sentence_embedding_dimension(self):
         return 8
 
+    def to(self, device):
+        return self
+
 
 def test_vibesearch_cache_hits(tmp_path, sample_notes, monkeypatch, capsys):
     settings.cache_dir = str(tmp_path)
     # replace SentenceTransformer with our dummy
-    monkeypatch.setattr("app.search.SentenceTransformer", lambda *args, **kwargs: DummyModel())
+    monkeypatch.setattr(
+        "app.search.SentenceTransformer", lambda *args, **kwargs: DummyModel()
+    )
 
     # first instantiation should compute embeddings
     vs1 = VibeSearch(sample_notes)

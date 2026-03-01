@@ -1,4 +1,4 @@
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useRef, useState } from 'react';
 
 import ImageGallery from '@/components/ImageGallery';
 import { NoteContent } from '@/components/NoteContent';
@@ -15,6 +15,7 @@ interface NoteCardProps {
   onShowRelated: (content: string) => void;
   onSelectNote?: (noteId: string, isSelected: boolean) => void;
   onRemoveTag?: (noteId: string, tagName: string) => void;
+  onRenameTag?: (oldTagName: string, newTagName: string) => void;
 }
 
 export const NoteCard = memo(
@@ -27,9 +28,15 @@ export const NoteCard = memo(
     onShowRelated,
     onSelectNote,
     onRemoveTag,
+    onRenameTag,
   }: NoteCardProps) => {
     const scorePercentage = calculateScorePercentage(note.score);
     const highlightedTitle = highlightMatches(note.title, query, refinementKeywords);
+
+    const [editingTag, setEditingTag] = useState<string | null>(null);
+    const [editValue, setEditValue] = useState('');
+    const editInputRef = useRef<HTMLInputElement>(null);
+    const editCommittedRef = useRef(false);
 
     const handleRelatedClick = useCallback(() => {
       const noteContent = `${note.title} ${note.content}`;
@@ -56,6 +63,46 @@ export const NoteCard = memo(
         }
       },
       [note.id, onRemoveTag],
+    );
+
+    const handleStartEditTag = useCallback((e: React.MouseEvent, tagName: string) => {
+      e.stopPropagation();
+      editCommittedRef.current = false;
+      setEditingTag(tagName);
+      setEditValue(tagName);
+      setTimeout(() => editInputRef.current?.focus(), 0);
+    }, []);
+
+    const handleEditKeyDown = useCallback(
+      (e: React.KeyboardEvent, oldName: string) => {
+        if (e.key === 'Enter') {
+          const trimmed = editValue.trim();
+          if (trimmed && trimmed !== oldName && onRenameTag && !editCommittedRef.current) {
+            editCommittedRef.current = true;
+            onRenameTag(oldName, trimmed);
+          } else {
+            editCommittedRef.current = true;
+          }
+          setEditingTag(null);
+        } else if (e.key === 'Escape') {
+          editCommittedRef.current = true;
+          setEditingTag(null);
+        }
+      },
+      [editValue, onRenameTag],
+    );
+
+    const handleEditBlur = useCallback(
+      (oldName: string) => {
+        if (!editCommittedRef.current) {
+          const trimmed = editValue.trim();
+          if (trimmed && trimmed !== oldName && onRenameTag) {
+            onRenameTag(oldName, trimmed);
+          }
+        }
+        setEditingTag(null);
+      },
+      [editValue, onRenameTag],
     );
 
     const handleCardClick = useCallback(() => {
@@ -98,18 +145,48 @@ export const NoteCard = memo(
           {note.pinned && <span className="note-badge badge-pinned">Pinned</span>}
           {note.archived && <span className="note-badge badge-archived">Archived</span>}
           {note.tags?.map((tagName) => (
-            <span key={tagName} className="note-badge badge-tag" title={`Tagged: ${tagName}`}>
-              <span className="material-icons">label</span>
-              {tagName}
-              {onRemoveTag && (
-                <button
-                  className="tag-remove-button"
-                  onClick={(e) => handleRemoveTag(e, tagName)}
-                  title="Remove tag"
-                  aria-label={`Remove tag ${tagName}`}
-                >
-                  <span className="material-icons">close</span>
-                </button>
+            <span
+              key={tagName}
+              className={`note-badge badge-tag${editingTag === tagName ? ' editing' : ''}`}
+              title={`Tagged: ${tagName}`}
+            >
+              {editingTag === tagName ? (
+                <>
+                  <input
+                    ref={editInputRef}
+                    className="tag-edit-input"
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    onKeyDown={(e) => handleEditKeyDown(e, tagName)}
+                    onBlur={() => handleEditBlur(tagName)}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </>
+              ) : (
+                <>
+                  <span className="material-icons">label</span>
+                  {tagName}
+                  {onRenameTag && (
+                    <button
+                      className="tag-edit-button"
+                      onClick={(e) => handleStartEditTag(e, tagName)}
+                      title="Rename tag"
+                      aria-label={`Rename tag ${tagName}`}
+                    >
+                      <span className="material-icons">edit</span>
+                    </button>
+                  )}
+                  {onRemoveTag && (
+                    <button
+                      className="tag-remove-button"
+                      onClick={(e) => handleRemoveTag(e, tagName)}
+                      title="Remove tag"
+                      aria-label={`Remove tag ${tagName}`}
+                    >
+                      <span className="material-icons">close</span>
+                    </button>
+                  )}
+                </>
               )}
             </span>
           ))}

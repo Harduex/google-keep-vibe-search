@@ -18,7 +18,7 @@ interface AllNotesProps {
 
 export const AllNotes = memo(({ onShowRelated }: AllNotesProps) => {
   const { notes, isLoading, error, refetch } = useAllNotes();
-  const { tags, removeTagFromNote } = useTags(refetch);
+  const { tags, removeTagFromNote, renameTag } = useTags(refetch);
   const [viewMode, setViewMode] = useState<ViewMode>(VIEW_MODES.LIST);
   const [sortBy, setSortBy] = useState<'edited' | 'created'>('edited');
   const [filterArchived, setFilterArchived] = useState<boolean>(false);
@@ -94,6 +94,14 @@ export const AllNotes = memo(({ onShowRelated }: AllNotesProps) => {
     setSelectedTags(newSelectedTags);
   }, []);
 
+  const handleRenameTag = useCallback(
+    async (oldName: string, newName: string) => {
+      await renameTag(oldName, newName);
+      setSelectedTags((prev) => prev.map((t) => (t === oldName ? newName : t)));
+    },
+    [renameTag],
+  );
+
   useEffect(() => {
     const handleScroll = () => {
       if (
@@ -130,6 +138,7 @@ export const AllNotes = memo(({ onShowRelated }: AllNotesProps) => {
           tags={tags}
           selectedTags={selectedTags}
           onUpdateSelectedTags={handleTagsChange}
+          onRenameTag={handleRenameTag}
         />
       )}
 
@@ -184,6 +193,7 @@ export const AllNotes = memo(({ onShowRelated }: AllNotesProps) => {
                   query=""
                   onShowRelated={onShowRelated}
                   onRemoveTag={removeTagFromNote}
+                  onRenameTag={renameTag}
                 />
               </div>
             ))

@@ -14,3 +14,8 @@ class TagManagementRequest(BaseModel):
 
 class RemoveTagRequest(BaseModel):
     tag_name: str
+
+
+class RenameTagRequest(BaseModel):
+    old_name: str
+    new_name: str

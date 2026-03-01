@@ -25,7 +25,7 @@ def search_get(
 ):
     results = search_service.search(q)
     filtered = note_service.filter_by_excluded_tags(results)
-    return {"results": filtered}
+    return {"results": note_service.enrich_with_tags(filtered)}
 
 
 @router.post("/search")
@@ -36,7 +36,7 @@ def search_post(
 ):
     results = search_service.search(request.query)
     filtered = note_service.filter_by_excluded_tags(results)
-    return {"results": filtered}
+    return {"results": note_service.enrich_with_tags(filtered)}
 
 
 @router.post("/search/image")

@@ -42,6 +42,13 @@ class TagNotFound(HTTPException):
         )
 
 
+class DuplicateTagName(HTTPException):
+    def __init__(self, tag_name: str):
+        super().__init__(
+            status_code=409, detail=f"A tag named '{tag_name}' already exists"
+        )
+
+
 class SessionNotFound(HTTPException):
     def __init__(self, session_id: str):
         super().__init__(

@@ -54,6 +54,7 @@ export const Results = memo(
       updateExcludedTags,
       removeTagFromAllNotes,
       removeTagFromNote,
+      renameTag,
     } = useTags(onResultsUpdate);
 
     useEffect(() => {
@@ -284,6 +285,7 @@ export const Results = memo(
                   onShowRelated={onShowRelated}
                   onSelectNote={handleNoteSelection}
                   onRemoveTag={removeTagFromNote}
+                  onRenameTag={renameTag}
                 />
               </div>
             ))}

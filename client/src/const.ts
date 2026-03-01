@@ -21,6 +21,7 @@ export const API_ROUTES = {
   EXCLUDED_TAGS: '/api/tags/excluded',
   REMOVE_TAG: '/api/notes',
   REMOVE_TAG_FROM_ALL: '/api/tags/remove',
+  RENAME_TAG: '/api/tags/rename',
   READY: '/api/ready',
   ORGANIZE_CATEGORIZE: '/api/organize/categorize',
   ORGANIZE_APPLY: '/api/organize/apply',

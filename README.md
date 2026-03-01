@@ -10,7 +10,9 @@ A semantic search and AI chat assistant for your Google Keep notes export. Searc
 - **Multi-Signal RAG** — Retrieval uses your latest message, recent context, and continuity boosting to handle follow-up questions naturally.
 - **Note Chunking** — Long notes are split into chunks for higher-precision retrieval with large collections (2000+ notes).
 - **Image Search** — Find notes by image content using OpenAI CLIP embeddings (optional).
-- **Tag Management** — Assign tags to notes, exclude tags from search results.
+- **Tag Management** — Assign tags to notes, rename tags inline, merge tags together, remove tags globally, and filter or exclude tags from search results.
+- **AI-Powered Categorization** — Automatically discover and organize notes into meaningful categories using AI topic detection. Review, approve, rename, merge, or reject proposals before applying.
+- **Tag Manager Dashboard** — Centralized tag management in the Organize tab. View all tags with note counts, rename, merge, or remove them.
 - **Clustering & 3D Visualization** — Group notes into semantic clusters and explore them in an interactive 3D scatter plot.
 - **Any OpenAI-Compatible LLM** — Works with Ollama, LM Studio, OpenAI, Anthropic (via proxy), or any `/v1/chat/completions` endpoint.
 
@@ -168,10 +170,13 @@ client/                 # React + TypeScript frontend (Vite)
     components/
       Chat/             # Chat tab: sessions sidebar, messages, context panel
       NoteCard/         # Note display with tag chips and actions
-      AllNotes/         # Browse all notes with filtering
+      AllNotes/         # Browse all notes with tag filtering and rename
+      Organize/         # Smart Tags AI categorization and Tag Manager dashboard
       Clusters/         # Cluster view
       Results/          # Search results grid
-    hooks/              # useSearch, useChat, useTags, ...
+      TagFilter/        # Tag inclusion filter with inline rename
+      TagManager/       # Tag exclusion filter with removal
+    hooks/              # useSearch, useChat, useTags, useOrganize, ...
 
 tests/                  # pytest backend tests
   conftest.py
@@ -221,6 +226,13 @@ cd client && npm run format
 5. **Chunking** — Notes longer than 500 characters are split into paragraph-level chunks that are embedded independently, enabling higher-precision retrieval in large collections.
 
 6. **Sessions** — Chat histories are persisted as JSON in `./cache/chat_sessions/`. The session sidebar lets you switch, rename, and delete conversations.
+
+7. **Tag Management** — Tags can be managed from multiple locations:
+   - **Search results** — The Tag Filters panel excludes tagged notes from results; individual tags can be removed from notes via badge buttons.
+   - **All Notes** — The Tag Filter panel supports filtering by tag with inline rename.
+   - **Note cards** — Each tag badge supports inline rename and removal.
+   - **Organize tab** — The Tag Manager dashboard provides centralized rename, merge (combine two tags into one), and removal.
+   - **AI Categorization** — Smart Tags uses UMAP + HDBSCAN clustering and LLM naming to propose categories. Proposals can be approved, renamed, merged, or rejected before applying.
 
 ---
 

@@ -91,6 +91,88 @@
   border-bottom: none;
 }
 
+.tag-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tag-rename-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 4px;
+  margin-right: 12px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+}
+
+.tag-item-row:hover .tag-rename-button {
+  opacity: 1;
+}
+
+.tag-rename-button:hover {
+  color: #4285f4;
+  background: rgba(66, 133, 244, 0.1);
+}
+
+.tag-rename-button .material-icons {
+  font-size: 18px;
+}
+
+.tag-rename-row {
+  padding: 8px 16px;
+}
+
+.tag-rename-input-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tag-rename-input {
+  padding: 4px 8px;
+  border: 1px solid var(--accent-color);
+  border-radius: 4px;
+  font-size: 0.9rem;
+  background-color: var(--input-bg);
+  color: var(--text-color);
+  outline: none;
+  flex: 1;
+  min-width: 0;
+}
+
+.tag-rename-confirm,
+.tag-rename-cancel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  background: none;
+}
+
+.tag-rename-confirm {
+  color: #0f9d58;
+}
+
+.tag-rename-cancel {
+  color: #ea4335;
+}
+
+.tag-rename-confirm .material-icons,
+.tag-rename-cancel .material-icons {
+  font-size: 20px;
+}
+
 .tag-checkbox {
   display: flex;
   align-items: center;

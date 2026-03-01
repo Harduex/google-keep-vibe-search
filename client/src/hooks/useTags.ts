@@ -166,6 +166,38 @@ export const useTags = (onNotesChanged?: () => void) => {
     [fetchTags, onNotesChanged],
   );
 
+  const renameTag = useCallback(
+    async (oldName: string, newName: string) => {
+      try {
+        setIsLoading(true);
+        const response = await fetch(API_ROUTES.RENAME_TAG, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ old_name: oldName, new_name: newName }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to rename tag');
+        }
+
+        await fetchTags();
+
+        if (onNotesChanged) {
+          onNotesChanged();
+        }
+
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An error occurred');
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [fetchTags, onNotesChanged],
+  );
+
   useEffect(() => {
     fetchTags();
     fetchExcludedTags();
@@ -180,6 +212,7 @@ export const useTags = (onNotesChanged?: () => void) => {
     updateExcludedTags,
     removeTagFromNote,
     removeTagFromAllNotes,
+    renameTag,
     refetchTags: fetchTags,
     refetchExcludedTags: fetchExcludedTags,
   };

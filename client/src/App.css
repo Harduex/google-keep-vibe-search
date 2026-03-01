@@ -418,6 +418,56 @@ h1 {
   font-size: 14px;
 }
 
+.tag-edit-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.7);
+  padding: 2px;
+  margin-left: 2px;
+  border-radius: 50%;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tag-edit-button:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.tag-edit-button .material-icons {
+  font-size: 14px;
+}
+
+.note-badge.badge-tag.editing {
+  background: var(--accent-color);
+  padding: 2px 6px;
+}
+
+.tag-edit-input {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 4px;
+  color: white;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 1px 4px;
+  min-width: 60px;
+  max-width: 120px;
+  outline: none;
+}
+
+.tag-edit-input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.tag-edit-input:focus {
+  border-color: white;
+  background: rgba(255, 255, 255, 0.25);
+}
+
 .selection-controls {
   display: flex;
   align-items: center;

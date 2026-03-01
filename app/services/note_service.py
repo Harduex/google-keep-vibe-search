@@ -129,6 +129,32 @@ class NoteService:
         save_tags_to_cache(self.note_tags)
         return notes_updated
 
+    def enrich_with_tags(self, notes_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        for note in notes_list:
+            note_id = note.get("id")
+            note["tags"] = self.note_tags.get(note_id, [])
+        return notes_list
+
+    def rename_tag(self, old_name: str, new_name: str) -> int:
+        if old_name == new_name:
+            raise ValueError("New tag name must differ from old name")
+        notes_updated = 0
+        for note_id, tags in self.note_tags.items():
+            if old_name in tags:
+                if new_name in tags:
+                    tags.remove(old_name)
+                else:
+                    tags[tags.index(old_name)] = new_name
+                notes_updated += 1
+        if not notes_updated:
+            raise KeyError(old_name)
+        if old_name in self.excluded_tags:
+            self.excluded_tags.discard(old_name)
+            self.excluded_tags.add(new_name)
+            save_excluded_tags_to_cache(self.excluded_tags)
+        save_tags_to_cache(self.note_tags)
+        return notes_updated
+
     def get_all_notes_with_metadata(self) -> List[Dict[str, Any]]:
         all_notes = []
         for note in self.notes:

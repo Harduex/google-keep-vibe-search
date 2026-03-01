@@ -32,7 +32,7 @@ export const AllNotes = memo(({ onShowRelated }: AllNotesProps) => {
 
     // Apply tag filter (if any tags are selected, show only notes with those tags)
     if (selectedTags.length > 0) {
-      filtered = filtered.filter((note) => note.tag && selectedTags.includes(note.tag));
+      filtered = filtered.filter((note) => note.tags?.some((tag) => selectedTags.includes(tag)));
     }
 
     // Apply other filters

@@ -4,6 +4,7 @@ from fastapi import FastAPI
 
 from app.core.config import settings
 from app.search import VibeSearch
+from app.services.categorization_service import CategorizationService
 from app.services.chat_service import ChatService
 from app.services.chunking_service import ChunkingService
 from app.services.note_service import NoteService
@@ -38,14 +39,19 @@ async def lifespan(app: FastAPI):
     session_service = SessionService()
     print(f"Initialized session service at: {settings.chat_sessions_dir}")
 
+    categorization_service = CategorizationService(search_service, note_service)
+    print("Initialized categorization service")
+
     # mark app as ready once all heavy initialization is complete
     app.state.note_service = note_service
     app.state.search_service = search_service
     app.state.chat_service = chat_service
     app.state.session_service = session_service
+    app.state.categorization_service = categorization_service
     app.state.ready = True
 
     yield
 
     # Cleanup
     await chat_service.close()
+    await categorization_service.close()

@@ -1,5 +1,6 @@
 from fastapi import Request
 
+from app.services.categorization_service import CategorizationService
 from app.services.chat_service import ChatService
 from app.services.note_service import NoteService
 from app.services.search_service import SearchService
@@ -20,3 +21,7 @@ def get_chat_service(request: Request) -> ChatService:
 
 def get_session_service(request: Request) -> SessionService:
     return request.app.state.session_service
+
+
+def get_categorization_service(request: Request) -> CategorizationService:
+    return request.app.state.categorization_service

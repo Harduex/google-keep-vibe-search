@@ -42,10 +42,11 @@ def set_excluded_tags(
 @router.delete("/notes/{note_id}/tag")
 def remove_note_tag(
     note_id: str,
+    tag_name: str,
     note_service: NoteService = Depends(get_note_service),
 ):
     try:
-        removed = note_service.remove_tag_from_note(note_id)
+        removed = note_service.remove_tag_from_note(note_id, tag_name)
         return {"message": f"Removed tag '{removed}' from note {note_id}"}
     except KeyError:
         raise NoteNotTagged(note_id)

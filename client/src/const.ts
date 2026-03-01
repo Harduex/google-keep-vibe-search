@@ -22,6 +22,8 @@ export const API_ROUTES = {
   REMOVE_TAG: '/api/notes',
   REMOVE_TAG_FROM_ALL: '/api/tags/remove',
   READY: '/api/ready',
+  ORGANIZE_CATEGORIZE: '/api/organize/categorize',
+  ORGANIZE_APPLY: '/api/organize/apply',
 };
 
 export const VIEW_MODES = {

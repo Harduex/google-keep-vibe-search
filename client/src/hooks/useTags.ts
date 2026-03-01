@@ -98,12 +98,15 @@ export const useTags = (onNotesChanged?: () => void) => {
   }, []);
 
   const removeTagFromNote = useCallback(
-    async (noteId: string) => {
+    async (noteId: string, tagName: string) => {
       try {
         setIsLoading(true);
-        const response = await fetch(`${API_ROUTES.REMOVE_TAG}/${noteId}/tag`, {
-          method: 'DELETE',
-        });
+        const response = await fetch(
+          `${API_ROUTES.REMOVE_TAG}/${noteId}/tag?tag_name=${encodeURIComponent(tagName)}`,
+          {
+            method: 'DELETE',
+          },
+        );
 
         if (!response.ok) {
           throw new Error('Failed to remove tag');

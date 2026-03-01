@@ -1,21 +1,21 @@
 import { useCallback, useMemo, useState } from 'react';
 
-import { useBackendReady } from '@/hooks/useBackendReady';
-import { LoadingScreen } from '@/components/LoadingScreen';
-
 import { AllNotes } from '@/components/AllNotes';
 import { Chat } from '@/components/Chat';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ErrorDisplay } from '@/components/ErrorDisplay';
 import { GalleryProvider, GalleryOverlay } from '@/components/ImageGallery';
 import { ImageSearchUpload } from '@/components/ImageSearchUpload';
+import { LoadingScreen } from '@/components/LoadingScreen';
 import { NotesClusters } from '@/components/NotesClusters';
+import { Organize } from '@/components/Organize';
 import { Results } from '@/components/Results';
 import { SearchBar } from '@/components/SearchBar';
 import { SearchModeToggle, type SearchMode } from '@/components/SearchModeToggle';
 import { TabNavigation, TabId } from '@/components/TabNavigation';
 import { UI_ELEMENTS } from '@/const';
 import { formatStatsText, scrollToElement } from '@/helpers';
+import { useBackendReady } from '@/hooks/useBackendReady';
 import { useSearch } from '@/hooks/useSearch';
 import { useStats } from '@/hooks/useStats';
 import { useTheme } from '@/hooks/useTheme';
@@ -205,6 +205,12 @@ const App = () => {
         {activeTab === 'chat' && (
           <ErrorBoundary fallbackLabel="Chat">
             <Chat query={query} onShowRelated={handleSearch} />
+          </ErrorBoundary>
+        )}
+
+        {activeTab === 'organize' && (
+          <ErrorBoundary fallbackLabel="Organize">
+            <Organize />
           </ErrorBoundary>
         )}
 

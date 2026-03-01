@@ -47,10 +47,11 @@ class ChatService:
             created = note.get("created", "Unknown")
             edited = note.get("edited", "Unknown")
             tag = note.get("tag", "")
+            tags = note.get("tags", [tag] if tag else [])
 
             block = f"--- Note #{i} ---\nTitle: {title}\nCreated: {created} | Last edited: {edited}"
-            if tag:
-                block += f"\nTags: {tag}"
+            if tags:
+                block += f"\nTags: {', '.join(tags)}"
             block += f"\n\n{content}\n--- End Note #{i} ---"
             formatted.append(block)
 

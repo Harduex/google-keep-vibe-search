@@ -15,7 +15,7 @@ from app.services.cache_service import (
 class NoteService:
     def __init__(self):
         self.notes: List[Dict[str, Any]] = []
-        self.note_tags: Dict[str, str] = {}
+        self.note_tags: Dict[str, List[str]] = {}
         self.excluded_tags: Set[str] = set()
 
     def load_notes(self, force_refresh: bool = False) -> List[Dict[str, Any]]:
@@ -50,7 +50,10 @@ class NoteService:
         return [
             note
             for note in notes_list
-            if self.note_tags.get(note.get("id")) not in self.excluded_tags
+            if not any(
+                t in self.excluded_tags
+                for t in self.note_tags.get(note.get("id"), [])
+            )
         ]
 
     def tag_notes(self, note_ids: List[str], tag_name: str) -> int:
@@ -60,15 +63,34 @@ class NoteService:
             raise ValueError(f"Invalid note IDs: {invalid_ids}")
 
         for note_id in note_ids:
-            self.note_tags[note_id] = tag_name
+            tags = self.note_tags.setdefault(note_id, [])
+            if tag_name not in tags:
+                tags.append(tag_name)
 
         save_tags_to_cache(self.note_tags)
         return len(note_ids)
 
+    def bulk_tag_notes(self, assignments: Dict[str, List[str]]) -> int:
+        """Assign multiple tags to multiple notes in one operation."""
+        valid_ids = {note["id"] for note in self.notes}
+        count = 0
+        for note_id, tag_names in assignments.items():
+            if note_id not in valid_ids:
+                continue
+            tags = self.note_tags.setdefault(note_id, [])
+            for tag_name in tag_names:
+                if tag_name not in tags:
+                    tags.append(tag_name)
+            count += 1
+
+        save_tags_to_cache(self.note_tags)
+        return count
+
     def get_all_tags(self) -> List[Dict[str, Any]]:
         tag_counts: Dict[str, int] = {}
-        for tag_name in self.note_tags.values():
-            tag_counts[tag_name] = tag_counts.get(tag_name, 0) + 1
+        for tag_list in self.note_tags.values():
+            for tag_name in tag_list:
+                tag_counts[tag_name] = tag_counts.get(tag_name, 0) + 1
 
         tags = [{"name": name, "count": count} for name, count in tag_counts.items()]
         tags.sort(key=lambda x: x["name"])
@@ -81,25 +103,31 @@ class NoteService:
         self.excluded_tags = set(excluded)
         save_excluded_tags_to_cache(self.excluded_tags)
 
-    def remove_tag_from_note(self, note_id: str) -> str:
-        if note_id not in self.note_tags:
+    def remove_tag_from_note(self, note_id: str, tag_name: str) -> str:
+        tags = self.note_tags.get(note_id, [])
+        if tag_name not in tags:
             raise KeyError(note_id)
-        removed_tag = self.note_tags.pop(note_id)
+        tags.remove(tag_name)
+        if not tags:
+            del self.note_tags[note_id]
         save_tags_to_cache(self.note_tags)
-        return removed_tag
+        return tag_name
 
     def remove_tag_from_all(self, tag_name: str) -> int:
-        notes_to_update = [
-            nid for nid, tag in self.note_tags.items() if tag == tag_name
-        ]
-        if not notes_to_update:
+        notes_updated = 0
+        for note_id in list(self.note_tags.keys()):
+            tags = self.note_tags[note_id]
+            if tag_name in tags:
+                tags.remove(tag_name)
+                if not tags:
+                    del self.note_tags[note_id]
+                notes_updated += 1
+
+        if not notes_updated:
             raise KeyError(tag_name)
 
-        for note_id in notes_to_update:
-            del self.note_tags[note_id]
-
         save_tags_to_cache(self.note_tags)
-        return len(notes_to_update)
+        return notes_updated
 
     def get_all_notes_with_metadata(self) -> List[Dict[str, Any]]:
         all_notes = []
@@ -107,8 +135,7 @@ class NoteService:
             note_copy = note.copy()
             note_copy["score"] = 1.0
             note_id = note_copy.get("id")
-            if note_id and note_id in self.note_tags:
-                note_copy["tag"] = self.note_tags[note_id]
+            note_copy["tags"] = self.note_tags.get(note_id, [])
             note_copy.pop("matched_image", None)
             all_notes.append(note_copy)
         return self.filter_by_excluded_tags(all_notes)

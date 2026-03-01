@@ -14,7 +14,7 @@ class Note(BaseModel):
     color: str = "DEFAULT"
     annotations: Optional[List[Dict[str, Any]]] = None
     attachments: Optional[List[Dict[str, Any]]] = None
-    tag: Optional[str] = None
+    tags: List[str] = []
     score: Optional[float] = None
     matched_image: Optional[str] = None
     has_matching_images: Optional[bool] = None

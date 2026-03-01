@@ -26,7 +26,7 @@ export interface Note {
   attachments?: Attachment[];
   has_matching_images?: boolean;
   matched_image?: string;
-  tag?: string;
+  tags: string[];
 }
 
 export type ViewMode = 'list' | '3d';
@@ -62,4 +62,31 @@ export interface ChatSessionSummary {
   title: string;
   message_count: number;
   updated_at: string;
+}
+
+export interface TagProposal {
+  tag_name: string;
+  note_ids: string[];
+  note_count: number;
+  sample_notes: { id: string; title: string; content: string }[];
+  confidence: number;
+}
+
+export type ProposalAction = 'approve' | 'reject' | 'rename' | 'merge' | 'pending';
+
+export interface ProposalState {
+  proposal: TagProposal;
+  action: ProposalAction;
+  newName?: string;
+  mergeTarget?: string;
+}
+
+export type Granularity = 'broad' | 'specific';
+
+export interface CategorizationProgress {
+  stage: string;
+  message: string;
+  progress: number;
+  current?: number;
+  total?: number;
 }

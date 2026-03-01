@@ -51,17 +51,31 @@ def load_notes_from_cache(latest_mod_time: float, current_hash: str) -> Optional
         return None
 
 
-def load_tags_from_cache() -> Dict[str, str]:
+def _migrate_tags_format(data: dict) -> Dict[str, List[str]]:
+    """Convert legacy {id: "tag"} format to {id: ["tag"]} format."""
+    if not data:
+        return {}
+    sample_value = next(iter(data.values()))
+    if isinstance(sample_value, str):
+        return {nid: [tag] for nid, tag in data.items()}
+    return data
+
+
+def load_tags_from_cache() -> Dict[str, List[str]]:
     if os.path.exists(settings.tags_cache_file):
         try:
             with open(settings.tags_cache_file, "r", encoding="utf-8") as f:
-                return json.load(f)
+                raw = json.load(f)
+            migrated = _migrate_tags_format(raw)
+            if migrated is not raw:
+                save_tags_to_cache(migrated)
+            return migrated
         except (json.JSONDecodeError, IOError):
             pass
     return {}
 
 
-def save_tags_to_cache(tags_data: Dict[str, str]) -> None:
+def save_tags_to_cache(tags_data: Dict[str, List[str]]) -> None:
     ensure_cache_dir()
     try:
         with open(settings.tags_cache_file, "w", encoding="utf-8") as f:

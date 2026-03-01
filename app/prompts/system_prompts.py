@@ -42,3 +42,11 @@ Keep the summary under 200 words.
 
 Conversation:
 {conversation}"""
+
+
+TAG_NAMING_PROMPT = """Below are several related personal notes from a collection. Generate a short, descriptive tag name (2-4 words) that captures the common theme of these notes. Return ONLY the tag name, nothing else.
+
+Notes:
+{notes_text}
+
+Tag name:"""

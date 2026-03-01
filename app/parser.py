@@ -1,4 +1,5 @@
 import glob
+import hashlib
 import json
 import os
 import time
@@ -68,3 +69,26 @@ def parse_notes() -> List[Dict[str, Any]]:
             print(f"Error parsing {file_path}: {e}")
 
     return notes
+
+
+def compute_notes_hash(directory: str) -> str:
+    """Return an MD5 hash of all note text for change detection.
+
+    The hash is computed over the concatenation of the title and content
+    fields of every JSON file (sorted by filename) so that modifications
+    to note text are detected even if file modification times are unchanged.
+    """
+    hash_obj = hashlib.md5()
+    json_files = sorted(glob.glob(os.path.join(directory, "*.json")))
+    for file_path in json_files:
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            title = data.get("title", "")
+            content = data.get("textContent", "")
+            hash_obj.update(title.encode("utf-8"))
+            hash_obj.update(content.encode("utf-8"))
+        except Exception:
+            # ignore malformed files; they'll be re-parsed later
+            continue
+    return hash_obj.hexdigest()

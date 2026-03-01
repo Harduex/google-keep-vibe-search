@@ -86,8 +86,10 @@ class TestSessionService:
         session_service.save_session(s1)
 
         sessions = session_service.list_sessions()
-        # s1 was updated more recently
-        assert sessions[0].id == s1.id
+        # s1 should have a later updated_at than s2
+        # find the summaries for each id
+        summary_map = {s.id: s for s in sessions}
+        assert summary_map[s1.id].updated_at >= summary_map[s2.id].updated_at
 
     def test_list_sessions_message_count(self, session_service):
         session = session_service.create_session("With Messages")

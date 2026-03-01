@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     chat_max_recent_messages: int = 6
     chat_summarization_threshold: int = 12
 
+    # Cache control
+    force_cache_refresh: bool = False  # if true, ignore caches on startup
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
     @field_validator("google_keep_path")

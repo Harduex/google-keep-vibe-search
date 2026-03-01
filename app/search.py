@@ -18,7 +18,7 @@ if settings.enable_image_search:
 
 
 class VibeSearch:
-    def __init__(self, notes: List[Dict[str, Any]]):
+    def __init__(self, notes: List[Dict[str, Any]], force_refresh: bool = False):
         self.notes = notes
         self.model = SentenceTransformer("all-MiniLM-L6-v2")
 
@@ -34,7 +34,7 @@ class VibeSearch:
                 self.note_indices.append(i)
 
         # Try to load embeddings from cache or compute new ones
-        self.load_or_compute_embeddings()
+        self.load_or_compute_embeddings(force_refresh)
         
         # Initialize image processor if enabled
         self.image_processor = None
@@ -71,8 +71,12 @@ class VibeSearch:
                                 self.image_note_map[image_path] = []
                             self.image_note_map[image_path].append(i)
 
-    def load_or_compute_embeddings(self):
-        """Load embeddings from cache if valid or compute and save new ones."""
+    def load_or_compute_embeddings(self, force_refresh: bool = False):
+        """Load embeddings from cache if valid or compute and save new ones.
+
+        The ``force_refresh`` flag bypasses the cache even if the stored hash
+        matches, useful for development or when you suspect corruption.
+        """
         # Ensure cache directory exists
         os.makedirs(settings.resolved_cache_dir, exist_ok=True)
 
@@ -80,10 +84,12 @@ class VibeSearch:
         current_hash = self._compute_notes_hash()
 
         # Check if cached embeddings exist and are valid
-        if self._is_cache_valid(current_hash):
+        if not force_refresh and self._is_cache_valid(current_hash):
             self._load_embeddings_from_cache()
             print("Loaded embeddings from cache")
         else:
+            if force_refresh:
+                print("Force-refresh requested, recomputing embeddings")
             # Compute new embeddings
             self.embeddings = self.model.encode(self.texts)
 

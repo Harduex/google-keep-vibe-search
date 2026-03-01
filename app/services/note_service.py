@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Set
 
 from app.core.config import settings
-from app.parser import get_latest_modification_time, parse_notes
+from app.parser import get_latest_modification_time, parse_notes, compute_notes_hash
 from app.services.cache_service import (
     load_excluded_tags_from_cache,
     load_notes_from_cache,
@@ -18,9 +18,16 @@ class NoteService:
         self.note_tags: Dict[str, str] = {}
         self.excluded_tags: Set[str] = set()
 
-    def load_notes(self) -> List[Dict[str, Any]]:
+    def load_notes(self, force_refresh: bool = False) -> List[Dict[str, Any]]:
+        """Load notes, using cache when possible.
+
+        Args:
+            force_refresh: bypass the cache and re‑parse regardless of timestamps.
+        """
         latest_mod_time = get_latest_modification_time(settings.google_keep_path)
-        cached = load_notes_from_cache(latest_mod_time)
+        notes_hash = compute_notes_hash(settings.google_keep_path)
+
+        cached = None if force_refresh else load_notes_from_cache(latest_mod_time, notes_hash)
 
         if cached:
             self.notes = cached
@@ -28,7 +35,7 @@ class NoteService:
         else:
             self.notes = parse_notes()
             print(f"Parsed {len(self.notes)} notes from Google Keep export")
-            save_notes_to_cache(self.notes)
+            save_notes_to_cache(self.notes, notes_hash)
 
         return self.notes
 

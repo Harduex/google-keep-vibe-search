@@ -14,10 +14,10 @@ from app.services.session_service import SessionService
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     note_service = NoteService()
-    note_service.load_notes()
+    note_service.load_notes(force_refresh=settings.force_cache_refresh)
     note_service.load_tags()
 
-    search_engine = VibeSearch(note_service.notes)
+    search_engine = VibeSearch(note_service.notes, force_refresh=settings.force_cache_refresh)
     search_service = SearchService(search_engine)
 
     if settings.enable_image_search:

@@ -112,6 +112,7 @@ All settings are read from `.env`. Copy `.env.example` to get started.
 | `IMAGE_SEARCH_THRESHOLD` | `0.2` | Minimum image similarity score |
 | `IMAGE_SEARCH_WEIGHT` | `0.3` | Weight of image score vs. text score in combined results |
 | `CACHE_DIR` | `./cache/` | Directory for embeddings and session cache |
+| `FORCE_CACHE_REFRESH` | `false` | Set `true` to ignore cached notes/embeddings on startup |
 
 ---
 

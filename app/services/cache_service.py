@@ -10,9 +10,10 @@ def ensure_cache_dir():
     os.makedirs(settings.resolved_cache_dir, exist_ok=True)
 
 
-def save_notes_to_cache(notes_data: List[Dict[str, Any]]) -> None:
+def save_notes_to_cache(notes_data: List[Dict[str, Any]], notes_hash: str) -> None:
+    """Persist parsed notes along with a content hash and timestamp."""
     ensure_cache_dir()
-    cache_data = {"timestamp": time.time(), "notes": notes_data}
+    cache_data = {"timestamp": time.time(), "notes": notes_data, "hash": notes_hash}
     try:
         with open(settings.notes_cache_file, "w", encoding="utf-8") as f:
             json.dump(cache_data, f)
@@ -20,7 +21,13 @@ def save_notes_to_cache(notes_data: List[Dict[str, Any]]) -> None:
         print(f"Error caching notes: {e}")
 
 
-def load_notes_from_cache(latest_mod_time: float) -> Optional[List[Dict[str, Any]]]:
+def load_notes_from_cache(latest_mod_time: float, current_hash: str) -> Optional[List[Dict[str, Any]]]:
+    """Return cached notes if still valid.
+
+    The cache is considered stale if any of the following are true:
+    * the source directory has newer files than the cache timestamp
+    * the stored content hash differs from ``current_hash``
+    """
     if not os.path.exists(settings.notes_cache_file):
         return None
 
@@ -31,6 +38,11 @@ def load_notes_from_cache(latest_mod_time: float) -> Optional[List[Dict[str, Any
         cache_timestamp = cache_data.get("timestamp", 0)
         if latest_mod_time > cache_timestamp:
             print("Source notes modified since last cache, will re-parse")
+            return None
+
+        cache_hash = cache_data.get("hash")
+        if cache_hash != current_hash:
+            print("Note contents changed since last cache, will re-parse")
             return None
 
         return cache_data.get("notes", [])

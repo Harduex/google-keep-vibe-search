@@ -18,6 +18,10 @@ fi
 echo "Installing Python dependencies..."
 venv/bin/pip install -q -r requirements.txt
 
+# Load nvm so npm/node are available in non-interactive shells
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
 # 2. Node.js dependencies
 echo "Installing frontend dependencies..."
 cd client

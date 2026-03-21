@@ -3,7 +3,19 @@ set -e
 
 cd "$(dirname "$0")/.."
 
+# Load nvm so npm/node are available in non-interactive shells
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
 echo "Starting backend + frontend..."
+
+if [ ! -d "venv" ]; then
+  echo "Creating virtualenv..."
+  python3 -m venv venv
+  echo "Upgrading pip and installing dependencies..."
+  venv/bin/pip install -U pip
+  venv/bin/pip install -r requirements.txt
+fi
 
 # Start backend in background
 echo "Starting backend on http://localhost:8000"

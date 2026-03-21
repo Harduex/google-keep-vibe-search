@@ -56,3 +56,32 @@ The app was running embedding, indexing, and other operations on CPU instead of 
 import torch
 print(torch.cuda.is_available())  # Should print True
 ```
+
+---
+
+## Agent Instructions Consolidation (March 2026)
+
+### Problem
+The repository had both `AGENTS.md` and `CLAUDE.md` at the root, splitting agent guidance across two overlapping files.
+
+### Root Cause
+The repo mixed a general `AGENTS.md` architecture note with Claude-specific workflow guidance in `CLAUDE.md`, which creates drift and conflicting instructions over time.
+
+### Solution
+
+#### 1. Promoted `AGENTS.md` to the single root instruction file
+- Merged project architecture, setup commands, validation commands, working conventions, agent workflow, and `.agents/` layout guidance into `AGENTS.md`.
+
+#### 2. Removed duplicate root instructions
+- Deleted `CLAUDE.md` so the repository has one checked-in root instruction file.
+
+### Key Lessons
+
+1. Keep one canonical root instruction file for agents.
+2. Keep detailed prompts and workflows under `.agents/` instead of duplicating them in the root file.
+3. Root instructions should stay concise and operational: setup, validation, structure, workflow, and conventions.
+
+### Files Changed
+- `AGENTS.md` - Rewritten as the single agent-facing root guide
+- `CLAUDE.md` - Removed after merging content into `AGENTS.md`
+- `memories.md` - Added note explaining the consolidation

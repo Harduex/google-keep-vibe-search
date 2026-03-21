@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     # Search
     max_results: int = 20
     search_threshold: float = 0.0
+    embedding_model: str = "paraphrase-multilingual-MiniLM-L12-v2"
     image_search_threshold: float = 0.2
     image_search_weight: float = 0.3
 

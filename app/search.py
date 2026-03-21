@@ -20,7 +20,7 @@ if settings.enable_image_search:
 class VibeSearch:
     def __init__(self, notes: List[Dict[str, Any]], force_refresh: bool = False):
         self.notes = notes
-        self.model = SentenceTransformer("all-MiniLM-L6-v2").to("cuda")
+        self.model = SentenceTransformer(settings.embedding_model).to("cuda")
 
         # Create document embeddings for all notes
         self.texts = []
@@ -98,8 +98,9 @@ class VibeSearch:
             print("Computed new embeddings and saved to cache")
 
     def _compute_notes_hash(self) -> str:
-        """Compute a hash of all note texts to detect changes."""
+        """Compute a hash of all note texts and model identity to detect changes."""
         hash_obj = hashlib.md5()
+        hash_obj.update(settings.embedding_model.encode("utf-8"))
         for text in self.texts:
             hash_obj.update(text.encode("utf-8"))
         return hash_obj.hexdigest()
@@ -136,7 +137,7 @@ class VibeSearch:
         cache_info = {
             "hash": notes_hash,
             "note_count": len(self.note_indices),
-            "model_name": self.model.get_sentence_embedding_dimension(),
+            "model_name": settings.embedding_model,
         }
 
         with open(settings.notes_hash_file, "w") as f:
@@ -438,12 +439,21 @@ class VibeSearch:
         # Combine all text from notes in cluster
         all_text = " ".join([f"{note['title']} {note['content']}" for note in notes])
 
-        # Get standard stopwords
+        # Get standard stopwords (English + Bulgarian)
         try:
             standard_stop_words = set(stopwords.words("english"))
         except LookupError:
             nltk.download("stopwords")
             standard_stop_words = set(stopwords.words("english"))
+
+        try:
+            standard_stop_words.update(stopwords.words("bulgarian"))
+        except (LookupError, OSError):
+            try:
+                nltk.download("stopwords")
+                standard_stop_words.update(stopwords.words("bulgarian"))
+            except OSError:
+                pass
 
         # Add custom stopwords
         technical_stop_words = {
@@ -483,7 +493,7 @@ class VibeSearch:
         cleaned_text = re.sub(r"https?://\S+|www\.\S+", " ", all_text)
 
         # Tokenize text and find phrases (bigrams and single words)
-        words = re.findall(r"\b[a-zA-Z]{3,}\b", cleaned_text.lower())
+        words = re.findall(r"\b[a-zA-Z\u0400-\u04FF]{3,}\b", cleaned_text.lower())
 
         # Create word counts
         word_counts = {}

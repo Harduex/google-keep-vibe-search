@@ -192,6 +192,7 @@ class ChunkingService:
 
     def _compute_chunks_hash(self) -> str:
         h = hashlib.md5()
+        h.update(settings.embedding_model.encode("utf-8"))
         for chunk in self.chunks:
             h.update(chunk.text.encode("utf-8"))
         return h.hexdigest()

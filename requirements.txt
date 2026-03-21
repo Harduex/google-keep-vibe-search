@@ -10,6 +10,7 @@ huggingface_hub==0.14.1
 transformers==4.30.2
 python-dotenv==1.0.0
 pydantic-settings>=2.0.0
+nltk>=3.8.1
 httpx>=0.24.1
 black==23.7.0
 isort==5.12.0

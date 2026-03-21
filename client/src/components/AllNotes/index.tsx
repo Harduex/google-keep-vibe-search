@@ -102,6 +102,19 @@ export const AllNotes = memo(({ onShowRelated }: AllNotesProps) => {
     [renameTag],
   );
 
+  const handleMergeSelectedTags = useCallback(
+    async (targetTag: string) => {
+      const sourceTags = selectedTags.filter((tag) => tag !== targetTag);
+
+      for (const sourceTag of sourceTags) {
+        await renameTag(sourceTag, targetTag);
+      }
+
+      setSelectedTags([targetTag]);
+    },
+    [renameTag, selectedTags],
+  );
+
   useEffect(() => {
     const handleScroll = () => {
       if (
@@ -139,6 +152,7 @@ export const AllNotes = memo(({ onShowRelated }: AllNotesProps) => {
           selectedTags={selectedTags}
           onUpdateSelectedTags={handleTagsChange}
           onRenameTag={handleRenameTag}
+          onMergeTags={handleMergeSelectedTags}
         />
       )}
 

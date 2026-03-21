@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 
 import { Tag } from '@/types';
 
@@ -9,6 +9,7 @@ interface TagFilterProps {
   selectedTags: string[];
   onUpdateSelectedTags: (selectedTags: string[]) => void;
   onRenameTag?: (oldName: string, newName: string) => void;
+  onMergeTags?: (targetTag: string) => void | Promise<void>;
 }
 
 export const TagFilter = ({
@@ -16,11 +17,19 @@ export const TagFilter = ({
   selectedTags,
   onUpdateSelectedTags,
   onRenameTag,
+  onMergeTags,
 }: TagFilterProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [editingTag, setEditingTag] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
+  const [isMergeSelectorOpen, setIsMergeSelectorOpen] = useState(false);
   const editCommittedRef = useRef(false);
+
+  useEffect(() => {
+    if (selectedTags.length < 2) {
+      setIsMergeSelectorOpen(false);
+    }
+  }, [selectedTags]);
 
   const handleToggleExpanded = useCallback(() => {
     setIsExpanded((prev) => !prev);
@@ -46,9 +55,38 @@ export const TagFilter = ({
     onUpdateSelectedTags([]);
   }, [onUpdateSelectedTags]);
 
+  const handleToggleMergeSelector = useCallback(() => {
+    setIsMergeSelectorOpen((prev) => !prev);
+  }, []);
+
+  const handleMergeSelect = useCallback(
+    (targetTag: string) => {
+      if (!onMergeTags) {
+        return;
+      }
+
+      const sourceTags = selectedTags.filter((tag) => tag !== targetTag);
+      if (
+        window.confirm(
+          `Merge ${sourceTags.join(', ')} into "${targetTag}"? All notes with the other selected tags will use "${targetTag}" instead.`,
+        )
+      ) {
+        void onMergeTags(targetTag);
+      }
+
+      setIsMergeSelectorOpen(false);
+    },
+    [onMergeTags, selectedTags],
+  );
+
   const createTagChangeHandler = useCallback(
     (tagName: string) => () => handleTagToggle(tagName),
     [handleTagToggle],
+  );
+
+  const createMergeHandler = useCallback(
+    (tagName: string) => () => handleMergeSelect(tagName),
+    [handleMergeSelect],
   );
 
   const handleStartRename = useCallback((e: React.MouseEvent, tagName: string) => {
@@ -96,11 +134,45 @@ export const TagFilter = ({
     [handleRenameSubmit],
   );
 
+  const handleRenameInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setEditValue(e.target.value);
+  }, []);
+
+  const createRenameKeyDownHandler = useCallback(
+    (oldName: string) => (e: React.KeyboardEvent) => handleRenameKeyDown(e, oldName),
+    [handleRenameKeyDown],
+  );
+
+  const createRenameBlurHandler = useCallback(
+    (oldName: string) => () => handleRenameBlur(oldName),
+    [handleRenameBlur],
+  );
+
+  const createRenameSubmitMouseDownHandler = useCallback(
+    (oldName: string) => (e: React.MouseEvent) => {
+      e.preventDefault();
+      handleRenameSubmit(oldName);
+    },
+    [handleRenameSubmit],
+  );
+
+  const handleRenameCancelMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    editCommittedRef.current = true;
+    setEditingTag(null);
+  }, []);
+
+  const createStartRenameHandler = useCallback(
+    (tagName: string) => (e: React.MouseEvent) => handleStartRename(e, tagName),
+    [handleStartRename],
+  );
+
   if (tags.length === 0) {
     return null;
   }
 
   const selectedCount = selectedTags.length;
+  const canMergeSelectedTags = Boolean(onMergeTags) && selectedCount > 1;
 
   return (
     <div className="tag-filter">
@@ -124,7 +196,34 @@ export const TagFilter = ({
             <button className="control-button" onClick={handleClearAll}>
               Clear All
             </button>
+            {canMergeSelectedTags && (
+              <button
+                className={`control-button merge-button ${isMergeSelectorOpen ? 'active' : ''}`}
+                onClick={handleToggleMergeSelector}
+                type="button"
+              >
+                Merge Selected
+              </button>
+            )}
           </div>
+
+          {canMergeSelectedTags && isMergeSelectorOpen && (
+            <div className="tag-filter-merge-selector">
+              <span className="merge-label">Keep this tag:</span>
+              <div className="tag-filter-merge-targets">
+                {selectedTags.map((tagName) => (
+                  <button
+                    key={tagName}
+                    className="merge-target-btn"
+                    onClick={createMergeHandler(tagName)}
+                    type="button"
+                  >
+                    {tagName}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="tag-list">
             {tags.map((tag) => {
@@ -139,27 +238,20 @@ export const TagFilter = ({
                           type="text"
                           className="tag-rename-input"
                           value={editValue}
-                          onChange={(e) => setEditValue(e.target.value)}
-                          onKeyDown={(e) => handleRenameKeyDown(e, tag.name)}
-                          onBlur={() => handleRenameBlur(tag.name)}
+                          onChange={handleRenameInputChange}
+                          onKeyDown={createRenameKeyDownHandler(tag.name)}
+                          onBlur={createRenameBlurHandler(tag.name)}
                           autoFocus
                         />
                         <button
                           className="tag-rename-confirm"
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            handleRenameSubmit(tag.name);
-                          }}
+                          onMouseDown={createRenameSubmitMouseDownHandler(tag.name)}
                         >
                           <span className="material-icons">check</span>
                         </button>
                         <button
                           className="tag-rename-cancel"
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            editCommittedRef.current = true;
-                            setEditingTag(null);
-                          }}
+                          onMouseDown={handleRenameCancelMouseDown}
                         >
                           <span className="material-icons">close</span>
                         </button>
@@ -182,7 +274,7 @@ export const TagFilter = ({
                       {onRenameTag && (
                         <button
                           className="tag-rename-button"
-                          onClick={(e) => handleStartRename(e, tag.name)}
+                          onClick={createStartRenameHandler(tag.name)}
                           title={`Rename tag "${tag.name}"`}
                         >
                           <span className="material-icons">edit</span>
@@ -199,7 +291,7 @@ export const TagFilter = ({
             <span className="material-icons">info</span>
             <span>
               Select tags to show only notes with those tags. When no tags are selected, all notes
-              are displayed.
+              are displayed. Select multiple tags to merge them into one of the selected tags.
             </span>
           </div>
         </div>

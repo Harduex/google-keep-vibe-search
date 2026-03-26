@@ -1,6 +1,12 @@
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path $PSScriptRoot)
 
+# Ensure virtual environment exists before starting services
+if (-not (Test-Path -Path "venv\Scripts\python.exe" -PathType Leaf)) {
+    Write-Host "Virtual environment not found; running setup.ps1..." -ForegroundColor Yellow
+    & "$PSScriptRoot\setup.ps1"
+}
+
 Write-Host "Starting backend + frontend..." -ForegroundColor Cyan
 
 # Start backend in background

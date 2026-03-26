@@ -20,7 +20,9 @@ if settings.enable_image_search:
 class VibeSearch:
     def __init__(self, notes: List[Dict[str, Any]], force_refresh: bool = False):
         self.notes = notes
-        self.model = SentenceTransformer(settings.embedding_model).to("cuda")
+        import torch
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.model = SentenceTransformer(settings.embedding_model).to(device)
 
         # Create document embeddings for all notes
         self.texts = []

@@ -8,6 +8,7 @@ import { TagManager } from '@/components/TagManager';
 import { ViewToggle } from '@/components/ViewToggle';
 import { Visualization } from '@/components/Visualization';
 import { VIEW_MODES } from '@/const';
+import { exportNotes, todayDateStr } from '@/exportUtils';
 import { useTags } from '@/hooks/useTags';
 import { Note, ViewMode } from '@/types/index';
 
@@ -160,6 +161,22 @@ export const Results = memo(
       setSelectedNoteIds([]);
     }, []);
 
+    const handleExportSelected = useCallback(() => {
+      const selected = results.filter((note) => selectedNoteIds.includes(note.id));
+      exportNotes(selected, `notes-export-${todayDateStr()}.txt`);
+    }, [results, selectedNoteIds]);
+
+    const handleExportTag = useCallback(async (tagName: string) => {
+      try {
+        const res = await fetch('/api/all-notes');
+        const data: Note[] = await res.json();
+        const tagNotesList = data.filter((note) => note.tags?.includes(tagName));
+        exportNotes(tagNotesList, `notes-export-${tagName}.txt`);
+      } catch (error) {
+        console.error('Failed to export tag notes:', error);
+      }
+    }, []);
+
     const handleExcludedTagsUpdate = useCallback(
       async (newExcludedTags: string[]) => {
         try {
@@ -203,6 +220,7 @@ export const Results = memo(
             excludedTags={excludedTags}
             onUpdateExcludedTags={handleExcludedTagsUpdate}
             onRemoveTagFromAll={handleRemoveTagFromAll}
+            onExportTag={handleExportTag}
           />
         )}
 
@@ -249,6 +267,17 @@ export const Results = memo(
                     >
                       <span className="material-icons">label</span>
                       <span>Tag ({selectedNoteIds.length})</span>
+                    </button>
+                  )}
+
+                  {selectedNoteIds.length > 0 && (
+                    <button
+                      className="tag-button"
+                      onClick={handleExportSelected}
+                      title={`Export ${selectedNoteIds.length} selected notes`}
+                    >
+                      <span className="material-icons">download</span>
+                      <span>Export ({selectedNoteIds.length})</span>
                     </button>
                   )}
                 </div>

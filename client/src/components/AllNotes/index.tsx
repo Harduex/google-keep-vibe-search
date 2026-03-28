@@ -7,6 +7,7 @@ import { TagFilter } from '@/components/TagFilter';
 import { ViewToggle } from '@/components/ViewToggle';
 import { Visualization } from '@/components/Visualization';
 import { VIEW_MODES } from '@/const';
+import { exportNotes, todayDateStr } from '@/exportUtils';
 import { useAllNotes } from '@/hooks/useAllNotes';
 import { useTags } from '@/hooks/useTags';
 import { ViewMode } from '@/types';
@@ -25,6 +26,7 @@ export const AllNotes = memo(({ onShowRelated }: AllNotesProps) => {
   const [filterPinned, setFilterPinned] = useState<boolean>(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [visibleNotesCount, setVisibleNotesCount] = useState<number>(20);
+  const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
 
   // Sort and filter notes
   const filteredNotes = useMemo(() => {
@@ -115,6 +117,33 @@ export const AllNotes = memo(({ onShowRelated }: AllNotesProps) => {
     [renameTag, selectedTags],
   );
 
+  const handleNoteSelection = useCallback((noteId: string, isSelected: boolean) => {
+    setSelectedNoteIds((prev) =>
+      isSelected ? [...prev, noteId] : prev.filter((id) => id !== noteId),
+    );
+  }, []);
+
+  const handleSelectAll = useCallback(() => {
+    setSelectedNoteIds(filteredNotes.map((note) => note.id));
+  }, [filteredNotes]);
+
+  const handleDeselectAll = useCallback(() => {
+    setSelectedNoteIds([]);
+  }, []);
+
+  const handleExportSelected = useCallback(() => {
+    const selected = filteredNotes.filter((note) => selectedNoteIds.includes(note.id));
+    exportNotes(selected, `notes-export-${todayDateStr()}.txt`);
+  }, [filteredNotes, selectedNoteIds]);
+
+  const handleExportByTag = useCallback(
+    (tagName: string) => {
+      const tagNotesList = notes.filter((note) => note.tags?.includes(tagName));
+      exportNotes(tagNotesList, `notes-export-${tagName}.txt`);
+    },
+    [notes],
+  );
+
   useEffect(() => {
     const handleScroll = () => {
       if (
@@ -153,6 +182,7 @@ export const AllNotes = memo(({ onShowRelated }: AllNotesProps) => {
           onUpdateSelectedTags={handleTagsChange}
           onRenameTag={handleRenameTag}
           onMergeTags={handleMergeSelectedTags}
+          onExportTag={handleExportByTag}
         />
       )}
 
@@ -168,6 +198,32 @@ export const AllNotes = memo(({ onShowRelated }: AllNotesProps) => {
         </div>
 
         <div className="all-notes-controls">
+          {viewMode === VIEW_MODES.LIST && filteredNotes.length > 0 && (
+            <div className="selection-controls">
+              <button
+                className="selection-toggle-button"
+                onClick={selectedNoteIds.length === 0 ? handleSelectAll : handleDeselectAll}
+                title={selectedNoteIds.length === 0 ? 'Select all notes' : 'Deselect all notes'}
+              >
+                <span className="material-icons">
+                  {selectedNoteIds.length === 0 ? 'check_box_outline_blank' : 'check_box'}
+                </span>
+                <span>{selectedNoteIds.length === 0 ? 'Select All' : 'Deselect All'}</span>
+              </button>
+
+              {selectedNoteIds.length > 0 && (
+                <button
+                  className="tag-button"
+                  onClick={handleExportSelected}
+                  title={`Export ${selectedNoteIds.length} selected notes`}
+                >
+                  <span className="material-icons">download</span>
+                  <span>Export ({selectedNoteIds.length})</span>
+                </button>
+              )}
+            </div>
+          )}
+
           {viewMode === VIEW_MODES.LIST && (
             <div className="all-notes-filters">
               <select value={sortBy} onChange={handleSortChange} className="all-notes-select">
@@ -205,7 +261,10 @@ export const AllNotes = memo(({ onShowRelated }: AllNotesProps) => {
                 <NoteCard
                   note={note}
                   query=""
+                  isSelectable={true}
+                  isSelected={selectedNoteIds.includes(note.id)}
                   onShowRelated={onShowRelated}
+                  onSelectNote={handleNoteSelection}
                   onRemoveTag={removeTagFromNote}
                   onRenameTag={renameTag}
                 />

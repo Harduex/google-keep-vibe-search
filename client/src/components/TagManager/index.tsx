@@ -9,6 +9,7 @@ interface TagManagerProps {
   excludedTags: string[];
   onUpdateExcludedTags: (excludedTags: string[]) => void;
   onRemoveTagFromAll?: (tagName: string) => void;
+  onExportTag?: (tagName: string) => void;
 }
 
 export const TagManager = ({
@@ -16,6 +17,7 @@ export const TagManager = ({
   excludedTags,
   onUpdateExcludedTags,
   onRemoveTagFromAll,
+  onExportTag,
 }: TagManagerProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -65,6 +67,11 @@ export const TagManager = ({
     [handleRemoveTagFromAll],
   );
 
+  const createExportTagHandler = useCallback(
+    (tagName: string) => () => onExportTag?.(tagName),
+    [onExportTag],
+  );
+
   if (tags.length === 0) {
     return null;
   }
@@ -112,6 +119,15 @@ export const TagManager = ({
                       <span className="tag-count">({tag.count} notes)</span>
                     </span>
                   </label>
+                  {onExportTag && (
+                    <button
+                      className="export-tag-button"
+                      onClick={createExportTagHandler(tag.name)}
+                      title={`Export all notes tagged "${tag.name}"`}
+                    >
+                      <span className="material-icons">download</span>
+                    </button>
+                  )}
                   {onRemoveTagFromAll && (
                     <button
                       className="remove-tag-button"

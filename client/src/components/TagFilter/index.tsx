@@ -10,6 +10,7 @@ interface TagFilterProps {
   onUpdateSelectedTags: (selectedTags: string[]) => void;
   onRenameTag?: (oldName: string, newName: string) => void;
   onMergeTags?: (targetTag: string) => void | Promise<void>;
+  onExportTag?: (tagName: string) => void;
 }
 
 export const TagFilter = ({
@@ -18,6 +19,7 @@ export const TagFilter = ({
   onUpdateSelectedTags,
   onRenameTag,
   onMergeTags,
+  onExportTag,
 }: TagFilterProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [editingTag, setEditingTag] = useState<string | null>(null);
@@ -167,6 +169,11 @@ export const TagFilter = ({
     [handleStartRename],
   );
 
+  const createExportTagHandler = useCallback(
+    (tagName: string) => () => onExportTag?.(tagName),
+    [onExportTag],
+  );
+
   if (tags.length === 0) {
     return null;
   }
@@ -278,6 +285,15 @@ export const TagFilter = ({
                           title={`Rename tag "${tag.name}"`}
                         >
                           <span className="material-icons">edit</span>
+                        </button>
+                      )}
+                      {onExportTag && (
+                        <button
+                          className="export-tag-button"
+                          onClick={createExportTagHandler(tag.name)}
+                          title={`Export all notes tagged "${tag.name}"`}
+                        >
+                          <span className="material-icons">download</span>
                         </button>
                       )}
                     </div>

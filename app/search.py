@@ -45,6 +45,7 @@ class VibeSearch:
         # Initialize image processor if enabled
         self.image_processor = None
         self.image_note_map = {}  # Maps image paths to note indices
+        self.reranker = None  # Set externally for cross-encoder reranking
         if settings.enable_image_search:
             self._init_image_search()
 
@@ -329,6 +330,10 @@ class VibeSearch:
             note = self.notes[note_idx].copy()
             note["score"] = float(fused_score)
             results.append(note)
+
+        # Cross-encoder reranking if available
+        if self.reranker and len(results) > 1:
+            results = self.reranker.rerank(query, results[:20], top_k=max_results or settings.max_results)
 
         return results[: max_results or settings.max_results]
 

@@ -449,7 +449,7 @@ Week 1:
   Day 1:  RRF fusion in search.py + chat_service.py (item 1)          ✅ DONE
   Day 1:  BM25 keyword upgrade (item 3-alt)                           ✅ DONE
   Day 1:  Retrieval stopping (item 7)                                 ✅ DONE
-  Day 2-3: Cross-encoder reranker service (item 2)
+  Day 2-3: Cross-encoder reranker service (item 2)                   ✅ DONE
 
 Week 2:
   Day 1-3: Entity Resolution service (item 4)

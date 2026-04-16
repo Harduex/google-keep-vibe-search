@@ -13,13 +13,13 @@ from app.prompts.system_prompts import (
 )
 from app.services.chunking_service import ChunkingService
 from app.services.citation_service import extract_citations
-from app.search import VibeSearch
 
 
 class ChatService:
-    def __init__(self, search_service, chunking_service: Optional[ChunkingService] = None):
+    def __init__(self, search_service, chunking_service: Optional[ChunkingService] = None, reranker=None):
         self.search_service = search_service
         self.chunking_service = chunking_service
+        self.reranker = reranker
         self.model = settings.llm_model
         self.api_base_url = settings.resolved_api_base_url
         self.max_context_notes = settings.chat_context_notes
@@ -148,6 +148,7 @@ class ChatService:
         merged = self._merge_and_rerank(
             primary_results, context_results, topic_results, previous_note_ids,
             chunk_results=chunk_results,
+            query=latest_message,
         )
 
         # Coverage saturation: cap results if they're all saying the same thing
@@ -162,8 +163,9 @@ class ChatService:
         topic: List[Dict],
         previous_ids: Optional[List[str]],
         chunk_results: Optional[List[Dict]] = None,
+        query: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        """Merge multiple retrieval signals using Reciprocal Rank Fusion."""
+        """Merge multiple retrieval signals using RRF, then optionally cross-encoder rerank."""
         # Build ranked lists from each signal (note_id, score)
         def to_ranked(notes: List[Dict]) -> List[tuple]:
             return [(n.get("id", ""), n.get("score", 0)) for n in notes]
@@ -197,8 +199,14 @@ class ChatService:
                 if nid not in note_map:
                     note_map[nid] = note
 
-        ranked = sorted(fused.items(), key=lambda x: x[1], reverse=True)
-        return [note_map[nid] for nid, _ in ranked if nid in note_map]
+        ranked_result = sorted(fused.items(), key=lambda x: x[1], reverse=True)
+        merged = [note_map[nid] for nid, _ in ranked_result if nid in note_map]
+
+        # Cross-encoder reranking: take top-20 RRF candidates, rerank to top-10
+        if self.reranker and query and len(merged) > 1:
+            merged = self.reranker.rerank(query, merged[:20], top_k=self.max_context_notes)
+
+        return merged
 
     async def _maybe_summarize_window(
         self, messages: List[Dict[str, str]]

@@ -8,6 +8,7 @@ from app.services.categorization_service import CategorizationService
 from app.services.chat_service import ChatService
 from app.services.chunking_service import ChunkingService
 from app.services.note_service import NoteService
+from app.services.reranker_service import RerankerService
 from app.services.search_service import SearchService
 from app.services.session_service import SessionService
 
@@ -33,7 +34,13 @@ async def lifespan(app: FastAPI):
     chunking_service.build_chunks(note_service.notes)
     chunking_service.load_or_compute_embeddings()
 
-    chat_service = ChatService(search_service, chunking_service)
+    # Cross-encoder reranker for precision reranking
+    reranker = None
+    if settings.enable_reranker:
+        reranker = RerankerService()
+        search_engine.reranker = reranker
+
+    chat_service = ChatService(search_service, chunking_service, reranker=reranker)
     print(f"Initialized chat service with model: {settings.llm_model}")
 
     session_service = SessionService()

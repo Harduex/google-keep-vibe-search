@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     # Legacy Ollama (used as fallback for llm_api_base_url)
     ollama_api_url: str = "http://localhost:11434"
 
+    # Reranker
+    enable_reranker: bool = True
+    reranker_model: str = "cross-encoder/ms-marco-MiniLM-L6-v2"
+
     # Image search
     enable_image_search: bool = True
 

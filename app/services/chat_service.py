@@ -2,6 +2,8 @@ import json
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 import httpx
+import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity as sklearn_cosine_similarity
 
 from app.core.config import settings
 from app.prompts.system_prompts import (
@@ -11,6 +13,7 @@ from app.prompts.system_prompts import (
 )
 from app.services.chunking_service import ChunkingService
 from app.services.citation_service import extract_citations
+from app.search import VibeSearch
 
 
 class ChatService:
@@ -38,6 +41,32 @@ class ChatService:
     ) -> List[Dict[str, Any]]:
         max_notes = max_notes or self.max_context_notes
         return self.search_service.search(query, max_results=max_notes)
+
+    def _is_duplicate_query(self, query: str, previous_queries: List[str], threshold: float = 0.95) -> bool:
+        """Query collapse: skip retrieval if query is near-duplicate of a previous one."""
+        if not previous_queries or not query.strip():
+            return False
+        model = self.search_service.engine.model
+        q_emb = model.encode([query])
+        prev_embs = model.encode(previous_queries)
+        sims = sklearn_cosine_similarity(q_emb, prev_embs)[0]
+        return bool(np.any(sims > threshold))
+
+    def _cap_if_saturated(self, notes: List[Dict[str, Any]], threshold: float = 0.9, cap: int = 5) -> List[Dict[str, Any]]:
+        """Coverage saturation: if top results are all redundant, cap the list."""
+        if len(notes) <= cap:
+            return notes
+        model = self.search_service.engine.model
+        texts = [(n.get("title", "") + " " + n.get("content", ""))[:500] for n in notes[:10]]
+        if len(texts) < 3:
+            return notes
+        embs = model.encode(texts)
+        sims = sklearn_cosine_similarity(embs)
+        n = len(sims)
+        avg_sim = (sims.sum() - n) / (n * (n - 1)) if n > 1 else 0
+        if avg_sim > threshold:
+            return notes[:cap]
+        return notes
 
     def format_notes_for_context(self, notes: List[Dict[str, Any]]) -> str:
         formatted = []
@@ -96,15 +125,18 @@ class ChatService:
             latest_message, max_notes=self.max_context_notes + 5
         ) if latest_message else []
 
+        # Query collapse: skip context retrieval if it duplicates the primary query
         context_results = []
         user_messages = [m["content"] for m in messages if m.get("role") == "user"]
         if len(user_messages) > 1:
             recent_context = " ".join(user_messages[-3:])
-            context_results = self.get_relevant_notes(recent_context, max_notes=5)
+            if not self._is_duplicate_query(recent_context, [latest_message]):
+                context_results = self.get_relevant_notes(recent_context, max_notes=5)
 
         topic_results = []
         if topic:
-            topic_results = self.get_relevant_notes(topic, max_notes=5)
+            if not self._is_duplicate_query(topic, [latest_message]):
+                topic_results = self.get_relevant_notes(topic, max_notes=5)
 
         # Chunk-level search for more precise retrieval on long notes
         chunk_results = []
@@ -117,6 +149,10 @@ class ChatService:
             primary_results, context_results, topic_results, previous_note_ids,
             chunk_results=chunk_results,
         )
+
+        # Coverage saturation: cap results if they're all saying the same thing
+        merged = self._cap_if_saturated(merged)
+
         return merged[: self.max_context_notes]
 
     def _merge_and_rerank(
@@ -127,42 +163,42 @@ class ChatService:
         previous_ids: Optional[List[str]],
         chunk_results: Optional[List[Dict]] = None,
     ) -> List[Dict[str, Any]]:
-        seen: Dict[str, Dict] = {}
+        """Merge multiple retrieval signals using Reciprocal Rank Fusion."""
+        # Build ranked lists from each signal (note_id, score)
+        def to_ranked(notes: List[Dict]) -> List[tuple]:
+            return [(n.get("id", ""), n.get("score", 0)) for n in notes]
 
-        for note in primary:
-            nid = note.get("id", "")
-            seen[nid] = {"note": note, "score": note.get("score", 0) * 1.0}
-
-        for note in context:
-            nid = note.get("id", "")
-            if nid in seen:
-                seen[nid]["score"] += note.get("score", 0) * 0.3
-            else:
-                seen[nid] = {"note": note, "score": note.get("score", 0) * 0.5}
-
-        for note in topic:
-            nid = note.get("id", "")
-            if nid in seen:
-                seen[nid]["score"] += note.get("score", 0) * 0.4
-            else:
-                seen[nid] = {"note": note, "score": note.get("score", 0) * 0.6}
-
-        # Chunk-level results boost precision for long notes
+        ranked_lists = [to_ranked(primary)]
+        if context:
+            ranked_lists.append(to_ranked(context))
+        if topic:
+            ranked_lists.append(to_ranked(topic))
         if chunk_results:
-            for note in chunk_results:
-                nid = note.get("id", "")
-                if nid in seen:
-                    seen[nid]["score"] += note.get("score", 0) * 0.5
-                else:
-                    seen[nid] = {"note": note, "score": note.get("score", 0) * 0.8}
+            ranked_lists.append(to_ranked(chunk_results))
 
+        # RRF fusion across all signals
+        fused: Dict[str, float] = {}
+        for ranked in ranked_lists:
+            sorted_items = sorted(ranked, key=lambda x: x[1], reverse=True)
+            for rank, (nid, _) in enumerate(sorted_items):
+                fused[nid] = fused.get(nid, 0.0) + 1.0 / (60 + rank + 1)
+
+        # Continuity boost for previously referenced notes
         if previous_ids:
             for nid in previous_ids:
-                if nid in seen:
-                    seen[nid]["score"] *= 1.15
+                if nid in fused:
+                    fused[nid] *= 1.15
 
-        ranked = sorted(seen.values(), key=lambda x: x["score"], reverse=True)
-        return [item["note"] for item in ranked]
+        # Collect note objects (dedup by id, keep first occurrence)
+        note_map: Dict[str, Dict] = {}
+        for notes_list in [primary, context, topic, chunk_results or []]:
+            for note in notes_list:
+                nid = note.get("id", "")
+                if nid not in note_map:
+                    note_map[nid] = note
+
+        ranked = sorted(fused.items(), key=lambda x: x[1], reverse=True)
+        return [note_map[nid] for nid, _ in ranked if nid in note_map]
 
     async def _maybe_summarize_window(
         self, messages: List[Dict[str, str]]

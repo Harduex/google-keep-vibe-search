@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Tuple, Set, Optional, BinaryIO, Union
 import nltk
 from nltk.corpus import stopwords
 import numpy as np
+from rank_bm25 import BM25Okapi
 from sentence_transformers import SentenceTransformer
 from sklearn.cluster import KMeans
 from sklearn.metrics.pairwise import cosine_similarity
@@ -37,6 +38,9 @@ class VibeSearch:
 
         # Try to load embeddings from cache or compute new ones
         self.load_or_compute_embeddings(force_refresh)
+
+        # Build BM25 index for keyword search
+        self._build_bm25_index()
 
         # Initialize image processor if enabled
         self.image_processor = None
@@ -163,38 +167,36 @@ class VibeSearch:
             # Fall back to computing new embeddings
             self.embeddings = self.model.encode(self.texts)
 
+    def _build_bm25_index(self):
+        """Build BM25 index over note texts for keyword search."""
+        tokenized = [text.lower().split() for text in self.texts]
+        self.bm25 = BM25Okapi(tokenized)
+
     def _keyword_search(self, query: str) -> List[Tuple[int, float]]:
-        """
-        Perform keyword-based search.
-
-        Args:
-            query: The search query
-
-        Returns:
-            List of tuples with (note_index, score)
-        """
-        # Break query into keywords
-        keywords = query.lower().split()
+        """Perform BM25 keyword search."""
+        tokens = query.lower().split()
+        if not tokens:
+            return []
+        scores = self.bm25.get_scores(tokens)
         results = []
-
-        # Score for each note based on keyword matches
-        for i, note_idx in enumerate(self.note_indices):
-            note = self.notes[note_idx]
-            text = f"{note['title']} {note['content']}".lower()
-
-            # Count exact keyword matches
-            match_count = 0
-            for keyword in keywords:
-                # Only count keywords with length >= 3 to avoid common words like "a", "an", "the"
-                if len(keyword) >= 3 and keyword in text:
-                    match_count += 1
-
-            # Calculate score based on proportion of matching keywords
-            if match_count > 0:
-                score = match_count / len(keywords)
-                results.append((note_idx, score))
-
+        for i, score in enumerate(scores):
+            if score > 0:
+                results.append((self.note_indices[i], float(score)))
         return results
+
+    @staticmethod
+    def rrf_fuse(ranked_lists: List[List[Tuple[int, float]]], k: int = 60) -> Dict[int, float]:
+        """Reciprocal Rank Fusion across multiple ranked lists.
+
+        Each ranked_list is [(note_idx, score), ...] sorted by score desc.
+        Returns {note_idx: fused_score}.
+        """
+        fused: Dict[int, float] = {}
+        for ranked in ranked_lists:
+            sorted_items = sorted(ranked, key=lambda x: x[1], reverse=True)
+            for rank, (note_idx, _) in enumerate(sorted_items):
+                fused[note_idx] = fused.get(note_idx, 0.0) + 1.0 / (k + rank + 1)
+        return fused
 
     def _image_search(self, query: str) -> Dict[int, float]:
         """
@@ -283,79 +285,52 @@ class VibeSearch:
         return results[: max_results or settings.max_results]
 
     def search(self, query: str, max_results: int = None) -> List[Dict[str, Any]]:
-        """
-        Search notes using both semantic, keyword, and image search.
-
-        Args:
-            query: The search query
-            max_results: Maximum number of results to return
-
-        Returns:
-            Sorted list of matching notes
-        """
+        """Search notes using RRF fusion of semantic, BM25 keyword, and image signals."""
         if not query.strip():
             return []
 
         # Get semantic search scores
         semantic_scores = self._semantic_search(query)
 
-        # Get keyword search scores
-        keyword_matches = self._keyword_search(query)
+        # Build ranked list for semantic signal
+        semantic_ranked = [
+            (self.note_indices[i], float(semantic_scores[i]))
+            for i in range(len(self.note_indices))
+            if semantic_scores[i] > settings.search_threshold
+        ]
 
-        # Create a map for keyword search scores for quick lookup
-        keyword_score_map = {idx: score for idx, score in keyword_matches}
+        # Get BM25 keyword search scores (already as [(note_idx, score)])
+        keyword_ranked = self._keyword_search(query)
 
         # Get image search scores if enabled
         image_score_map = self._image_search(query)
+        image_ranked = [(idx, score) for idx, score in image_score_map.items()]
 
-        # Create scores list with combined scores
-        scores = []
-        for i in range(len(self.note_indices)):
-            note_idx = self.note_indices[i]
-            semantic_score = semantic_scores[i]
-            keyword_score = keyword_score_map.get(note_idx, 0)
-            image_score = image_score_map.get(note_idx, 0)
+        # RRF fusion across all available signals
+        ranked_lists = [semantic_ranked, keyword_ranked]
+        if image_ranked:
+            ranked_lists.append(image_ranked)
+        fused_scores = self.rrf_fuse(ranked_lists)
 
-            # Basic text-based combined score (70% semantic, 30% keyword)
-            text_score = (semantic_score * 0.7) + (keyword_score * 0.3)
+        # Track which notes have image matches for UI
+        for note_idx in image_score_map:
+            self.notes[note_idx]["has_matching_images"] = True
 
-            # Add image match boost if applicable
-            if image_score > 0:
-                # Combine text and image scores, adjust weights as needed
-                combined_score = (text_score * (1 - settings.image_search_weight)) + (
-                    image_score * settings.image_search_weight
-                )
-                # Add a flag to indicate this note has matching images
-                self.notes[note_idx]["has_matching_images"] = True
-            else:
-                combined_score = text_score
-                # Ensure the flag is removed if it was previously set
-                if "has_matching_images" in self.notes[note_idx]:
-                    del self.notes[note_idx]["has_matching_images"]
+        # Build result set from all notes that appeared in any signal
+        keyword_idx_set = {idx for idx, _ in keyword_ranked}
+        image_idx_set = set(image_score_map.keys())
 
-            # Determine if this note should be included in results
-            should_include = (
-                semantic_score > settings.search_threshold
-                or keyword_score > 0
-                or image_score > settings.image_search_threshold
-            )
-
-            scores.append((note_idx, combined_score, should_include))
-
-        # Sort by combined score (descending)
-        scores.sort(key=lambda x: x[1], reverse=True)
-
-        # Return top results that meet the threshold
         results = []
-        for note_idx, combined_score, should_include in scores[
-            : max_results or settings.max_results
-        ]:
-            if should_include:
-                note = self.notes[note_idx].copy()
-                note["score"] = float(combined_score)
-                results.append(note)
+        for note_idx, fused_score in sorted(fused_scores.items(), key=lambda x: x[1], reverse=True):
+            # Clean up image flag for notes without matches
+            if note_idx not in image_idx_set and "has_matching_images" in self.notes[note_idx]:
+                del self.notes[note_idx]["has_matching_images"]
 
-        return results
+            note = self.notes[note_idx].copy()
+            note["score"] = float(fused_score)
+            results.append(note)
+
+        return results[: max_results or settings.max_results]
 
     def _semantic_search(self, query: str) -> np.ndarray:
         """Perform semantic search using embeddings."""

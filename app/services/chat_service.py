@@ -135,6 +135,13 @@ class ChatService:
         else:
             system_content = NO_NOTES_SYSTEM_PROMPT
 
+        # Gap analysis warning: if retrieval couldn't find all needed info
+        if getattr(self, "_last_gap_status", "sufficient") == "best_effort":
+            system_content += (
+                "\n\nNote: Your notes may not contain complete information "
+                "about this topic. Be honest about gaps in the available information."
+            )
+
         prepared.insert(0, {"role": "system", "content": system_content})
         return prepared
 
@@ -155,7 +162,7 @@ class ChatService:
 
         # Prompt decomposition: break complex queries into sub-queries
         sub_queries = [latest_message] if latest_message else []
-        if self.query_service and latest_message:
+        if self.query_service and latest_message and settings.enable_prompt_decomposition:
             sub_queries = await self.query_service.decompose_if_complex(latest_message)
 
         # Note-level search (existing behavior for primary query)
@@ -201,7 +208,16 @@ class ChatService:
         # Coverage saturation: cap results if they're all saying the same thing
         merged = self._cap_if_saturated(merged)
 
-        return merged[: self.max_context_notes]
+        result = merged[: self.max_context_notes]
+
+        # Gap analysis: check if retrieved notes are sufficient, search for gaps
+        self._last_gap_status = "sufficient"
+        if self.query_service and latest_message and result and settings.enable_gap_analysis:
+            result, self._last_gap_status = await self.query_service.retrieve_with_gap_analysis(
+                latest_message, result, self.get_relevant_notes
+            )
+
+        return result
 
     def _merge_and_rerank(
         self,

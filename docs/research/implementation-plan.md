@@ -350,7 +350,7 @@ Question: {query}"""
 
 ---
 
-### 9. Gap Analysis / Adaptive Retrieval (CRAG-style)
+### 9. Gap Analysis / Adaptive Retrieval (CRAG-style) ✅ DONE
 
 **Add to**: `app/services/query_service.py`
 
@@ -460,7 +460,7 @@ Week 3:
 
 Week 4:
   Day 1-2: Prompt decomposition (item 8)                           ✅ DONE
-  Day 3-5: Gap analysis / CRAG (item 9)
+  Day 3-5: Gap analysis / CRAG (item 9)                           ✅ DONE
 
 Later:
   Model upgrade to BGE-M3 → Late Chunking + Sparse Vectors (item 10 + item 3)

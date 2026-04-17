@@ -45,6 +45,9 @@ class Settings(BaseSettings):
     # Prompt decomposition
     enable_prompt_decomposition: bool = True
 
+    # Gap analysis (CRAG-style adaptive retrieval)
+    enable_gap_analysis: bool = True
+
     # Image search
     enable_image_search: bool = True
 

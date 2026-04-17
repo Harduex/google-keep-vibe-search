@@ -266,7 +266,7 @@ class VerificationService:
 
 ---
 
-### 6. Conflict Detection
+### 6. Conflict Detection ✅ DONE
 
 **Add to**: `app/services/verification_service.py`
 
@@ -311,7 +311,7 @@ def detect_conflicts(self, notes: list[dict], similarity_threshold=0.85) -> list
 
 ## Phase 5: Query Intelligence (Week 4) — Items 8, 9
 
-### 8. Prompt Decomposition
+### 8. Prompt Decomposition ✅ DONE
 
 **New file**: `app/services/query_service.py`
 
@@ -455,11 +455,11 @@ Week 2:
   Day 1-3: Entity Resolution service (item 4)                       ✅ DONE
 
 Week 3:
-  Day 1-2: Citation verification (item 5)
-  Day 3-5: Conflict detection (item 6)
+  Day 1-2: Citation verification (item 5)                          ✅ DONE
+  Day 3-5: Conflict detection (item 6)                             ✅ DONE
 
 Week 4:
-  Day 1-2: Prompt decomposition (item 8)
+  Day 1-2: Prompt decomposition (item 8)                           ✅ DONE
   Day 3-5: Gap analysis / CRAG (item 9)
 
 Later:

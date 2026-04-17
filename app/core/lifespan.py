@@ -76,6 +76,14 @@ async def lifespan(app: FastAPI):
         reranker=reranker, entity_service=entity_service,
         verification_service=verification_service,
     )
+
+    # Prompt decomposition for complex queries
+    if settings.enable_prompt_decomposition:
+        from app.services.query_service import QueryService
+
+        chat_service.query_service = QueryService(chat_service.client, settings.llm_model)
+        print("  Prompt decomposition: enabled")
+
     _step(f"Chat service ready (model: {settings.llm_model})", t)
 
     session_service = SessionService()

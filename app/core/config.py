@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     enable_citation_verification: bool = True
     nli_model: str = "cross-encoder/nli-deberta-v3-small"
 
+    # Prompt decomposition
+    enable_prompt_decomposition: bool = True
+
     # Image search
     enable_image_search: bool = True
 

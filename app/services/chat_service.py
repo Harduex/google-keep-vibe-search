@@ -16,12 +16,13 @@ from app.services.citation_service import extract_citations
 
 
 class ChatService:
-    def __init__(self, search_service, chunking_service: Optional[ChunkingService] = None, reranker=None, entity_service=None, verification_service=None):
+    def __init__(self, search_service, chunking_service: Optional[ChunkingService] = None, reranker=None, entity_service=None, verification_service=None, query_service=None):
         self.search_service = search_service
         self.chunking_service = chunking_service
         self.reranker = reranker
         self.entity_service = entity_service
         self.verification_service = verification_service
+        self.query_service = query_service
         self.model = settings.llm_model
         self.api_base_url = settings.resolved_api_base_url
         self.max_context_notes = settings.chat_context_notes
@@ -137,7 +138,7 @@ class ChatService:
         prepared.insert(0, {"role": "system", "content": system_content})
         return prepared
 
-    def get_conversation_aware_context(
+    async def get_conversation_aware_context(
         self,
         messages: List[Dict[str, str]],
         topic: Optional[str] = None,
@@ -152,10 +153,23 @@ class ChatService:
         if not latest_message and not topic:
             return []
 
-        # Note-level search (existing behavior)
+        # Prompt decomposition: break complex queries into sub-queries
+        sub_queries = [latest_message] if latest_message else []
+        if self.query_service and latest_message:
+            sub_queries = await self.query_service.decompose_if_complex(latest_message)
+
+        # Note-level search (existing behavior for primary query)
         primary_results = self.get_relevant_notes(
             latest_message, max_notes=self.max_context_notes + 5
         ) if latest_message else []
+
+        # Sub-query retrieval: if decomposed, retrieve for each sub-query
+        decomposed_results = []
+        if len(sub_queries) > 1:
+            for sq in sub_queries:
+                decomposed_results.extend(
+                    self.get_relevant_notes(sq, max_notes=5)
+                )
 
         # Query collapse: skip context retrieval if it duplicates the primary query
         context_results = []
@@ -180,6 +194,7 @@ class ChatService:
         merged = self._merge_and_rerank(
             primary_results, context_results, topic_results, previous_note_ids,
             chunk_results=chunk_results,
+            decomposed_results=decomposed_results,
             query=latest_message,
         )
 
@@ -195,6 +210,7 @@ class ChatService:
         topic: List[Dict],
         previous_ids: Optional[List[str]],
         chunk_results: Optional[List[Dict]] = None,
+        decomposed_results: Optional[List[Dict]] = None,
         query: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Merge multiple retrieval signals using RRF, then optionally cross-encoder rerank."""
@@ -209,6 +225,8 @@ class ChatService:
             ranked_lists.append(to_ranked(topic))
         if chunk_results:
             ranked_lists.append(to_ranked(chunk_results))
+        if decomposed_results:
+            ranked_lists.append(to_ranked(decomposed_results))
 
         # Entity signal: named entity matches from query
         if self.entity_service and query:
@@ -231,7 +249,7 @@ class ChatService:
 
         # Collect note objects (dedup by id, keep first occurrence)
         note_map: Dict[str, Dict] = {}
-        for notes_list in [primary, context, topic, chunk_results or []]:
+        for notes_list in [primary, context, topic, chunk_results or [], decomposed_results or []]:
             for note in notes_list:
                 nid = note.get("id", "")
                 if nid not in note_map:
@@ -300,7 +318,7 @@ class ChatService:
         relevant_notes = []
 
         if use_notes_context:
-            relevant_notes = self.get_conversation_aware_context(messages, topic)
+            relevant_notes = await self.get_conversation_aware_context(messages, topic)
 
         windowed = await self._maybe_summarize_window(messages)
         prepared = self.prepare_messages_with_context(
@@ -333,7 +351,7 @@ class ChatService:
     ) -> AsyncGenerator[bytes, None]:
         relevant_notes = []
         if use_notes_context:
-            relevant_notes = self.get_conversation_aware_context(messages, topic)
+            relevant_notes = await self.get_conversation_aware_context(messages, topic)
 
         # Detect conflicts between context notes
         conflicts = []

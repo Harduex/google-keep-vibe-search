@@ -43,7 +43,8 @@ export const ChatNotes = memo(({ notes, conflicts, query, onShowRelated }: ChatN
             <strong>Conflicting notes detected</strong>
             {conflicts.map((c, i) => (
               <div key={i} className="conflict-detail">
-                Note #{c.note_a_index} vs Note #{c.note_b_index} ({Math.round(c.contradiction_score * 100)}% contradiction)
+                Note #{c.note_a_index} vs Note #{c.note_b_index} (
+                {Math.round(c.contradiction_score * 100)}% contradiction)
               </div>
             ))}
           </div>

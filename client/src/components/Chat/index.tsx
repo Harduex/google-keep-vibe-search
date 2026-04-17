@@ -109,9 +109,7 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
             onClick={toggleSidebar}
             title={sidebarOpen ? 'Hide sessions' : 'Show sessions'}
           >
-            <span className="material-icons">
-              {sidebarOpen ? 'menu_open' : 'menu'}
-            </span>
+            <span className="material-icons">{sidebarOpen ? 'menu_open' : 'menu'}</span>
           </button>
           <span className="material-icons">chat</span>
           AI Assistant
@@ -243,7 +241,12 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
         </div>
 
         <div className="notes-container">
-          <ChatNotes notes={relevantNotes} conflicts={conflicts} query={query} onShowRelated={onShowRelated} />
+          <ChatNotes
+            notes={relevantNotes}
+            conflicts={conflicts}
+            query={query}
+            onShowRelated={onShowRelated}
+          />
         </div>
       </div>
     </div>

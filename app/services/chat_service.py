@@ -101,6 +101,36 @@ class ChatService:
                 note_count=len(relevant_notes),
                 formatted_notes=formatted_notes,
             )
+
+            # Detect conflicts between context notes
+            if self.verification_service and len(relevant_notes) > 1:
+                try:
+                    model = self.search_service.engine.model
+                    conflicts = self.verification_service.detect_conflicts(
+                        relevant_notes, model
+                    )
+                    if conflicts:
+                        conflict_lines = []
+                        for c in conflicts:
+                            a_label = c["note_a_title"] or f"Note #{c['note_a_index']}"
+                            b_label = c["note_b_title"] or f"Note #{c['note_b_index']}"
+                            line = (
+                                f"- Note #{c['note_a_index']} ({a_label}) and "
+                                f"Note #{c['note_b_index']} ({b_label}) "
+                                f"contain conflicting information (confidence: {c['contradiction_score']:.0%})."
+                            )
+                            # Add recency hint
+                            if c["note_a_edited"] and c["note_b_edited"]:
+                                line += f" Edited: #{c['note_a_index']} on {c['note_a_edited']}, #{c['note_b_index']} on {c['note_b_edited']}."
+                            conflict_lines.append(line)
+
+                        system_content += (
+                            "\n\nIMPORTANT — CONFLICTING NOTES DETECTED:\n"
+                            + "\n".join(conflict_lines)
+                            + "\nPlease acknowledge these conflicts in your response and prefer the most recently edited note."
+                        )
+                except Exception as e:
+                    print(f"[conflict] Detection error: {e}")
         else:
             system_content = NO_NOTES_SYSTEM_PROMPT
 
@@ -305,10 +335,22 @@ class ChatService:
         if use_notes_context:
             relevant_notes = self.get_conversation_aware_context(messages, topic)
 
+        # Detect conflicts between context notes
+        conflicts = []
+        if self.verification_service and len(relevant_notes) > 1:
+            try:
+                model = self.search_service.engine.model
+                conflicts = self.verification_service.detect_conflicts(
+                    relevant_notes, model
+                )
+            except Exception as e:
+                print(f"[conflict] Detection error in stream: {e}")
+
         yield json.dumps(
             {
                 "type": "context",
                 "notes": relevant_notes,
+                "conflicts": conflicts,
                 "session_id": session_id or "",
             }
         ).encode() + b"\n"

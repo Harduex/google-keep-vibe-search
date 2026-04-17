@@ -1,6 +1,7 @@
-"""Citation verification using NLI (Natural Language Inference).
+"""Citation verification and conflict detection using NLI (Natural Language Inference).
 
 Checks whether cited notes actually support the claims made in the LLM response.
+Detects contradictions between semantically similar context notes.
 Uses a cross-encoder NLI model that classifies premise-hypothesis pairs as
 entailment / neutral / contradiction.
 """
@@ -10,6 +11,7 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 from sentence_transformers import CrossEncoder
+from sklearn.metrics.pairwise import cosine_similarity as sklearn_cosine_similarity
 
 
 class VerificationService:
@@ -17,6 +19,12 @@ class VerificationService:
         print(f"[verification] Loading NLI model: {model_name}")
         self.nli_model = CrossEncoder(model_name, max_length=512)
         print("[verification] NLI model loaded")
+
+    @staticmethod
+    def _softmax(logits: np.ndarray) -> np.ndarray:
+        """Convert raw logits to probabilities."""
+        e = np.exp(logits - logits.max())
+        return e / e.sum()
 
     def verify_citations(
         self,
@@ -60,11 +68,7 @@ class VerificationService:
 
             if len(score_arr) == 3:
                 # Model label order: 0=contradiction, 1=entailment, 2=neutral
-                contradiction, entailment, neutral = float(score_arr[0]), float(score_arr[1]), float(score_arr[2])
-                # Convert logits to probabilities via softmax
-                logits = np.array([contradiction, entailment, neutral])
-                probs = np.exp(logits - logits.max())
-                probs = probs / probs.sum()
+                probs = self._softmax(np.array(score_arr))
                 contradiction, entailment, neutral = float(probs[0]), float(probs[1]), float(probs[2])
             else:
                 # Fallback: single score (shouldn't happen with this model)
@@ -122,3 +126,62 @@ class VerificationService:
         # Strip leading markdown (bullets, headers)
         claim = re.sub(r'^[\s\-*#>]+', '', claim).strip()
         return claim if claim else None
+
+    def detect_conflicts(
+        self,
+        notes: List[Dict[str, Any]],
+        embedding_model,
+        similarity_threshold: float = 0.85,
+    ) -> List[Dict[str, Any]]:
+        """Find contradictions between semantically similar context notes.
+
+        Args:
+            notes: The context notes provided to the LLM.
+            embedding_model: SentenceTransformer model for computing similarity.
+            similarity_threshold: Only check NLI for pairs above this similarity.
+
+        Returns:
+            List of conflict dicts with note indices, titles, and contradiction scores.
+        """
+        if len(notes) < 2:
+            return []
+
+        texts = [(n.get("title", "") + " " + n.get("content", ""))[:500] for n in notes]
+        embs = embedding_model.encode(texts)
+        sims = sklearn_cosine_similarity(embs)
+
+        # Collect high-similarity pairs for NLI check
+        pairs_to_check = []
+        pair_indices = []
+        for i in range(len(notes)):
+            for j in range(i + 1, len(notes)):
+                if sims[i][j] > similarity_threshold:
+                    pairs_to_check.append((texts[i], texts[j]))
+                    pair_indices.append((i, j))
+
+        if not pairs_to_check:
+            return []
+
+        # Batch NLI prediction for efficiency
+        all_scores = self.nli_model.predict(pairs_to_check)
+
+        conflicts = []
+        for idx, (i, j) in enumerate(pair_indices):
+            score_arr = all_scores[idx]
+            probs = self._softmax(np.array(score_arr))
+            # Label order: 0=contradiction, 1=entailment, 2=neutral
+            contradiction_prob = float(probs[0])
+
+            if contradiction_prob > probs[1] and contradiction_prob > probs[2]:
+                conflicts.append({
+                    "note_a_index": i + 1,  # 1-indexed to match [Note #N]
+                    "note_b_index": j + 1,
+                    "note_a_title": notes[i].get("title", "") or f"Note #{i + 1}",
+                    "note_b_title": notes[j].get("title", "") or f"Note #{j + 1}",
+                    "note_a_edited": notes[i].get("edited", ""),
+                    "note_b_edited": notes[j].get("edited", ""),
+                    "contradiction_score": round(contradiction_prob, 2),
+                    "similarity": round(float(sims[i][j]), 2),
+                })
+
+        return conflicts

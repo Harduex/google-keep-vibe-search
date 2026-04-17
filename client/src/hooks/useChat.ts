@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 import { API_ROUTES } from '@/const';
-import { Citation, ChatSessionSummary, Note } from '@/types';
+import { Citation, ChatSessionSummary, ConflictInfo, Note } from '@/types';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -14,6 +14,7 @@ export interface ChatMessage {
 interface StreamContextMessage {
   type: 'context';
   notes: Note[];
+  conflicts?: ConflictInfo[];
   session_id: string;
 }
 
@@ -50,6 +51,7 @@ export const useChat = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [relevantNotes, setRelevantNotes] = useState<Note[]>([]);
+  const [conflicts, setConflicts] = useState<ConflictInfo[]>([]);
   const [modelName, setModelName] = useState<string | null>(null);
   const [useNotesContext, setUseNotesContext] = useState<boolean>(true);
   const [topic, setTopic] = useState<string>('');
@@ -278,6 +280,11 @@ export const useChat = () => {
                   if (data.notes && data.notes.length > 0) {
                     setRelevantNotes(data.notes);
                   }
+                  if (data.conflicts && data.conflicts.length > 0) {
+                    setConflicts(data.conflicts);
+                  } else {
+                    setConflicts([]);
+                  }
                   break;
 
                 case 'delta':
@@ -363,6 +370,7 @@ export const useChat = () => {
     setSessionId(null);
     setMessages([]);
     setRelevantNotes([]);
+    setConflicts([]);
     setError(null);
   }, [stopGenerating]);
 
@@ -371,6 +379,7 @@ export const useChat = () => {
     setSessionId(null);
     setMessages([]);
     setRelevantNotes([]);
+    setConflicts([]);
     setError(null);
   }, [stopGenerating]);
 
@@ -383,6 +392,7 @@ export const useChat = () => {
     isLoading,
     error,
     relevantNotes,
+    conflicts,
     modelName,
     useNotesContext,
     topic,

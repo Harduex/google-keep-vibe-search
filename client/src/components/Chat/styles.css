@@ -999,6 +999,48 @@
   border-color: rgba(255, 152, 0, 0.35);
 }
 
+/* Conflict banner */
+.conflict-banner {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  background: rgba(255, 152, 0, 0.1);
+  border: 1px solid rgba(255, 152, 0, 0.3);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  color: #e65100;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.conflict-banner .material-icons {
+  font-size: 20px;
+  color: #ff9800;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.conflict-banner strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.conflict-detail {
+  font-size: 0.8rem;
+  opacity: 0.85;
+}
+
+[data-theme='dark'] .conflict-banner {
+  background: rgba(255, 152, 0, 0.12);
+  border-color: rgba(255, 152, 0, 0.25);
+  color: #ffb74d;
+}
+
+[data-theme='dark'] .conflict-banner .material-icons {
+  color: #ffb74d;
+}
+
 /* Sidebar toggle button */
 .sidebar-toggle-btn {
   background: none;

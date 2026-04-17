@@ -62,6 +62,17 @@ export interface Citation {
   verdict?: 'supported' | 'contradicted' | 'neutral' | 'unknown';
 }
 
+export interface ConflictInfo {
+  note_a_index: number;
+  note_b_index: number;
+  note_a_title: string;
+  note_b_title: string;
+  note_a_edited: string;
+  note_b_edited: string;
+  contradiction_score: number;
+  similarity: number;
+}
+
 export interface ChatSessionSummary {
   id: string;
   title: string;

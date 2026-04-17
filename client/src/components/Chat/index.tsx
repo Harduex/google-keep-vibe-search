@@ -25,6 +25,7 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
     clearChat,
     stopGenerating,
     relevantNotes,
+    conflicts,
     modelName,
     useNotesContext,
     toggleNotesContext,
@@ -242,7 +243,7 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
         </div>
 
         <div className="notes-container">
-          <ChatNotes notes={relevantNotes} query={query} onShowRelated={onShowRelated} />
+          <ChatNotes notes={relevantNotes} conflicts={conflicts} query={query} onShowRelated={onShowRelated} />
         </div>
       </div>
     </div>

@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     enable_reranker: bool = True
     reranker_model: str = "cross-encoder/ms-marco-MiniLM-L6-v2"
 
+    # Entity resolution
+    enable_entity_resolution: bool = True
+
     # Image search
     enable_image_search: bool = True
 

@@ -16,10 +16,11 @@ from app.services.citation_service import extract_citations
 
 
 class ChatService:
-    def __init__(self, search_service, chunking_service: Optional[ChunkingService] = None, reranker=None):
+    def __init__(self, search_service, chunking_service: Optional[ChunkingService] = None, reranker=None, entity_service=None):
         self.search_service = search_service
         self.chunking_service = chunking_service
         self.reranker = reranker
+        self.entity_service = entity_service
         self.model = settings.llm_model
         self.api_base_url = settings.resolved_api_base_url
         self.max_context_notes = settings.chat_context_notes
@@ -177,6 +178,12 @@ class ChatService:
             ranked_lists.append(to_ranked(topic))
         if chunk_results:
             ranked_lists.append(to_ranked(chunk_results))
+
+        # Entity signal: named entity matches from query
+        if self.entity_service and query:
+            entity_pairs = self.entity_service.get_entity_signal(query)
+            if entity_pairs:
+                ranked_lists.append(entity_pairs)
 
         # RRF fusion across all signals
         fused: Dict[str, float] = {}

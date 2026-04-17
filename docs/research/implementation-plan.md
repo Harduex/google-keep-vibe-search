@@ -452,7 +452,7 @@ Week 1:
   Day 2-3: Cross-encoder reranker service (item 2)                   ✅ DONE
 
 Week 2:
-  Day 1-3: Entity Resolution service (item 4)
+  Day 1-3: Entity Resolution service (item 4)                       ✅ DONE
 
 Week 3:
   Day 1-2: Citation verification (item 5)

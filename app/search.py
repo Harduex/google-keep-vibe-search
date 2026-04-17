@@ -46,6 +46,7 @@ class VibeSearch:
         self.image_processor = None
         self.image_note_map = {}  # Maps image paths to note indices
         self.reranker = None  # Set externally for cross-encoder reranking
+        self.entity_service = None  # Set externally for entity-based retrieval
         if settings.enable_image_search:
             self._init_image_search()
 
@@ -311,6 +312,21 @@ class VibeSearch:
         ranked_lists = [semantic_ranked, keyword_ranked]
         if image_ranked:
             ranked_lists.append(image_ranked)
+
+        # Entity-based signal: match named entities from query to notes
+        if self.entity_service:
+            entity_pairs = self.entity_service.get_entity_signal(query)
+            if entity_pairs:
+                # Convert note IDs to note indices
+                id_to_idx = {n.get("id", ""): i for i, n in enumerate(self.notes)}
+                entity_ranked = [
+                    (id_to_idx[nid], score)
+                    for nid, score in entity_pairs
+                    if nid in id_to_idx
+                ]
+                if entity_ranked:
+                    ranked_lists.append(entity_ranked)
+
         fused_scores = self.rrf_fuse(ranked_lists)
 
         # Track which notes have image matches for UI

@@ -109,6 +109,7 @@ class TestChatServiceRerankerIntegration:
 
         cs = ChatService.__new__(ChatService)
         cs.max_context_notes = 5
+        cs.entity_service = None
 
         mock_reranker = MagicMock()
         mock_reranker.rerank.return_value = [
@@ -130,6 +131,7 @@ class TestChatServiceRerankerIntegration:
         cs = ChatService.__new__(ChatService)
         cs.max_context_notes = 5
         cs.reranker = None
+        cs.entity_service = None
 
         primary = [{"id": "a", "score": 0.8}, {"id": "b", "score": 0.6}]
         result = cs._merge_and_rerank(primary, [], [], None, query="test")

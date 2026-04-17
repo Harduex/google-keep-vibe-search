@@ -40,7 +40,15 @@ async def lifespan(app: FastAPI):
         reranker = RerankerService()
         search_engine.reranker = reranker
 
-    chat_service = ChatService(search_service, chunking_service, reranker=reranker)
+    # Entity resolution for named entity-based retrieval
+    entity_service = None
+    if settings.enable_entity_resolution:
+        from app.services.entity_service import EntityService
+
+        entity_service = EntityService(note_service.notes)
+        search_engine.entity_service = entity_service
+
+    chat_service = ChatService(search_service, chunking_service, reranker=reranker, entity_service=entity_service)
     print(f"Initialized chat service with model: {settings.llm_model}")
 
     session_service = SessionService()

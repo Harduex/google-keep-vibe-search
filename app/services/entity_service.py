@@ -18,7 +18,12 @@ class EntityService:
     def __init__(self, notes: List[Dict[str, Any]], cache_dir: Optional[str] = None):
         import spacy
 
-        self.nlp = spacy.load("en_core_web_sm")
+        try:
+            self.nlp = spacy.load("en_core_web_sm")
+        except OSError:
+            print("[entity] Downloading spaCy model 'en_core_web_sm'...")
+            spacy.cli.download("en_core_web_sm")
+            self.nlp = spacy.load("en_core_web_sm")
         self.cache_dir = cache_dir or settings.resolved_cache_dir
         self.entity_index: Dict[str, Set[str]] = {}  # canonical → note IDs
         self.alias_map: Dict[str, str] = {}  # surface form → canonical
@@ -83,7 +88,10 @@ class EntityService:
     def _extract_entities(self, notes: List[Dict[str, Any]]) -> Dict[str, List[Tuple[str, str]]]:
         """Extract entities from notes. Returns {note_id: [(text, label), ...]}."""
         results: Dict[str, List[Tuple[str, str]]] = {}
-        for note in notes:
+        total = len(notes)
+        for i, note in enumerate(notes):
+            if i % 500 == 0:
+                print(f"  [entity] Processing notes: {i}/{total} ({i * 100 // total}%)")
             text = (note.get("title", "") + " " + note.get("content", ""))[:5000]
             doc = self.nlp(text)
             entities = [
@@ -93,6 +101,7 @@ class EntityService:
             ]
             if entities:
                 results[note.get("id", "")] = entities
+        print(f"  [entity] Processing notes: {total}/{total} (100%)")
         return results
 
     def _cluster_entities(self, raw_entities: Dict[str, List[Tuple[str, str]]]):

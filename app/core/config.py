@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     # Entity resolution
     enable_entity_resolution: bool = True
 
+    # Citation verification (NLI)
+    enable_citation_verification: bool = True
+    nli_model: str = "cross-encoder/nli-deberta-v3-small"
+
     # Image search
     enable_image_search: bool = True
 

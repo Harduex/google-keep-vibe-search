@@ -213,7 +213,7 @@ class RerankerService:
 
 ## Phase 4: Citation Verification + Conflict Detection (Week 3) — Items 5, 6
 
-### 5. Citation Verification (NLI-based)
+### 5. Citation Verification (NLI-based) ✅ DONE
 
 **New file**: `app/services/verification_service.py`
 
@@ -262,7 +262,7 @@ class VerificationService:
   ```
 - **Frontend** (`client/src/hooks/useChat.ts`): Handle `verification` message type, show green/yellow/red indicators on citations
 
-**Model**: `cross-encoder/nli-deberta-v3-small` — 370MB, <20ms/pair on GPU
+**Model**: `cross-encoder/nli-deberta-v3-small` — 568MB, <20ms/pair on GPU. Requires transformers>=4.36 and tokenizers>=0.14.
 
 ---
 

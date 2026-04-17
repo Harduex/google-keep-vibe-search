@@ -922,7 +922,9 @@
   border: 1px solid rgba(var(--primary-color-rgb), 0.25);
   border-radius: 12px;
   cursor: pointer;
-  transition: background 0.15s, transform 0.1s;
+  transition:
+    background 0.15s,
+    transform 0.1s;
 }
 
 .citation-chip:hover {
@@ -941,6 +943,60 @@
 [data-theme='dark'] .citation-chip {
   background: rgba(var(--primary-color-rgb), 0.15);
   border-color: rgba(var(--primary-color-rgb), 0.3);
+}
+
+/* Citation verification states */
+.citation-icon {
+  font-size: 14px !important;
+  margin-right: 3px;
+}
+
+.citation-supported {
+  background: rgba(76, 175, 80, 0.12);
+  color: #2e7d32;
+  border-color: rgba(76, 175, 80, 0.3);
+}
+
+.citation-supported:hover {
+  background: rgba(76, 175, 80, 0.22);
+}
+
+.citation-contradicted {
+  background: rgba(244, 67, 54, 0.12);
+  color: #c62828;
+  border-color: rgba(244, 67, 54, 0.3);
+}
+
+.citation-contradicted:hover {
+  background: rgba(244, 67, 54, 0.22);
+}
+
+.citation-neutral {
+  background: rgba(255, 152, 0, 0.12);
+  color: #e65100;
+  border-color: rgba(255, 152, 0, 0.3);
+}
+
+.citation-neutral:hover {
+  background: rgba(255, 152, 0, 0.22);
+}
+
+[data-theme='dark'] .citation-supported {
+  background: rgba(76, 175, 80, 0.18);
+  color: #81c784;
+  border-color: rgba(76, 175, 80, 0.35);
+}
+
+[data-theme='dark'] .citation-contradicted {
+  background: rgba(244, 67, 54, 0.18);
+  color: #ef9a9a;
+  border-color: rgba(244, 67, 54, 0.35);
+}
+
+[data-theme='dark'] .citation-neutral {
+  background: rgba(255, 152, 0, 0.18);
+  color: #ffb74d;
+  border-color: rgba(255, 152, 0, 0.35);
 }
 
 /* Sidebar toggle button */
@@ -1104,7 +1160,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: color 0.15s, background 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s;
 }
 
 .session-action-btn .material-icons {

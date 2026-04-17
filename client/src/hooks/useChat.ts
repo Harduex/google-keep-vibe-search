@@ -33,11 +33,17 @@ interface StreamErrorMessage {
   error: string;
 }
 
+interface StreamVerificationMessage {
+  type: 'verification';
+  citations: Citation[];
+}
+
 type StreamMessage =
   | StreamContextMessage
   | StreamDeltaMessage
   | StreamDoneMessage
-  | StreamErrorMessage;
+  | StreamErrorMessage
+  | StreamVerificationMessage;
 
 export const useChat = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -303,6 +309,17 @@ export const useChat = () => {
 
                 case 'error':
                   setError(data.error);
+                  break;
+
+                case 'verification':
+                  // Update citations with verification results
+                  setMessages((prevMessages) =>
+                    prevMessages.map((msg) =>
+                      msg.timestamp === assistantMessageId && msg.role === 'assistant'
+                        ? { ...msg, citations: data.citations }
+                        : msg,
+                    ),
+                  );
                   break;
               }
             } catch {

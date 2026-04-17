@@ -55,6 +55,11 @@ export interface Citation {
   note_number: number;
   note_id: string;
   note_title: string;
+  // Verification fields (populated after NLI check)
+  claim?: string;
+  support_score?: number;
+  contradiction_score?: number;
+  verdict?: 'supported' | 'contradicted' | 'neutral' | 'unknown';
 }
 
 export interface ChatSessionSummary {

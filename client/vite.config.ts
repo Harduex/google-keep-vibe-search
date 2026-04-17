@@ -19,6 +19,15 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true,
         secure: false,
+        configure: (proxy) => {
+          proxy.on('error', (err) => {
+            // Suppress ECONNREFUSED during backend startup, log real errors
+            const msg = err.message || '';
+            if (!msg.includes('ECONNREFUSED') && err.name !== 'AggregateError') {
+              console.error('[proxy]', msg);
+            }
+          });
+        },
       },
     },
   },

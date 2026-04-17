@@ -106,10 +106,23 @@ export const ChatMessage = memo(({ message, onCitationClick }: ChatMessageProps)
             {citations.map((c) => (
               <button
                 key={c.note_id}
-                className="citation-chip"
+                className={`citation-chip ${c.verdict ? `citation-${c.verdict}` : ''}`}
                 onClick={() => onCitationClick?.(c.note_number)}
-                title={c.note_title}
+                title={
+                  c.verdict
+                    ? `${c.note_title} — ${c.verdict}${c.support_score !== undefined ? ` (${Math.round(c.support_score * 100)}%)` : ''}`
+                    : c.note_title
+                }
               >
+                {c.verdict === 'supported' && (
+                  <span className="material-icons citation-icon">check_circle</span>
+                )}
+                {c.verdict === 'contradicted' && (
+                  <span className="material-icons citation-icon">cancel</span>
+                )}
+                {c.verdict === 'neutral' && (
+                  <span className="material-icons citation-icon">help</span>
+                )}
                 Note #{c.note_number}
               </button>
             ))}

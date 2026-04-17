@@ -1,3 +1,4 @@
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -13,32 +14,45 @@ from app.services.search_service import SearchService
 from app.services.session_service import SessionService
 
 
+def _step(label: str, start: float) -> float:
+    elapsed = time.time() - start
+    print(f"  [{elapsed:5.1f}s] OK: {label}")
+    return time.time()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    t0 = time.time()
+    print("Starting up...")
     # ensure ready flag exists and is false until startup finishes
     app.state.ready = False
+
     note_service = NoteService()
     note_service.load_notes(force_refresh=settings.force_cache_refresh)
     note_service.load_tags()
+    t = _step(f"Notes loaded ({len(note_service.notes)} notes)", t0)
 
     search_engine = VibeSearch(note_service.notes, force_refresh=settings.force_cache_refresh)
     search_service = SearchService(search_engine)
+    t = _step("Search engine ready", t)
 
     if settings.enable_image_search:
-        print("Image search capability is enabled")
+        print("  Image search: enabled")
     else:
-        print("Image search capability is disabled (set ENABLE_IMAGE_SEARCH=true to enable)")
+        print("  Image search: disabled")
 
     # Build chunk-level embeddings for enhanced RAG context retrieval
     chunking_service = ChunkingService(search_engine.model)
     chunking_service.build_chunks(note_service.notes)
     chunking_service.load_or_compute_embeddings()
+    t = _step("Chunking service ready", t)
 
     # Cross-encoder reranker for precision reranking
     reranker = None
     if settings.enable_reranker:
         reranker = RerankerService()
         search_engine.reranker = reranker
+        t = _step(f"Reranker loaded ({settings.reranker_model})", t)
 
     # Entity resolution for named entity-based retrieval
     entity_service = None
@@ -47,15 +61,25 @@ async def lifespan(app: FastAPI):
 
         entity_service = EntityService(note_service.notes)
         search_engine.entity_service = entity_service
+        t = _step("Entity service ready", t)
 
-    chat_service = ChatService(search_service, chunking_service, reranker=reranker, entity_service=entity_service)
-    print(f"Initialized chat service with model: {settings.llm_model}")
+    # Citation verification (NLI-based)
+    verification_service = None
+    if settings.enable_citation_verification:
+        from app.services.verification_service import VerificationService
+
+        verification_service = VerificationService(model_name=settings.nli_model)
+        t = _step(f"Verification service ready ({settings.nli_model})", t)
+
+    chat_service = ChatService(
+        search_service, chunking_service,
+        reranker=reranker, entity_service=entity_service,
+        verification_service=verification_service,
+    )
+    _step(f"Chat service ready (model: {settings.llm_model})", t)
 
     session_service = SessionService()
-    print(f"Initialized session service at: {settings.chat_sessions_dir}")
-
     categorization_service = CategorizationService(search_service, note_service)
-    print("Initialized categorization service")
 
     # mark app as ready once all heavy initialization is complete
     app.state.note_service = note_service
@@ -64,6 +88,9 @@ async def lifespan(app: FastAPI):
     app.state.session_service = session_service
     app.state.categorization_service = categorization_service
     app.state.ready = True
+
+    total = time.time() - t0
+    print(f"Startup complete in {total:.1f}s")
 
     yield
 

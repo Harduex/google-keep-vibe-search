@@ -16,11 +16,12 @@ from app.services.citation_service import extract_citations
 
 
 class ChatService:
-    def __init__(self, search_service, chunking_service: Optional[ChunkingService] = None, reranker=None, entity_service=None):
+    def __init__(self, search_service, chunking_service: Optional[ChunkingService] = None, reranker=None, entity_service=None, verification_service=None):
         self.search_service = search_service
         self.chunking_service = chunking_service
         self.reranker = reranker
         self.entity_service = entity_service
+        self.verification_service = verification_service
         self.model = settings.llm_model
         self.api_base_url = settings.resolved_api_base_url
         self.max_context_notes = settings.chat_context_notes
@@ -357,6 +358,19 @@ class ChatService:
             yield json.dumps(
                 {"type": "done", "citations": citations, "full_response": full_response}
             ).encode() + b"\n"
+
+            # Citation verification: check if cited notes actually support the claims
+            if self.verification_service and citations:
+                try:
+                    verification_results = self.verification_service.verify_citations(
+                        full_response, citations, relevant_notes
+                    )
+                    yield json.dumps(
+                        {"type": "verification", "citations": verification_results}
+                    ).encode() + b"\n"
+                except Exception as e:
+                    print(f"[verification] Error: {e}")
+                    # Non-fatal: don't emit verification if it fails
 
         except Exception as e:
             yield json.dumps({"type": "error", "error": str(e)}).encode() + b"\n"

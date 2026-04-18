@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 import { API_ROUTES } from '@/const';
-import { Citation, ChatSessionSummary, ConflictInfo, Note } from '@/types';
+import { AgentStep, Citation, ChatSessionSummary, ConflictInfo, Note } from '@/types';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -50,6 +50,16 @@ interface StreamSuggestionsMessage {
   questions: string[];
 }
 
+interface StreamAgentStepMessage {
+  type: 'agent_step';
+  step_number: number;
+  action: string;
+  params: Record<string, unknown>;
+  result_summary: string;
+  notes_found: number;
+  reasoning: string;
+}
+
 type StreamMessage =
   | StreamContextMessage
   | StreamDeltaMessage
@@ -57,7 +67,8 @@ type StreamMessage =
   | StreamErrorMessage
   | StreamVerificationMessage
   | StreamPhaseMessage
-  | StreamSuggestionsMessage;
+  | StreamSuggestionsMessage
+  | StreamAgentStepMessage;
 
 export const useChat = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -70,6 +81,7 @@ export const useChat = () => {
   const [topic, setTopic] = useState<string>('');
   const [currentPhase, setCurrentPhase] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [agentSteps, setAgentSteps] = useState<AgentStep[]>([]);
 
   // Session state
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -128,7 +140,9 @@ export const useChat = () => {
   const loadSession = useCallback(async (id: string) => {
     try {
       const response = await fetch(`${API_ROUTES.CHAT_SESSIONS}/${id}`);
-      if (!response.ok) return;
+      if (!response.ok) {
+        return;
+      }
       const data = await response.json();
       setSessionId(data.id);
       setMessages(
@@ -232,6 +246,7 @@ export const useChat = () => {
       setError(null);
       setCurrentPhase(null);
       setSuggestions([]);
+      setAgentSteps([]);
 
       // Create a placeholder for the assistant's response
       const assistantMessageId = Date.now() + 1;
@@ -311,7 +326,9 @@ export const useChat = () => {
 
           for (const line of lines) {
             const trimmed = line.trim();
-            if (!trimmed) continue;
+            if (!trimmed) {
+              continue;
+            }
 
             try {
               const data: StreamMessage = JSON.parse(trimmed);
@@ -379,6 +396,20 @@ export const useChat = () => {
                 case 'suggestions':
                   setSuggestions(data.questions || []);
                   break;
+
+                case 'agent_step':
+                  setAgentSteps((prev) => [
+                    ...prev,
+                    {
+                      step_number: data.step_number,
+                      action: data.action,
+                      params: data.params,
+                      result_summary: data.result_summary,
+                      notes_found: data.notes_found,
+                      reasoning: data.reasoning,
+                    },
+                  ]);
+                  break;
               }
             } catch {
               // eslint-disable-next-line no-console
@@ -432,6 +463,7 @@ export const useChat = () => {
     setConflicts([]);
     setCurrentPhase(null);
     setSuggestions([]);
+    setAgentSteps([]);
     setError(null);
   }, [stopGenerating]);
 
@@ -443,6 +475,7 @@ export const useChat = () => {
     setConflicts([]);
     setCurrentPhase(null);
     setSuggestions([]);
+    setAgentSteps([]);
     setError(null);
   }, [stopGenerating]);
 
@@ -461,6 +494,7 @@ export const useChat = () => {
     topic,
     currentPhase,
     suggestions,
+    agentSteps,
     setTopic,
     sendMessage,
     clearChat,

@@ -106,3 +106,12 @@ export interface CategorizationProgress {
   current?: number;
   total?: number;
 }
+
+export interface AgentStep {
+  step_number: number;
+  action: string;
+  params: Record<string, unknown>;
+  result_summary: string;
+  notes_found: number;
+  reasoning: string;
+}

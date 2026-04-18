@@ -1,5 +1,6 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 
+import { AgentSteps } from '@/components/Chat/AgentSteps';
 import { ChatMessage } from '@/components/Chat/ChatMessage';
 import { ChatNotes } from '@/components/Chat/ChatNotes';
 import { SessionList } from '@/components/Chat/SessionList';
@@ -33,6 +34,7 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
     setTopic,
     currentPhase,
     suggestions,
+    agentSteps,
     // Session management
     sessionId,
     sessions,
@@ -195,7 +197,9 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
                 <ChatMessage key={index} message={message} onCitationClick={handleCitationClick} />
               ))
             )}
-            {currentPhase && (
+            {agentSteps.length > 0 ? (
+              <AgentSteps steps={agentSteps} isActive={isLoading} />
+            ) : currentPhase ? (
               <div className="phase-indicator">
                 <span className="material-icons phase-icon">
                   {currentPhase === 'searching' ? 'search' : 'edit'}
@@ -206,7 +210,7 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
                     : 'Generating response...'}
                 </span>
               </div>
-            )}
+            ) : null}
             {suggestions.length > 0 && !isLoading && (
               <div className="suggestion-chips">
                 <span className="suggestions-label">Follow-up:</span>

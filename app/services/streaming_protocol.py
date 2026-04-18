@@ -65,6 +65,9 @@ class StreamingProtocol:
             }
         )
 
+    def grounding(self, grounding_result: Dict[str, Any]) -> bytes:
+        return self._encode({"type": "grounding", **grounding_result})
+
     def error(self, message: str) -> bytes:
         return self._encode({"type": "error", "error": message})
 

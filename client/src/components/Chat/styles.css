@@ -1471,6 +1471,94 @@
   color: #999;
 }
 
+/* Grounding Score */
+.grounding-score {
+  padding: 8px 16px;
+  animation: fade-in 0.3s ease-out;
+}
+
+.grounding-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 16px;
+  background: var(--card-bg, #fff);
+  cursor: pointer;
+  font-size: 0.78rem;
+  transition: all 0.15s;
+}
+
+.grounding-badge:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.grounding-icon {
+  font-size: 16px;
+}
+
+.grounding-pct {
+  font-weight: 600;
+}
+
+.grounding-label {
+  color: #888;
+}
+
+.grounding-expand {
+  font-size: 16px;
+  color: #888;
+}
+
+.grounding-claims {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  animation: fade-in 0.2s ease-out;
+}
+
+.grounding-claim {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.grounding-claim-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.grounding-claim-text {
+  color: var(--text-color);
+  flex: 1;
+}
+
+.grounding-claim-cite {
+  color: var(--primary-color);
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+[data-theme='dark'] .grounding-badge {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme='dark'] .grounding-badge:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme='dark'] .grounding-claims {
+  background: rgba(255, 255, 255, 0.03);
+}
+
 [data-theme='dark'] .suggestion-chip {
   background: rgba(var(--primary-color-rgb), 0.12);
   border-color: rgba(var(--primary-color-rgb), 0.25);

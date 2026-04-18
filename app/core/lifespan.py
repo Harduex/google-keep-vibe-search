@@ -70,11 +70,17 @@ async def lifespan(app: FastAPI):
 
     # Citation verification (NLI-based)
     verification_service = None
+    grounding_service = None
     if settings.enable_citation_verification:
         from app.services.verification_service import VerificationService
 
         verification_service = VerificationService(model_name=settings.nli_model)
-        t = _step(f"Verification service ready ({settings.nli_model})", t)
+
+        # Grounding service reuses the NLI model
+        from app.services.grounding_service import GroundingService
+
+        grounding_service = GroundingService(nli_model=verification_service.nli_model)
+        t = _step(f"Verification + grounding ready ({settings.nli_model})", t)
 
     # Shared LLM client (LiteLLM-powered)
     llm = LLMClient(
@@ -136,6 +142,7 @@ async def lifespan(app: FastAPI):
         conversation_mgr=conversation_mgr,
         protocol=protocol,
         verification_service=verification_service,
+        grounding_service=grounding_service,
         llm=llm,
         agent=agent,
     )

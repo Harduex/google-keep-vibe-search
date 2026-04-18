@@ -115,3 +115,17 @@ export interface AgentStep {
   notes_found: number;
   reasoning: string;
 }
+
+export interface GroundingClaim {
+  text: string;
+  score: number;
+  verdict: 'supported' | 'contradicted' | 'neutral' | 'unsupported';
+  cited_note: number | null;
+}
+
+export interface GroundingResult {
+  claims: GroundingClaim[];
+  overall_score: number;
+  grounded_count: number;
+  total_claims: number;
+}

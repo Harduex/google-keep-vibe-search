@@ -3,6 +3,7 @@ import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { AgentSteps } from '@/components/Chat/AgentSteps';
 import { ChatMessage } from '@/components/Chat/ChatMessage';
 import { ChatNotes } from '@/components/Chat/ChatNotes';
+import { GroundingScore } from '@/components/Chat/GroundingScore';
 import { SessionList } from '@/components/Chat/SessionList';
 import { useChat } from '@/hooks/useChat';
 
@@ -35,6 +36,7 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
     currentPhase,
     suggestions,
     agentSteps,
+    groundingResult,
     // Session management
     sessionId,
     sessions,
@@ -211,6 +213,9 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
                 </span>
               </div>
             ) : null}
+            {groundingResult && !isLoading && (
+              <GroundingScore result={groundingResult} />
+            )}
             {suggestions.length > 0 && !isLoading && (
               <div className="suggestion-chips">
                 <span className="suggestions-label">Follow-up:</span>

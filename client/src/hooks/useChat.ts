@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 import { API_ROUTES } from '@/const';
-import { AgentStep, Citation, ChatSessionSummary, ConflictInfo, Note } from '@/types';
+import { AgentStep, Citation, ChatSessionSummary, ConflictInfo, GroundingResult, Note } from '@/types';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -60,6 +60,14 @@ interface StreamAgentStepMessage {
   reasoning: string;
 }
 
+interface StreamGroundingMessage {
+  type: 'grounding';
+  claims: GroundingResult['claims'];
+  overall_score: number;
+  grounded_count: number;
+  total_claims: number;
+}
+
 type StreamMessage =
   | StreamContextMessage
   | StreamDeltaMessage
@@ -68,7 +76,8 @@ type StreamMessage =
   | StreamVerificationMessage
   | StreamPhaseMessage
   | StreamSuggestionsMessage
-  | StreamAgentStepMessage;
+  | StreamAgentStepMessage
+  | StreamGroundingMessage;
 
 export const useChat = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -82,6 +91,7 @@ export const useChat = () => {
   const [currentPhase, setCurrentPhase] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [agentSteps, setAgentSteps] = useState<AgentStep[]>([]);
+  const [groundingResult, setGroundingResult] = useState<GroundingResult | null>(null);
 
   // Session state
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -247,6 +257,7 @@ export const useChat = () => {
       setCurrentPhase(null);
       setSuggestions([]);
       setAgentSteps([]);
+      setGroundingResult(null);
 
       // Create a placeholder for the assistant's response
       const assistantMessageId = Date.now() + 1;
@@ -410,6 +421,15 @@ export const useChat = () => {
                     },
                   ]);
                   break;
+
+                case 'grounding':
+                  setGroundingResult({
+                    claims: data.claims,
+                    overall_score: data.overall_score,
+                    grounded_count: data.grounded_count,
+                    total_claims: data.total_claims,
+                  });
+                  break;
               }
             } catch {
               // eslint-disable-next-line no-console
@@ -464,6 +484,7 @@ export const useChat = () => {
     setCurrentPhase(null);
     setSuggestions([]);
     setAgentSteps([]);
+    setGroundingResult(null);
     setError(null);
   }, [stopGenerating]);
 
@@ -476,6 +497,7 @@ export const useChat = () => {
     setCurrentPhase(null);
     setSuggestions([]);
     setAgentSteps([]);
+    setGroundingResult(null);
     setError(null);
   }, [stopGenerating]);
 
@@ -495,6 +517,7 @@ export const useChat = () => {
     currentPhase,
     suggestions,
     agentSteps,
+    groundingResult,
     setTopic,
     sendMessage,
     clearChat,

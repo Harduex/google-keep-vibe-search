@@ -20,6 +20,7 @@ class ChatService:
         conversation_mgr: ConversationManager,
         protocol: StreamingProtocol,
         verification_service=None,
+        grounding_service=None,
         llm: LLMClient = None,
         agent: Optional[NoteAgent] = None,
     ):
@@ -28,6 +29,7 @@ class ChatService:
         self.conversation_mgr = conversation_mgr
         self.protocol = protocol
         self.verification_service = verification_service
+        self.grounding_service = grounding_service
         self.llm = llm
         self.agent = agent
 
@@ -163,6 +165,16 @@ class ChatService:
                 except Exception as e:
                     print(f"[verification] Error: {e}")
 
+            # Grounding score
+            if self.grounding_service and relevant_notes:
+                try:
+                    grounding_result = self.grounding_service.score_response(
+                        full_response, relevant_notes
+                    )
+                    yield self.protocol.grounding(grounding_result)
+                except Exception as e:
+                    print(f"[grounding] Error: {e}")
+
         except Exception as e:
             yield self.protocol.error(str(e))
 
@@ -211,6 +223,16 @@ class ChatService:
                     yield self.protocol.verification(verification_results)
                 except Exception as e:
                     print(f"[verification] Error: {e}")
+
+            # Grounding score
+            if self.grounding_service and relevant_notes:
+                try:
+                    grounding_result = self.grounding_service.score_response(
+                        full_response, relevant_notes
+                    )
+                    yield self.protocol.grounding(grounding_result)
+                except Exception as e:
+                    print(f"[grounding] Error: {e}")
 
         except Exception as e:
             yield self.protocol.error(str(e))

@@ -100,6 +100,15 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
     setSidebarOpen((prev) => !prev);
   }, []);
 
+  const handleCitationClick = useCallback((noteNumber: number) => {
+    const el = document.getElementById(`context-note-${noteNumber}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('citation-highlight');
+      setTimeout(() => el.classList.remove('citation-highlight'), 2000);
+    }
+  }, []);
+
   return (
     <div className="chat-container">
       <div className="chat-header">
@@ -180,7 +189,9 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
                 <p>Ask me anything about your notes!</p>
               </div>
             ) : (
-              messages.map((message, index) => <ChatMessage key={index} message={message} />)
+              messages.map((message, index) => (
+                <ChatMessage key={index} message={message} onCitationClick={handleCitationClick} />
+              ))
             )}
             <div ref={messagesEndRef} />
           </div>

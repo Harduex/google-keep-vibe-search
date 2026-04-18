@@ -1239,3 +1239,22 @@
 [data-theme='dark'] .session-action-btn:hover {
   background: rgba(255, 255, 255, 0.08);
 }
+
+/* Citation highlight flash when scrolling to a note */
+.citation-highlight {
+  animation: highlight-flash 2s ease-out;
+}
+
+@keyframes highlight-flash {
+  0% {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+    background: rgba(var(--primary-color-rgb), 0.12);
+    border-radius: 12px;
+  }
+  100% {
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+    background: transparent;
+  }
+}

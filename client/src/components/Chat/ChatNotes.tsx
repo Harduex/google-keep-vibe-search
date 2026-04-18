@@ -51,14 +51,15 @@ export const ChatNotes = memo(({ notes, conflicts, query, onShowRelated }: ChatN
         </div>
       )}
       <div className="notes-list">
-        {notes.map((note) => (
-          <NoteCard
-            key={note.id}
-            note={note}
-            query={query}
-            onShowRelated={onShowRelated}
-            onRemoveTag={removeTagFromNote}
-          />
+        {notes.map((note, index) => (
+          <div key={note.id} id={`context-note-${index + 1}`}>
+            <NoteCard
+              note={note}
+              query={query}
+              onShowRelated={onShowRelated}
+              onRemoveTag={removeTagFromNote}
+            />
+          </div>
         ))}
       </div>
     </div>

@@ -61,6 +61,8 @@ export const useChat = () => {
   const [sessions, setSessions] = useState<ChatSessionSummary[]>([]);
 
   const abortControllerRef = useRef<AbortController | null>(null);
+  const streamingContentRef = useRef<string>('');
+  const rafIdRef = useRef<number | null>(null);
 
   // Fetch the model name on mount
   useEffect(() => {
@@ -185,6 +187,10 @@ export const useChat = () => {
       abortControllerRef.current = null;
       setIsLoading(false);
     }
+    if (rafIdRef.current !== null) {
+      cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
+    }
   }, []);
 
   const sendMessage = useCallback(
@@ -253,6 +259,25 @@ export const useChat = () => {
         let accumulatedContent = '';
         const decoder = new TextDecoder();
         let buffer = '';
+        streamingContentRef.current = '';
+
+        const flushStreamContent = () => {
+          const content = streamingContentRef.current;
+          setMessages((prevMessages) =>
+            prevMessages.map((msg) =>
+              msg.timestamp === assistantMessageId && msg.role === 'assistant'
+                ? { ...msg, content }
+                : msg,
+            ),
+          );
+          rafIdRef.current = null;
+        };
+
+        const scheduleFlush = () => {
+          if (rafIdRef.current === null) {
+            rafIdRef.current = requestAnimationFrame(flushStreamContent);
+          }
+        };
 
         // Process the stream with new protocol
         while (true) {
@@ -288,18 +313,18 @@ export const useChat = () => {
                   break;
 
                 case 'delta':
-                  // Incremental content token
+                  // Incremental content token — batch updates via RAF
                   accumulatedContent += data.content;
-                  setMessages((prevMessages) =>
-                    prevMessages.map((msg) =>
-                      msg.timestamp === assistantMessageId && msg.role === 'assistant'
-                        ? { ...msg, content: accumulatedContent }
-                        : msg,
-                    ),
-                  );
+                  streamingContentRef.current = accumulatedContent;
+                  scheduleFlush();
                   break;
 
                 case 'done':
+                  // Cancel pending RAF — final state takes over
+                  if (rafIdRef.current !== null) {
+                    cancelAnimationFrame(rafIdRef.current);
+                    rafIdRef.current = null;
+                  }
                   // Final message with citations
                   setMessages((prevMessages) =>
                     prevMessages.map((msg) =>
@@ -362,7 +387,15 @@ export const useChat = () => {
         setIsLoading(false);
       }
     },
-    [messages, stopGenerating, useNotesContext, topic, sessionId, createSession, saveSessionMessages],
+    [
+      messages,
+      stopGenerating,
+      useNotesContext,
+      topic,
+      sessionId,
+      createSession,
+      saveSessionMessages,
+    ],
   );
 
   const clearChat = useCallback(() => {

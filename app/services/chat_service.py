@@ -16,7 +16,15 @@ from app.services.citation_service import extract_citations
 
 
 class ChatService:
-    def __init__(self, search_service, chunking_service: Optional[ChunkingService] = None, reranker=None, entity_service=None, verification_service=None, query_service=None):
+    def __init__(
+        self,
+        search_service,
+        chunking_service: Optional[ChunkingService] = None,
+        reranker=None,
+        entity_service=None,
+        verification_service=None,
+        query_service=None,
+    ):
         self.search_service = search_service
         self.chunking_service = chunking_service
         self.reranker = reranker
@@ -45,7 +53,9 @@ class ChatService:
         max_notes = max_notes or self.max_context_notes
         return self.search_service.search(query, max_results=max_notes)
 
-    def _is_duplicate_query(self, query: str, previous_queries: List[str], threshold: float = 0.95) -> bool:
+    def _is_duplicate_query(
+        self, query: str, previous_queries: List[str], threshold: float = 0.95
+    ) -> bool:
         """Query collapse: skip retrieval if query is near-duplicate of a previous one."""
         if not previous_queries or not query.strip():
             return False
@@ -55,7 +65,9 @@ class ChatService:
         sims = sklearn_cosine_similarity(q_emb, prev_embs)[0]
         return bool(np.any(sims > threshold))
 
-    def _cap_if_saturated(self, notes: List[Dict[str, Any]], threshold: float = 0.9, cap: int = 5) -> List[Dict[str, Any]]:
+    def _cap_if_saturated(
+        self, notes: List[Dict[str, Any]], threshold: float = 0.9, cap: int = 5
+    ) -> List[Dict[str, Any]]:
         """Coverage saturation: if top results are all redundant, cap the list."""
         if len(notes) <= cap:
             return notes
@@ -93,6 +105,7 @@ class ChatService:
         self,
         messages: List[Dict[str, str]],
         relevant_notes: List[Dict[str, Any]],
+        conflicts: Optional[List[Dict[str, Any]]] = None,
     ) -> List[Dict[str, str]]:
         prepared = [m for m in messages if m.get("role") != "system"]
 
@@ -103,35 +116,26 @@ class ChatService:
                 formatted_notes=formatted_notes,
             )
 
-            # Detect conflicts between context notes
-            if self.verification_service and len(relevant_notes) > 1:
-                try:
-                    model = self.search_service.engine.model
-                    conflicts = self.verification_service.detect_conflicts(
-                        relevant_notes, model
+            # Inject pre-computed conflict warnings into the system prompt
+            if conflicts:
+                conflict_lines = []
+                for c in conflicts:
+                    a_label = c["note_a_title"] or f"Note #{c['note_a_index']}"
+                    b_label = c["note_b_title"] or f"Note #{c['note_b_index']}"
+                    line = (
+                        f"- Note #{c['note_a_index']} ({a_label}) and "
+                        f"Note #{c['note_b_index']} ({b_label}) "
+                        f"contain conflicting information (confidence: {c['contradiction_score']:.0%})."
                     )
-                    if conflicts:
-                        conflict_lines = []
-                        for c in conflicts:
-                            a_label = c["note_a_title"] or f"Note #{c['note_a_index']}"
-                            b_label = c["note_b_title"] or f"Note #{c['note_b_index']}"
-                            line = (
-                                f"- Note #{c['note_a_index']} ({a_label}) and "
-                                f"Note #{c['note_b_index']} ({b_label}) "
-                                f"contain conflicting information (confidence: {c['contradiction_score']:.0%})."
-                            )
-                            # Add recency hint
-                            if c["note_a_edited"] and c["note_b_edited"]:
-                                line += f" Edited: #{c['note_a_index']} on {c['note_a_edited']}, #{c['note_b_index']} on {c['note_b_edited']}."
-                            conflict_lines.append(line)
+                    if c["note_a_edited"] and c["note_b_edited"]:
+                        line += f" Edited: #{c['note_a_index']} on {c['note_a_edited']}, #{c['note_b_index']} on {c['note_b_edited']}."
+                    conflict_lines.append(line)
 
-                        system_content += (
-                            "\n\nIMPORTANT — CONFLICTING NOTES DETECTED:\n"
-                            + "\n".join(conflict_lines)
-                            + "\nPlease acknowledge these conflicts in your response and prefer the most recently edited note."
-                        )
-                except Exception as e:
-                    print(f"[conflict] Detection error: {e}")
+                system_content += (
+                    "\n\nIMPORTANT — CONFLICTING NOTES DETECTED:\n"
+                    + "\n".join(conflict_lines)
+                    + "\nPlease acknowledge these conflicts in your response and prefer the most recently edited note."
+                )
         else:
             system_content = NO_NOTES_SYSTEM_PROMPT
 
@@ -166,17 +170,17 @@ class ChatService:
             sub_queries = await self.query_service.decompose_if_complex(latest_message)
 
         # Note-level search (existing behavior for primary query)
-        primary_results = self.get_relevant_notes(
-            latest_message, max_notes=self.max_context_notes + 5
-        ) if latest_message else []
+        primary_results = (
+            self.get_relevant_notes(latest_message, max_notes=self.max_context_notes + 5)
+            if latest_message
+            else []
+        )
 
         # Sub-query retrieval: if decomposed, retrieve for each sub-query
         decomposed_results = []
         if len(sub_queries) > 1:
             for sq in sub_queries:
-                decomposed_results.extend(
-                    self.get_relevant_notes(sq, max_notes=5)
-                )
+                decomposed_results.extend(self.get_relevant_notes(sq, max_notes=5))
 
         # Query collapse: skip context retrieval if it duplicates the primary query
         context_results = []
@@ -199,7 +203,10 @@ class ChatService:
             )
 
         merged = self._merge_and_rerank(
-            primary_results, context_results, topic_results, previous_note_ids,
+            primary_results,
+            context_results,
+            topic_results,
+            previous_note_ids,
             chunk_results=chunk_results,
             decomposed_results=decomposed_results,
             query=latest_message,
@@ -230,6 +237,7 @@ class ChatService:
         query: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Merge multiple retrieval signals using RRF, then optionally cross-encoder rerank."""
+
         # Build ranked lists from each signal (note_id, score)
         def to_ranked(notes: List[Dict]) -> List[tuple]:
             return [(n.get("id", ""), n.get("score", 0)) for n in notes]
@@ -280,9 +288,7 @@ class ChatService:
 
         return merged
 
-    async def _maybe_summarize_window(
-        self, messages: List[Dict[str, str]]
-    ) -> List[Dict[str, str]]:
+    async def _maybe_summarize_window(self, messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
         non_system = [m for m in messages if m.get("role") != "system"]
         if len(non_system) <= self.max_recent_messages + 2:
             return non_system
@@ -336,9 +342,18 @@ class ChatService:
         if use_notes_context:
             relevant_notes = await self.get_conversation_aware_context(messages, topic)
 
+        # Detect conflicts for non-streaming path
+        conflicts = []
+        if self.verification_service and len(relevant_notes) > 1:
+            try:
+                model = self.search_service.engine.model
+                conflicts = self.verification_service.detect_conflicts(relevant_notes, model)
+            except Exception as e:
+                print(f"[conflict] Detection error: {e}")
+
         windowed = await self._maybe_summarize_window(messages)
         prepared = self.prepare_messages_with_context(
-            windowed, relevant_notes if use_notes_context else []
+            windowed, relevant_notes if use_notes_context else [], conflicts=conflicts
         )
 
         try:
@@ -374,9 +389,7 @@ class ChatService:
         if self.verification_service and len(relevant_notes) > 1:
             try:
                 model = self.search_service.engine.model
-                conflicts = self.verification_service.detect_conflicts(
-                    relevant_notes, model
-                )
+                conflicts = self.verification_service.detect_conflicts(relevant_notes, model)
             except Exception as e:
                 print(f"[conflict] Detection error in stream: {e}")
 
@@ -391,7 +404,7 @@ class ChatService:
 
         windowed = await self._maybe_summarize_window(messages)
         prepared = self.prepare_messages_with_context(
-            windowed, relevant_notes if use_notes_context else []
+            windowed, relevant_notes if use_notes_context else [], conflicts=conflicts
         )
 
         try:

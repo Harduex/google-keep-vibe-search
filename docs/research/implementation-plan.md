@@ -464,7 +464,53 @@ Week 4:
 
 Later:
   Model upgrade to BGE-M3 → Late Chunking + Sparse Vectors (item 10 + item 3)
+
+Week 5-6: (NEW)
+  Phase 7: Chat System Deep Research + Refactoring
+  Step 1: Deep research of entire chat functionality (backend + frontend)
+          - Save findings to docs/research/chat-system-research.md
+  Step 2: Plan chat refactoring based on research
+          - Benchmark against NotebookLM-style conversational AI
+          - Architecture for robust, modern chat experience
+          - Save plan to docs/research/chat-refactoring-plan.md
+  Step 3: Implement chat refactoring
 ```
+
+---
+
+## Phase 7: Chat System Deep Research + Refactoring (Week 5-6) — NEW
+
+### Step 1: Deep Research of Chat Functionality
+
+**Goal**: Comprehensive audit of the entire chat system — backend services, frontend components, streaming protocol, state management, prompt engineering, and UX flow.
+
+**Output**: `docs/research/chat-system-research.md`
+
+**Scope**:
+- Backend: `chat_service.py`, `query_service.py`, `verification_service.py`, chat API routes, streaming protocol, context window management, conversation history handling
+- Frontend: Chat components, `useChat` hook, message rendering, citation display, streaming UX, error handling
+- Integration: How all Phase 1-5 features (RRF, reranker, entity resolution, NLI verification, gap analysis) interact within chat flow
+- Gaps: What's missing vs. state-of-the-art conversational AI (NotebookLM, Perplexity, etc.)
+
+### Step 2: Chat Refactoring Plan (NotebookLM-comparable)
+
+**Goal**: Design a modern, robust chat architecture informed by the research. Benchmark against NotebookLM's conversational features.
+
+**Output**: `docs/research/chat-refactoring-plan.md`
+
+**Target capabilities**:
+- Grounded responses with inline source citations
+- Multi-turn conversation with proper context threading
+- Streaming with progressive rendering and status indicators
+- Robust error recovery and graceful degradation
+- Source panel / evidence viewer alongside chat
+- Follow-up question suggestions
+- Conversation branching / topic detection
+- Performance: sub-2s first token, smooth streaming
+
+### Step 3: Implement Refactoring
+
+Execute the plan from Step 2. Detailed implementation steps TBD after research.
 
 ---
 

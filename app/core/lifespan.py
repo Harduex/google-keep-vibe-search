@@ -114,6 +114,22 @@ async def lifespan(app: FastAPI):
         query_service=query_service,
         max_context_notes=settings.chat_context_notes,
     )
+
+    # Agentic retrieval (feature-flagged)
+    agent = None
+    if settings.enable_agent_mode:
+        from app.services.agent.note_agent import NoteAgent
+        from app.services.agent.tools import AgentTools
+
+        agent_tools = AgentTools(
+            search_service=search_service,
+            chunking_service=chunking_service,
+            note_service=note_service,
+            reranker=reranker,
+        )
+        agent = NoteAgent(llm=llm, tools=agent_tools, max_steps=settings.agent_max_steps)
+        t = _step("Agent mode enabled", t)
+
     chat_service = ChatService(
         retrieval=retrieval,
         context_builder=context_builder,
@@ -121,6 +137,7 @@ async def lifespan(app: FastAPI):
         protocol=protocol,
         verification_service=verification_service,
         llm=llm,
+        agent=agent,
     )
     _step(f"Chat service ready (model: {settings.resolved_litellm_model})", t)
 

@@ -44,6 +44,27 @@ class StreamingProtocol:
     def verification(self, citations: List[Dict[str, Any]]) -> bytes:
         return self._encode({"type": "verification", "citations": citations})
 
+    def agent_step(
+        self,
+        step_number: int,
+        action: str,
+        params: Dict[str, Any],
+        result_summary: str,
+        notes_found: int,
+        reasoning: str = "",
+    ) -> bytes:
+        return self._encode(
+            {
+                "type": "agent_step",
+                "step_number": step_number,
+                "action": action,
+                "params": params,
+                "result_summary": result_summary,
+                "notes_found": notes_found,
+                "reasoning": reasoning,
+            }
+        )
+
     def error(self, message: str) -> bytes:
         return self._encode({"type": "error", "error": message})
 

@@ -1,6 +1,7 @@
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 from app.prompts.system_prompts import FOLLOW_UP_PROMPT
+from app.services.agent.note_agent import AgentResult, AgentStep, NoteAgent
 from app.services.citation_service import extract_citations
 from app.services.context_builder import ContextBuilder
 from app.services.conversation_manager import ConversationManager
@@ -20,6 +21,7 @@ class ChatService:
         protocol: StreamingProtocol,
         verification_service=None,
         llm: LLMClient = None,
+        agent: Optional[NoteAgent] = None,
     ):
         self.retrieval = retrieval
         self.context_builder = context_builder
@@ -27,6 +29,7 @@ class ChatService:
         self.protocol = protocol
         self.verification_service = verification_service
         self.llm = llm
+        self.agent = agent
 
     def _detect_conflicts(self, notes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Run conflict detection if verification service is available."""
@@ -72,25 +75,71 @@ class ChatService:
         session_id: Optional[str] = None,
     ) -> AsyncGenerator[bytes, None]:
         """Streaming chat with NDJSON protocol including phases and suggestions."""
+        if self.agent and use_notes_context:
+            async for chunk in self._stream_agentic(messages, topic, session_id):
+                yield chunk
+        else:
+            async for chunk in self._stream_legacy(messages, use_notes_context, topic, session_id):
+                yield chunk
+
+    async def _stream_agentic(
+        self,
+        messages: List[Dict[str, str]],
+        topic: Optional[str] = None,
+        session_id: Optional[str] = None,
+    ) -> AsyncGenerator[bytes, None]:
+        """Agentic retrieval: agent iteratively searches, then generates response."""
+        # Extract latest user query
+        query = ""
+        for msg in reversed(messages):
+            if msg.get("role") == "user":
+                query = msg["content"]
+                break
+
+        # Build conversation context for the agent
+        conversation_context = None
+        if topic:
+            conversation_context = f"Topic: {topic}"
+
+        # Phase 1: Agent gathers context with live step streaming
+        yield self.protocol.phase("searching", "Agent searching your notes...")
         relevant_notes = []
         gap_status = "sufficient"
 
-        # Phase 1: Retrieve context
-        if use_notes_context:
-            yield self.protocol.phase("searching", "Searching your notes...")
-            relevant_notes, gap_status = await self.retrieval.get_context(messages, topic)
+        async for item in self.agent.gather_context(query, conversation_context):
+            if isinstance(item, AgentStep):
+                yield self.protocol.agent_step(
+                    step_number=item.step_number,
+                    action=item.action,
+                    params=item.params,
+                    result_summary=item.result_summary,
+                    notes_found=item.notes_found,
+                    reasoning=item.reasoning,
+                )
+            elif isinstance(item, AgentResult):
+                relevant_notes = item.notes
+                gap_status = item.gap_status
 
-        # Phase 2: Conflict detection
+        # Rebuild full notes from agent's truncated results
+        note_map = {n.get("id"): n for n in self.agent.tools.note_service.notes}
+        full_notes = []
+        for n in relevant_notes:
+            nid = n.get("id", "")
+            if nid in note_map:
+                full_notes.append(note_map[nid])
+            else:
+                full_notes.append(n)
+        relevant_notes = full_notes
+
+        # Common path: conflict detection → context → prompt → LLM → citations
         conflicts = self._detect_conflicts(relevant_notes)
         yield self.protocol.context(relevant_notes, conflicts, session_id or "")
 
-        # Phase 3: Build prompt
         windowed = await self.conversation_mgr.maybe_summarize(messages)
         prepared = self.context_builder.build_messages(
-            windowed, relevant_notes if use_notes_context else [], conflicts, gap_status
+            windowed, relevant_notes, conflicts, gap_status
         )
 
-        # Phase 4: Stream LLM response
         yield self.protocol.phase("generating")
         try:
             full_response = ""
@@ -98,16 +147,62 @@ class ChatService:
                 full_response += delta
                 yield self.protocol.delta(delta)
 
-            # Phase 5: Citations
             citations = extract_citations(full_response, relevant_notes)
             yield self.protocol.done(full_response, citations)
 
-            # Phase 6: Follow-up suggestions
             suggestions = await self._generate_suggestions(full_response, relevant_notes)
             if suggestions:
                 yield self.protocol.suggestions(suggestions)
 
-            # Phase 7: Citation verification
+            if self.verification_service and citations:
+                try:
+                    verification_results = self.verification_service.verify_citations(
+                        full_response, citations, relevant_notes
+                    )
+                    yield self.protocol.verification(verification_results)
+                except Exception as e:
+                    print(f"[verification] Error: {e}")
+
+        except Exception as e:
+            yield self.protocol.error(str(e))
+
+    async def _stream_legacy(
+        self,
+        messages: List[Dict[str, str]],
+        use_notes_context: bool = True,
+        topic: Optional[str] = None,
+        session_id: Optional[str] = None,
+    ) -> AsyncGenerator[bytes, None]:
+        """Legacy single-shot retrieval path."""
+        relevant_notes = []
+        gap_status = "sufficient"
+
+        if use_notes_context:
+            yield self.protocol.phase("searching", "Searching your notes...")
+            relevant_notes, gap_status = await self.retrieval.get_context(messages, topic)
+
+        conflicts = self._detect_conflicts(relevant_notes)
+        yield self.protocol.context(relevant_notes, conflicts, session_id or "")
+
+        windowed = await self.conversation_mgr.maybe_summarize(messages)
+        prepared = self.context_builder.build_messages(
+            windowed, relevant_notes if use_notes_context else [], conflicts, gap_status
+        )
+
+        yield self.protocol.phase("generating")
+        try:
+            full_response = ""
+            async for delta in self.llm.stream(prepared):
+                full_response += delta
+                yield self.protocol.delta(delta)
+
+            citations = extract_citations(full_response, relevant_notes)
+            yield self.protocol.done(full_response, citations)
+
+            suggestions = await self._generate_suggestions(full_response, relevant_notes)
+            if suggestions:
+                yield self.protocol.suggestions(suggestions)
+
             if self.verification_service and citations:
                 try:
                     verification_results = self.verification_service.verify_citations(

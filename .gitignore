@@ -206,6 +206,10 @@ dist-ssr
 # AI ephemeral workspace
 .ai-workspace/
 
+# Claude Code local files
+CLAUDE.local.md
+.claude/settings.local.json
+
 # Other
 *.fuse_hidden*
 tmpclaude-*

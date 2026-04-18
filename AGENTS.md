@@ -71,38 +71,22 @@ Use the agent stack intentionally rather than mixing everything into one long pr
 3. Implement with engineer.
 4. Verify with reviewer or debugger when changes are risky or failures appear.
 
-Current project agent definitions live in `.agents/agents/`:
+## Agent Configuration
 
-- `architect`
-- `debugger`
-- `designer`
-- `engineer`
-- `planner`
-- `researcher`
-- `reviewer`
+This repository is multi-agent. Tool-specific configuration lives in tool-specific directories:
 
-## .agents Convention In This Repo
+- **Claude Code**: `CLAUDE.md` (imports this file), `.claude/settings.json`, `.claude/rules/`, `.claude/agents/`
+- **GitHub Copilot**: `.github/copilot-instructions.md`, `.github/instructions/`
+- **Shared skills**: `.agents/skills/*/SKILL.md` (managed by dotagents, symlinked to `.claude/skills/`)
 
-This repository follows the common pattern of a single root instruction file plus detailed agent assets in `.agents/`.
-
-- `.agents/agents/*.md`: agent definitions and role prompts
-- `.agents/skills/*/SKILL.md`: reusable, task-specific workflows and domain guidance
-- `.agents/rules/*.md`: cross-cutting standards that should stay modular and easy to update
-
-Current shared rules:
-
-- `.agents/rules/workflow.md`: ambiguity handling, modification discipline, git behavior, task completion
-- `.agents/rules/code-quality.md`: naming, comments, DRY, SOLID, error handling, validation
-
-Current skills include architecture, debugging, design, engineering, planning, research, review, TDD, frontend design, and architecture-improvement workflows.
+Skills include architecture, debugging, design, engineering, planning, research, review, and architecture-improvement workflows.
 
 ## Memory
 
-- Read `memories.md` before substantial implementation work.
-- Update `memories.md` after solving a non-obvious problem, discovering an environment quirk, or establishing a repo convention worth preserving.
-- Keep memory entries brief and practical: problem, root cause, solution, lesson, files changed.
+- Project memory lives in `docs/memories/`. Read `docs/memories/MEMORY.md` for the index.
+- Update memory after solving a non-obvious problem, discovering an environment quirk, or establishing a repo convention worth preserving.
+- Keep memory entries brief and practical: problem, root cause, solution, lesson.
 
 ## Important Rules
 - When reporting information to me, be extremely concise. Sacrifice grammar for the sake of concision and clarity.
-- When your context hits over 75%, use your compact tool to compact the context.
-- After the final implementation of the task, before ending the chat session, use your 'Ask Questions' tool to ask me: "Would you like me to apply any corrections, or should we conclude the session now?"
+- When ambiguity cannot be resolved from the codebase, ask a clarifying question instead of guessing.

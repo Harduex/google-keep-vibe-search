@@ -50,3 +50,6 @@ Notes:
 {notes_text}
 
 Tag name:"""
+
+
+FOLLOW_UP_PROMPT = """Based on this conversation and the notes used, suggest 3 brief follow-up questions the user might want to ask. Return ONLY the questions, one per line. Keep each under 60 characters."""

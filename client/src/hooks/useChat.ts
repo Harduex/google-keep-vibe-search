@@ -39,12 +39,25 @@ interface StreamVerificationMessage {
   citations: Citation[];
 }
 
+interface StreamPhaseMessage {
+  type: 'phase';
+  phase: string;
+  detail?: string;
+}
+
+interface StreamSuggestionsMessage {
+  type: 'suggestions';
+  questions: string[];
+}
+
 type StreamMessage =
   | StreamContextMessage
   | StreamDeltaMessage
   | StreamDoneMessage
   | StreamErrorMessage
-  | StreamVerificationMessage;
+  | StreamVerificationMessage
+  | StreamPhaseMessage
+  | StreamSuggestionsMessage;
 
 export const useChat = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -55,6 +68,8 @@ export const useChat = () => {
   const [modelName, setModelName] = useState<string | null>(null);
   const [useNotesContext, setUseNotesContext] = useState<boolean>(true);
   const [topic, setTopic] = useState<string>('');
+  const [currentPhase, setCurrentPhase] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
 
   // Session state
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -215,6 +230,8 @@ export const useChat = () => {
       setMessages((prev) => [...prev, userMessage]);
       setIsLoading(true);
       setError(null);
+      setCurrentPhase(null);
+      setSuggestions([]);
 
       // Create a placeholder for the assistant's response
       const assistantMessageId = Date.now() + 1;
@@ -325,6 +342,7 @@ export const useChat = () => {
                     cancelAnimationFrame(rafIdRef.current);
                     rafIdRef.current = null;
                   }
+                  setCurrentPhase(null);
                   // Final message with citations
                   setMessages((prevMessages) =>
                     prevMessages.map((msg) =>
@@ -352,6 +370,14 @@ export const useChat = () => {
                         : msg,
                     ),
                   );
+                  break;
+
+                case 'phase':
+                  setCurrentPhase(data.phase);
+                  break;
+
+                case 'suggestions':
+                  setSuggestions(data.questions || []);
                   break;
               }
             } catch {
@@ -404,6 +430,8 @@ export const useChat = () => {
     setMessages([]);
     setRelevantNotes([]);
     setConflicts([]);
+    setCurrentPhase(null);
+    setSuggestions([]);
     setError(null);
   }, [stopGenerating]);
 
@@ -413,6 +441,8 @@ export const useChat = () => {
     setMessages([]);
     setRelevantNotes([]);
     setConflicts([]);
+    setCurrentPhase(null);
+    setSuggestions([]);
     setError(null);
   }, [stopGenerating]);
 
@@ -429,6 +459,8 @@ export const useChat = () => {
     modelName,
     useNotesContext,
     topic,
+    currentPhase,
+    suggestions,
     setTopic,
     sendMessage,
     clearChat,

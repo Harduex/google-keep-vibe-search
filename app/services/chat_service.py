@@ -2,334 +2,46 @@ import json
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 import httpx
-import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity as sklearn_cosine_similarity
 
-from app.core.config import settings
-from app.prompts.system_prompts import (
-    CONVERSATION_SUMMARY_PROMPT,
-    NO_NOTES_SYSTEM_PROMPT,
-    NOTES_CHAT_SYSTEM_PROMPT,
-)
-from app.services.chunking_service import ChunkingService
+from app.prompts.system_prompts import FOLLOW_UP_PROMPT
 from app.services.citation_service import extract_citations
+from app.services.context_builder import ContextBuilder
+from app.services.conversation_manager import ConversationManager
+from app.services.retrieval_orchestrator import RetrievalOrchestrator
+from app.services.streaming_protocol import StreamingProtocol
 
 
 class ChatService:
+    """Thin orchestrator that coordinates retrieval, context building, and LLM streaming."""
+
     def __init__(
         self,
-        search_service,
-        chunking_service: Optional[ChunkingService] = None,
-        reranker=None,
-        entity_service=None,
+        retrieval: RetrievalOrchestrator,
+        context_builder: ContextBuilder,
+        conversation_mgr: ConversationManager,
+        protocol: StreamingProtocol,
         verification_service=None,
-        query_service=None,
+        client: httpx.AsyncClient = None,
+        model: str = "llama3",
     ):
-        self.search_service = search_service
-        self.chunking_service = chunking_service
-        self.reranker = reranker
-        self.entity_service = entity_service
+        self.retrieval = retrieval
+        self.context_builder = context_builder
+        self.conversation_mgr = conversation_mgr
+        self.protocol = protocol
         self.verification_service = verification_service
-        self.query_service = query_service
-        self.model = settings.llm_model
-        self.api_base_url = settings.resolved_api_base_url
-        self.max_context_notes = settings.chat_context_notes
-        self.max_recent_messages = settings.chat_max_recent_messages
-        self.summarization_threshold = settings.chat_summarization_threshold
+        self.client = client
+        self.model = model
 
-        headers = {"Content-Type": "application/json"}
-        if settings.llm_api_key:
-            headers["Authorization"] = f"Bearer {settings.llm_api_key}"
-
-        self.client = httpx.AsyncClient(
-            base_url=self.api_base_url,
-            headers=headers,
-            timeout=httpx.Timeout(connect=10.0, read=120.0, write=10.0, pool=10.0),
-        )
-
-    def get_relevant_notes(
-        self, query: str, max_notes: Optional[int] = None
-    ) -> List[Dict[str, Any]]:
-        max_notes = max_notes or self.max_context_notes
-        return self.search_service.search(query, max_results=max_notes)
-
-    def _is_duplicate_query(
-        self, query: str, previous_queries: List[str], threshold: float = 0.95
-    ) -> bool:
-        """Query collapse: skip retrieval if query is near-duplicate of a previous one."""
-        if not previous_queries or not query.strip():
-            return False
-        model = self.search_service.engine.model
-        q_emb = model.encode([query])
-        prev_embs = model.encode(previous_queries)
-        sims = sklearn_cosine_similarity(q_emb, prev_embs)[0]
-        return bool(np.any(sims > threshold))
-
-    def _cap_if_saturated(
-        self, notes: List[Dict[str, Any]], threshold: float = 0.9, cap: int = 5
-    ) -> List[Dict[str, Any]]:
-        """Coverage saturation: if top results are all redundant, cap the list."""
-        if len(notes) <= cap:
-            return notes
-        model = self.search_service.engine.model
-        texts = [(n.get("title", "") + " " + n.get("content", ""))[:500] for n in notes[:10]]
-        if len(texts) < 3:
-            return notes
-        embs = model.encode(texts)
-        sims = sklearn_cosine_similarity(embs)
-        n = len(sims)
-        avg_sim = (sims.sum() - n) / (n * (n - 1)) if n > 1 else 0
-        if avg_sim > threshold:
-            return notes[:cap]
-        return notes
-
-    def format_notes_for_context(self, notes: List[Dict[str, Any]]) -> str:
-        formatted = []
-        for i, note in enumerate(notes, 1):
-            title = note.get("title", "Untitled Note")
-            content = note.get("content", "")
-            created = note.get("created", "Unknown")
-            edited = note.get("edited", "Unknown")
-            tag = note.get("tag", "")
-            tags = note.get("tags", [tag] if tag else [])
-
-            block = f"--- Note #{i} ---\nTitle: {title}\nCreated: {created} | Last edited: {edited}"
-            if tags:
-                block += f"\nTags: {', '.join(tags)}"
-            block += f"\n\n{content}\n--- End Note #{i} ---"
-            formatted.append(block)
-
-        return "\n\n".join(formatted)
-
-    def prepare_messages_with_context(
-        self,
-        messages: List[Dict[str, str]],
-        relevant_notes: List[Dict[str, Any]],
-        conflicts: Optional[List[Dict[str, Any]]] = None,
-    ) -> List[Dict[str, str]]:
-        prepared = [m for m in messages if m.get("role") != "system"]
-
-        if relevant_notes:
-            formatted_notes = self.format_notes_for_context(relevant_notes)
-            system_content = NOTES_CHAT_SYSTEM_PROMPT.format(
-                note_count=len(relevant_notes),
-                formatted_notes=formatted_notes,
-            )
-
-            # Inject pre-computed conflict warnings into the system prompt
-            if conflicts:
-                conflict_lines = []
-                for c in conflicts:
-                    a_label = c["note_a_title"] or f"Note #{c['note_a_index']}"
-                    b_label = c["note_b_title"] or f"Note #{c['note_b_index']}"
-                    line = (
-                        f"- Note #{c['note_a_index']} ({a_label}) and "
-                        f"Note #{c['note_b_index']} ({b_label}) "
-                        f"contain conflicting information (confidence: {c['contradiction_score']:.0%})."
-                    )
-                    if c["note_a_edited"] and c["note_b_edited"]:
-                        line += f" Edited: #{c['note_a_index']} on {c['note_a_edited']}, #{c['note_b_index']} on {c['note_b_edited']}."
-                    conflict_lines.append(line)
-
-                system_content += (
-                    "\n\nIMPORTANT — CONFLICTING NOTES DETECTED:\n"
-                    + "\n".join(conflict_lines)
-                    + "\nPlease acknowledge these conflicts in your response and prefer the most recently edited note."
-                )
-        else:
-            system_content = NO_NOTES_SYSTEM_PROMPT
-
-        # Gap analysis warning: if retrieval couldn't find all needed info
-        if getattr(self, "_last_gap_status", "sufficient") == "best_effort":
-            system_content += (
-                "\n\nNote: Your notes may not contain complete information "
-                "about this topic. Be honest about gaps in the available information."
-            )
-
-        prepared.insert(0, {"role": "system", "content": system_content})
-        return prepared
-
-    async def get_conversation_aware_context(
-        self,
-        messages: List[Dict[str, str]],
-        topic: Optional[str] = None,
-        previous_note_ids: Optional[List[str]] = None,
-    ) -> List[Dict[str, Any]]:
-        latest_message = ""
-        for msg in reversed(messages):
-            if msg.get("role") == "user":
-                latest_message = msg["content"]
-                break
-
-        if not latest_message and not topic:
+    def _detect_conflicts(self, notes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Run conflict detection if verification service is available."""
+        if not self.verification_service or len(notes) <= 1:
             return []
-
-        # Prompt decomposition: break complex queries into sub-queries
-        sub_queries = [latest_message] if latest_message else []
-        if self.query_service and latest_message and settings.enable_prompt_decomposition:
-            sub_queries = await self.query_service.decompose_if_complex(latest_message)
-
-        # Note-level search (existing behavior for primary query)
-        primary_results = (
-            self.get_relevant_notes(latest_message, max_notes=self.max_context_notes + 5)
-            if latest_message
-            else []
-        )
-
-        # Sub-query retrieval: if decomposed, retrieve for each sub-query
-        decomposed_results = []
-        if len(sub_queries) > 1:
-            for sq in sub_queries:
-                decomposed_results.extend(self.get_relevant_notes(sq, max_notes=5))
-
-        # Query collapse: skip context retrieval if it duplicates the primary query
-        context_results = []
-        user_messages = [m["content"] for m in messages if m.get("role") == "user"]
-        if len(user_messages) > 1:
-            recent_context = " ".join(user_messages[-3:])
-            if not self._is_duplicate_query(recent_context, [latest_message]):
-                context_results = self.get_relevant_notes(recent_context, max_notes=5)
-
-        topic_results = []
-        if topic:
-            if not self._is_duplicate_query(topic, [latest_message]):
-                topic_results = self.get_relevant_notes(topic, max_notes=5)
-
-        # Chunk-level search for more precise retrieval on long notes
-        chunk_results = []
-        if self.chunking_service and latest_message:
-            chunk_results = self.chunking_service.search_chunks(
-                latest_message, max_results=self.max_context_notes + 5
-            )
-
-        merged = self._merge_and_rerank(
-            primary_results,
-            context_results,
-            topic_results,
-            previous_note_ids,
-            chunk_results=chunk_results,
-            decomposed_results=decomposed_results,
-            query=latest_message,
-        )
-
-        # Coverage saturation: cap results if they're all saying the same thing
-        merged = self._cap_if_saturated(merged)
-
-        result = merged[: self.max_context_notes]
-
-        # Gap analysis: check if retrieved notes are sufficient, search for gaps
-        self._last_gap_status = "sufficient"
-        if self.query_service and latest_message and result and settings.enable_gap_analysis:
-            result, self._last_gap_status = await self.query_service.retrieve_with_gap_analysis(
-                latest_message, result, self.get_relevant_notes
-            )
-
-        return result
-
-    def _merge_and_rerank(
-        self,
-        primary: List[Dict],
-        context: List[Dict],
-        topic: List[Dict],
-        previous_ids: Optional[List[str]],
-        chunk_results: Optional[List[Dict]] = None,
-        decomposed_results: Optional[List[Dict]] = None,
-        query: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
-        """Merge multiple retrieval signals using RRF, then optionally cross-encoder rerank."""
-
-        # Build ranked lists from each signal (note_id, score)
-        def to_ranked(notes: List[Dict]) -> List[tuple]:
-            return [(n.get("id", ""), n.get("score", 0)) for n in notes]
-
-        ranked_lists = [to_ranked(primary)]
-        if context:
-            ranked_lists.append(to_ranked(context))
-        if topic:
-            ranked_lists.append(to_ranked(topic))
-        if chunk_results:
-            ranked_lists.append(to_ranked(chunk_results))
-        if decomposed_results:
-            ranked_lists.append(to_ranked(decomposed_results))
-
-        # Entity signal: named entity matches from query
-        if self.entity_service and query:
-            entity_pairs = self.entity_service.get_entity_signal(query)
-            if entity_pairs:
-                ranked_lists.append(entity_pairs)
-
-        # RRF fusion across all signals
-        fused: Dict[str, float] = {}
-        for ranked in ranked_lists:
-            sorted_items = sorted(ranked, key=lambda x: x[1], reverse=True)
-            for rank, (nid, _) in enumerate(sorted_items):
-                fused[nid] = fused.get(nid, 0.0) + 1.0 / (60 + rank + 1)
-
-        # Continuity boost for previously referenced notes
-        if previous_ids:
-            for nid in previous_ids:
-                if nid in fused:
-                    fused[nid] *= 1.15
-
-        # Collect note objects (dedup by id, keep first occurrence)
-        note_map: Dict[str, Dict] = {}
-        for notes_list in [primary, context, topic, chunk_results or [], decomposed_results or []]:
-            for note in notes_list:
-                nid = note.get("id", "")
-                if nid not in note_map:
-                    note_map[nid] = note
-
-        ranked_result = sorted(fused.items(), key=lambda x: x[1], reverse=True)
-        merged = [note_map[nid] for nid, _ in ranked_result if nid in note_map]
-
-        # Cross-encoder reranking: take top-20 RRF candidates, rerank to top-10
-        if self.reranker and query and len(merged) > 1:
-            merged = self.reranker.rerank(query, merged[:20], top_k=self.max_context_notes)
-
-        return merged
-
-    async def _maybe_summarize_window(self, messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
-        non_system = [m for m in messages if m.get("role") != "system"]
-        if len(non_system) <= self.max_recent_messages + 2:
-            return non_system
-
-        old = non_system[: -self.max_recent_messages]
-        recent = non_system[-self.max_recent_messages :]
-
-        summary = await self._summarize_messages(old)
-        if summary:
-            summary_msg = {
-                "role": "system",
-                "content": f"Summary of earlier conversation:\n{summary}",
-            }
-            return [summary_msg] + recent
-
-        return recent
-
-    async def _summarize_messages(self, messages: List[Dict[str, str]]) -> Optional[str]:
-        conversation = "\n".join(
-            f"{m.get('role', 'user').title()}: {m.get('content', '')}" for m in messages
-        )
-        prompt_text = CONVERSATION_SUMMARY_PROMPT.format(conversation=conversation)
-
         try:
-            response = await self.client.post(
-                "chat/completions",
-                json={
-                    "model": self.model,
-                    "messages": [
-                        {"role": "system", "content": "You are a concise summarizer."},
-                        {"role": "user", "content": prompt_text},
-                    ],
-                    "stream": False,
-                    "max_tokens": 300,
-                },
-            )
-            response.raise_for_status()
-            data = response.json()
-            return data["choices"][0]["message"]["content"]
-        except Exception:
-            return None
+            model = self.retrieval.search_service.engine.model
+            return self.verification_service.detect_conflicts(notes, model)
+        except Exception as e:
+            print(f"[conflict] Detection error: {e}")
+            return []
 
     async def generate_chat_completion(
         self,
@@ -337,23 +49,17 @@ class ChatService:
         use_notes_context: bool = True,
         topic: Optional[str] = None,
     ) -> Tuple[str, List[Dict[str, Any]]]:
+        """Non-streaming chat completion."""
         relevant_notes = []
+        gap_status = "sufficient"
 
         if use_notes_context:
-            relevant_notes = await self.get_conversation_aware_context(messages, topic)
+            relevant_notes, gap_status = await self.retrieval.get_context(messages, topic)
 
-        # Detect conflicts for non-streaming path
-        conflicts = []
-        if self.verification_service and len(relevant_notes) > 1:
-            try:
-                model = self.search_service.engine.model
-                conflicts = self.verification_service.detect_conflicts(relevant_notes, model)
-            except Exception as e:
-                print(f"[conflict] Detection error: {e}")
-
-        windowed = await self._maybe_summarize_window(messages)
-        prepared = self.prepare_messages_with_context(
-            windowed, relevant_notes if use_notes_context else [], conflicts=conflicts
+        conflicts = self._detect_conflicts(relevant_notes)
+        windowed = await self.conversation_mgr.maybe_summarize(messages)
+        prepared = self.context_builder.build_messages(
+            windowed, relevant_notes if use_notes_context else [], conflicts, gap_status
         )
 
         try:
@@ -369,7 +75,6 @@ class ChatService:
             data = response.json()
             text = data["choices"][0]["message"]["content"]
             return text, relevant_notes
-
         except Exception as e:
             return f"Error calling LLM API: {str(e)}", relevant_notes
 
@@ -380,33 +85,27 @@ class ChatService:
         topic: Optional[str] = None,
         session_id: Optional[str] = None,
     ) -> AsyncGenerator[bytes, None]:
+        """Streaming chat with NDJSON protocol including phases and suggestions."""
         relevant_notes = []
+        gap_status = "sufficient"
+
+        # Phase 1: Retrieve context
         if use_notes_context:
-            relevant_notes = await self.get_conversation_aware_context(messages, topic)
+            yield self.protocol.phase("searching", "Searching your notes...")
+            relevant_notes, gap_status = await self.retrieval.get_context(messages, topic)
 
-        # Detect conflicts between context notes
-        conflicts = []
-        if self.verification_service and len(relevant_notes) > 1:
-            try:
-                model = self.search_service.engine.model
-                conflicts = self.verification_service.detect_conflicts(relevant_notes, model)
-            except Exception as e:
-                print(f"[conflict] Detection error in stream: {e}")
+        # Phase 2: Conflict detection
+        conflicts = self._detect_conflicts(relevant_notes)
+        yield self.protocol.context(relevant_notes, conflicts, session_id or "")
 
-        yield json.dumps(
-            {
-                "type": "context",
-                "notes": relevant_notes,
-                "conflicts": conflicts,
-                "session_id": session_id or "",
-            }
-        ).encode() + b"\n"
-
-        windowed = await self._maybe_summarize_window(messages)
-        prepared = self.prepare_messages_with_context(
-            windowed, relevant_notes if use_notes_context else [], conflicts=conflicts
+        # Phase 3: Build prompt
+        windowed = await self.conversation_mgr.maybe_summarize(messages)
+        prepared = self.context_builder.build_messages(
+            windowed, relevant_notes if use_notes_context else [], conflicts, gap_status
         )
 
+        # Phase 4: Stream LLM response
+        yield self.protocol.phase("generating")
         try:
             full_response = ""
             async with self.client.stream(
@@ -424,7 +123,6 @@ class ChatService:
                     if not line:
                         continue
 
-                    # OpenAI SSE format: "data: {json}" or "data: [DONE]"
                     if line.startswith("data: "):
                         data_str = line[6:]
                         if data_str == "[DONE]":
@@ -437,32 +135,56 @@ class ChatService:
                                 chunk = delta.get("content", "")
                                 if chunk:
                                     full_response += chunk
-                                    yield json.dumps(
-                                        {"type": "delta", "content": chunk}
-                                    ).encode() + b"\n"
+                                    yield self.protocol.delta(chunk)
                         except json.JSONDecodeError:
                             continue
 
+            # Phase 5: Citations
             citations = extract_citations(full_response, relevant_notes)
-            yield json.dumps(
-                {"type": "done", "citations": citations, "full_response": full_response}
-            ).encode() + b"\n"
+            yield self.protocol.done(full_response, citations)
 
-            # Citation verification: check if cited notes actually support the claims
+            # Phase 6: Follow-up suggestions
+            suggestions = await self._generate_suggestions(full_response, relevant_notes)
+            if suggestions:
+                yield self.protocol.suggestions(suggestions)
+
+            # Phase 7: Citation verification
             if self.verification_service and citations:
                 try:
                     verification_results = self.verification_service.verify_citations(
                         full_response, citations, relevant_notes
                     )
-                    yield json.dumps(
-                        {"type": "verification", "citations": verification_results}
-                    ).encode() + b"\n"
+                    yield self.protocol.verification(verification_results)
                 except Exception as e:
                     print(f"[verification] Error: {e}")
-                    # Non-fatal: don't emit verification if it fails
 
         except Exception as e:
-            yield json.dumps({"type": "error", "error": str(e)}).encode() + b"\n"
+            yield self.protocol.error(str(e))
+
+    async def _generate_suggestions(self, response: str, notes: List[Dict[str, Any]]) -> List[str]:
+        """Generate follow-up question suggestions via LLM."""
+        if not notes:
+            return []
+        try:
+            context = f"Response: {response[:500]}\nNotes used: {len(notes)}"
+            result = await self.client.post(
+                "chat/completions",
+                json={
+                    "model": self.model,
+                    "messages": [
+                        {"role": "system", "content": FOLLOW_UP_PROMPT},
+                        {"role": "user", "content": context},
+                    ],
+                    "stream": False,
+                    "max_tokens": 200,
+                },
+            )
+            result.raise_for_status()
+            text = result.json()["choices"][0]["message"]["content"]
+            lines = [line.strip().lstrip("0123456789.-) ") for line in text.strip().split("\n")]
+            return [q for q in lines if q and len(q) < 80][:3]
+        except Exception:
+            return []
 
     async def close(self):
         await self.client.aclose()

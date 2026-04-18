@@ -1,6 +1,7 @@
 import time
 from contextlib import asynccontextmanager
 
+import httpx
 from fastapi import FastAPI
 
 from app.core.config import settings
@@ -8,16 +9,33 @@ from app.search import VibeSearch
 from app.services.categorization_service import CategorizationService
 from app.services.chat_service import ChatService
 from app.services.chunking_service import ChunkingService
+from app.services.context_builder import ContextBuilder
+from app.services.conversation_manager import ConversationManager
 from app.services.note_service import NoteService
 from app.services.reranker_service import RerankerService
+from app.services.retrieval_orchestrator import RetrievalOrchestrator
 from app.services.search_service import SearchService
 from app.services.session_service import SessionService
+from app.services.streaming_protocol import StreamingProtocol
 
 
 def _step(label: str, start: float) -> float:
     elapsed = time.time() - start
     print(f"  [{elapsed:5.1f}s] OK: {label}")
     return time.time()
+
+
+def _create_llm_client() -> httpx.AsyncClient:
+    """Create the shared httpx client for LLM API calls."""
+    headers = {"Content-Type": "application/json"}
+    if settings.llm_api_key:
+        headers["Authorization"] = f"Bearer {settings.llm_api_key}"
+
+    return httpx.AsyncClient(
+        base_url=settings.resolved_api_base_url,
+        headers=headers,
+        timeout=httpx.Timeout(connect=10.0, read=120.0, write=10.0, pool=10.0),
+    )
 
 
 @asynccontextmanager
@@ -71,17 +89,13 @@ async def lifespan(app: FastAPI):
         verification_service = VerificationService(model_name=settings.nli_model)
         t = _step(f"Verification service ready ({settings.nli_model})", t)
 
-    chat_service = ChatService(
-        search_service, chunking_service,
-        reranker=reranker, entity_service=entity_service,
-        verification_service=verification_service,
-    )
-
-    # Prompt decomposition and gap analysis share QueryService
+    # Query intelligence (prompt decomposition + gap analysis)
+    query_service = None
+    llm_client = _create_llm_client()
     if settings.enable_prompt_decomposition or settings.enable_gap_analysis:
         from app.services.query_service import QueryService
 
-        chat_service.query_service = QueryService(chat_service.client, settings.llm_model)
+        query_service = QueryService(llm_client, settings.llm_model)
         features = []
         if settings.enable_prompt_decomposition:
             features.append("decomposition")
@@ -89,6 +103,32 @@ async def lifespan(app: FastAPI):
             features.append("gap analysis")
         print(f"  Query intelligence: {', '.join(features)}")
 
+    # Assemble chat service from focused components
+    protocol = StreamingProtocol()
+    conversation_mgr = ConversationManager(
+        client=llm_client,
+        model=settings.llm_model,
+        max_recent_messages=settings.chat_max_recent_messages,
+        summarization_threshold=settings.chat_summarization_threshold,
+    )
+    context_builder = ContextBuilder()
+    retrieval = RetrievalOrchestrator(
+        search_service=search_service,
+        chunking_service=chunking_service,
+        reranker=reranker,
+        entity_service=entity_service,
+        query_service=query_service,
+        max_context_notes=settings.chat_context_notes,
+    )
+    chat_service = ChatService(
+        retrieval=retrieval,
+        context_builder=context_builder,
+        conversation_mgr=conversation_mgr,
+        protocol=protocol,
+        verification_service=verification_service,
+        client=llm_client,
+        model=settings.llm_model,
+    )
     _step(f"Chat service ready (model: {settings.llm_model})", t)
 
     session_service = SessionService()

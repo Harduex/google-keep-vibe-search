@@ -1258,3 +1258,77 @@
     background: transparent;
   }
 }
+
+/* Phase indicator */
+.phase-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  color: #666;
+  font-size: 0.85rem;
+  animation: fade-in 0.3s ease-out;
+}
+
+.phase-icon {
+  font-size: 18px !important;
+  animation: pulse 1.5s infinite;
+  color: var(--primary-color);
+}
+
+.phase-text {
+  font-style: italic;
+}
+
+[data-theme='dark'] .phase-indicator {
+  color: #aaa;
+}
+
+/* Follow-up suggestion chips */
+.suggestion-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  animation: fade-in 0.4s ease-out;
+}
+
+.suggestions-label {
+  font-size: 0.75rem;
+  color: #888;
+  font-weight: 500;
+}
+
+.suggestion-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  font-size: 0.8rem;
+  background: rgba(var(--primary-color-rgb), 0.08);
+  color: var(--primary-color);
+  border: 1px solid rgba(var(--primary-color-rgb), 0.2);
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.suggestion-chip:hover:not(:disabled) {
+  background: rgba(var(--primary-color-rgb), 0.16);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+.suggestion-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+[data-theme='dark'] .suggestions-label {
+  color: #888;
+}
+
+[data-theme='dark'] .suggestion-chip {
+  background: rgba(var(--primary-color-rgb), 0.12);
+  border-color: rgba(var(--primary-color-rgb), 0.25);
+}

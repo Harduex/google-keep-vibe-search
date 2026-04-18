@@ -31,6 +31,8 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
     toggleNotesContext,
     topic,
     setTopic,
+    currentPhase,
+    suggestions,
     // Session management
     sessionId,
     sessions,
@@ -192,6 +194,33 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
               messages.map((message, index) => (
                 <ChatMessage key={index} message={message} onCitationClick={handleCitationClick} />
               ))
+            )}
+            {currentPhase && (
+              <div className="phase-indicator">
+                <span className="material-icons phase-icon">
+                  {currentPhase === 'searching' ? 'search' : 'edit'}
+                </span>
+                <span className="phase-text">
+                  {currentPhase === 'searching'
+                    ? 'Searching your notes...'
+                    : 'Generating response...'}
+                </span>
+              </div>
+            )}
+            {suggestions.length > 0 && !isLoading && (
+              <div className="suggestion-chips">
+                <span className="suggestions-label">Follow-up:</span>
+                {suggestions.map((q, i) => (
+                  <button
+                    key={i}
+                    className="suggestion-chip"
+                    onClick={() => sendMessage(q)}
+                    disabled={isLoading}
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
             )}
             <div ref={messagesEndRef} />
           </div>

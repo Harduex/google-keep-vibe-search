@@ -78,7 +78,9 @@ export const useOrganize = () => {
 
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
+        if (done) {
+          break;
+        }
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
@@ -86,7 +88,9 @@ export const useOrganize = () => {
 
         for (const line of lines) {
           const trimmed = line.trim();
-          if (!trimmed) continue;
+          if (!trimmed) {
+            continue;
+          }
 
           try {
             const data: StreamMessage = JSON.parse(trimmed);
@@ -170,27 +174,22 @@ export const useOrganize = () => {
     [updateProposal],
   );
 
-  const mergeProposals = useCallback(
-    (sourceIndex: number, targetIndex: number) => {
-      setProposals((prev) => {
-        const updated = [...prev];
-        const targetName = updated[targetIndex].proposal.tag_name;
-        updated[sourceIndex] = {
-          ...updated[sourceIndex],
-          action: 'merge',
-          mergeTarget: targetName,
-        };
-        return updated;
-      });
-    },
-    [],
-  );
+  const mergeProposals = useCallback((sourceIndex: number, targetIndex: number) => {
+    setProposals((prev) => {
+      const updated = [...prev];
+      const targetName = updated[targetIndex].proposal.tag_name;
+      updated[sourceIndex] = {
+        ...updated[sourceIndex],
+        action: 'merge',
+        mergeTarget: targetName,
+      };
+      return updated;
+    });
+  }, []);
 
   const approveAll = useCallback(() => {
     setProposals((prev) =>
-      prev.map((p) =>
-        p.action === 'pending' ? { ...p, action: 'approve' as ProposalAction } : p,
-      ),
+      prev.map((p) => (p.action === 'pending' ? { ...p, action: 'approve' as ProposalAction } : p)),
     );
   }, []);
 
@@ -201,7 +200,9 @@ export const useOrganize = () => {
   const applyProposals = useCallback(async () => {
     const actionable = proposals.filter((p) => p.action !== 'pending' && p.action !== 'reject');
 
-    if (actionable.length === 0) return;
+    if (actionable.length === 0) {
+      return;
+    }
 
     setIsApplying(true);
     setError(null);

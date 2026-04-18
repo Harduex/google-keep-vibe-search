@@ -23,12 +23,16 @@ Google Keep Vibe Search is a full-stack note search and chat application for Goo
 
 - `app/`: backend application code
 - `app/core/`: config, dependency wiring, exceptions, lifespan
-- `app/services/`: business logic for notes, search, chat, session, chunking, citation, categorization, cache
+- `app/services/`: business logic — LLM client, chat, search, retrieval orchestrator, agent, grounding, verification, chunking, reranking, entity resolution, session, notes, categorization, cache
+- `app/services/agent/`: agentic RAG system (NoteAgent, AgentTools) — feature-flagged via ENABLE_AGENT_MODE
 - `app/routes/`: FastAPI route modules by domain
 - `app/models/`: Pydantic request and response models
 - `client/src/`: React components, hooks, helpers, and tests
 - `tests/`: backend pytest suite
-- `scripts/`: setup and dev scripts for Windows and Linux/macOS
+- `scripts/`: setup and dev scripts (setup.sh/.ps1, dev.sh/.ps1) for Windows and Linux/macOS
+- `docs/plans/`: phased implementation plans and tracking
+- `docs/research/`: research docs (done/ and pending/)
+- `docs/memories/`: project memory index
 - `.agents/`: project-specific agent definitions, skills, and shared rules
 - `memories.md`: human-maintained project memory for non-obvious lessons learned
 
@@ -90,3 +94,29 @@ Skills include architecture, debugging, design, engineering, planning, research,
 ## Important Rules
 - When reporting information to me, be extremely concise. Sacrifice grammar for the sake of concision and clarity.
 - When ambiguity cannot be resolved from the codebase, ask a clarifying question instead of guessing.
+
+## Architecture Notes
+
+### LLM Integration
+- All LLM calls go through `app/services/llm_client.py` (LiteLLM wrapper)
+- Model string: `settings.resolved_litellm_model` (e.g., `ollama_chat/model` for Ollama)
+- For Ollama, `api_base` must be the raw Ollama URL without `/v1/` suffix — LiteLLM handles pathing
+
+### Chat Pipeline
+- Legacy: single-shot retrieval via `RetrievalOrchestrator` → context → LLM → response
+- Agentic (ENABLE_AGENT_MODE=true): `NoteAgent` iteratively searches with tools, yields `AgentStep` objects for live UI streaming, then LLM generates response
+- Both paths: conflict detection → context building → LLM streaming → citations → verification → grounding
+
+### Feature Flags (in .env)
+- `ENABLE_AGENT_MODE`: agentic RAG vs legacy single-shot retrieval
+- `ENABLE_IMAGE_SEARCH`: CLIP-based image search (requires pip install from git)
+- `ENABLE_RERANKER`, `ENABLE_ENTITY_RESOLUTION`, `ENABLE_CITATION_VERIFICATION`
+- `ENABLE_PROMPT_DECOMPOSITION`, `ENABLE_GAP_ANALYSIS`
+
+### Streaming Protocol (NDJSON)
+Message types: `phase`, `context`, `delta`, `done`, `suggestions`, `verification`, `agent_step`, `grounding`, `error`
+
+## Plan Tracking
+- Implementation plans live in `docs/plans/PLANS.md`
+- When developing a phased plan, write it there and track progress per phase
+- Claude Code plan files (`.claude/plans/`) are ephemeral session artifacts — clean them up after completion

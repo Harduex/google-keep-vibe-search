@@ -2,11 +2,11 @@ import hashlib
 import json
 import os
 import re
-from typing import Any, Dict, List, Tuple, Set, Optional, BinaryIO, Union
+from typing import Any, BinaryIO, Dict, List, Optional, Set, Tuple, Union
 
 import nltk
-from nltk.corpus import stopwords
 import numpy as np
+from nltk.corpus import stopwords
 from rank_bm25 import BM25Okapi
 from sentence_transformers import SentenceTransformer
 from sklearn.cluster import KMeans
@@ -15,13 +15,22 @@ from sklearn.metrics.pairwise import cosine_similarity
 from app.core.config import settings
 
 if settings.enable_image_search:
-    from app.image_processor import ImageProcessor
+    try:
+        from app.image_processor import ImageProcessor
+    except ImportError:
+        import warnings
+
+        warnings.warn(
+            "CLIP not installed — disabling image search. Install with: pip install git+https://github.com/openai/CLIP.git"
+        )
+        settings.enable_image_search = False
 
 
 class VibeSearch:
     def __init__(self, notes: List[Dict[str, Any]], force_refresh: bool = False):
         self.notes = notes
         import torch
+
         device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model = SentenceTransformer(settings.embedding_model).to(device)
 
@@ -125,9 +134,9 @@ class VibeSearch:
                 cache_info = json.load(f)
 
             # Check if the number of notes and hash match
-            return cache_info.get("hash") == current_hash and cache_info.get(
-                "note_count"
-            ) == len(self.note_indices)
+            return cache_info.get("hash") == current_hash and cache_info.get("note_count") == len(
+                self.note_indices
+            )
         except Exception as e:
             print(f"Error checking cache validity: {e}")
             return False
@@ -320,9 +329,7 @@ class VibeSearch:
                 # Convert note IDs to note indices
                 id_to_idx = {n.get("id", ""): i for i, n in enumerate(self.notes)}
                 entity_ranked = [
-                    (id_to_idx[nid], score)
-                    for nid, score in entity_pairs
-                    if nid in id_to_idx
+                    (id_to_idx[nid], score) for nid, score in entity_pairs if nid in id_to_idx
                 ]
                 if entity_ranked:
                     ranked_lists.append(entity_ranked)
@@ -349,7 +356,9 @@ class VibeSearch:
 
         # Cross-encoder reranking if available
         if self.reranker and len(results) > 1:
-            results = self.reranker.rerank(query, results[:20], top_k=max_results or settings.max_results)
+            results = self.reranker.rerank(
+                query, results[:20], top_k=max_results or settings.max_results
+            )
 
         return results[: max_results or settings.max_results]
 
@@ -401,9 +410,7 @@ class VibeSearch:
         # Sort notes within each cluster by closeness to cluster center
         for cluster_idx in range(num_clusters):
             cluster_center_distances[cluster_idx].sort(key=lambda x: x[1])
-            cluster_notes[cluster_idx] = [
-                item[0] for item in cluster_center_distances[cluster_idx]
-            ]
+            cluster_notes[cluster_idx] = [item[0] for item in cluster_center_distances[cluster_idx]]
 
         # Create cluster objects with notes and extract topics
         clusters_result = []
@@ -412,9 +419,7 @@ class VibeSearch:
                 continue  # Skip empty clusters
 
             # Extract top keywords from cluster
-            cluster_keywords = self._extract_cluster_keywords(
-                cluster_notes[cluster_idx]
-            )
+            cluster_keywords = self._extract_cluster_keywords(cluster_notes[cluster_idx])
 
             clusters_result.append(
                 {

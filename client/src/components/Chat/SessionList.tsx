@@ -48,16 +48,24 @@ export const SessionList = memo(
     );
 
     const formatDate = (dateStr: string) => {
-      if (!dateStr) return '';
+      if (!dateStr) {
+        return '';
+      }
       try {
         const d = new Date(dateStr);
         const now = new Date();
         const diffMs = now.getTime() - d.getTime();
         const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-        if (diffDays === 0) return 'Today';
-        if (diffDays === 1) return 'Yesterday';
-        if (diffDays < 7) return `${diffDays}d ago`;
+        if (diffDays === 0) {
+          return 'Today';
+        }
+        if (diffDays === 1) {
+          return 'Yesterday';
+        }
+        if (diffDays < 7) {
+          return `${diffDays}d ago`;
+        }
         return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
       } catch {
         return '';

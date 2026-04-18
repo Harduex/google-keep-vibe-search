@@ -83,9 +83,13 @@ async def lifespan(app: FastAPI):
         t = _step(f"Verification + grounding ready ({settings.nli_model})", t)
 
     # Shared LLM client (LiteLLM-powered)
+    # For Ollama, LiteLLM needs the raw base URL (no /v1/ suffix)
+    llm_api_base = settings.resolved_api_base_url
+    if settings.llm_provider.lower() == "ollama":
+        llm_api_base = settings.ollama_api_url.rstrip("/")
     llm = LLMClient(
         model=settings.resolved_litellm_model,
-        api_base=settings.resolved_api_base_url,
+        api_base=llm_api_base,
         api_key=settings.llm_api_key or None,
         temperature=settings.llm_temperature,
         max_tokens=settings.llm_max_tokens,

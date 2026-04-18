@@ -5,8 +5,9 @@
 
 ### Environment
 - Windows 11, bash via Git Bash
-- Python venv at `.venv/`. Backend: `python -m uvicorn app.main:app --reload`
+- Python 3.11 (global install, no venv). Backend: `python -m uvicorn app.main:app --reload`
 - Node at `client/`. Frontend: `cd client && npm run dev`
+- Both servers: `./scripts/dev.ps1` (Windows) or `bash scripts/dev.sh` (Linux/macOS)
 - GPU/CUDA available (RTX 3060 12GB, CUDA 12.1) — see docs/memories/gpu-cuda-setup.md
 
 ### Formatting

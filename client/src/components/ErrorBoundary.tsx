@@ -18,7 +18,11 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error(`ErrorBoundary [${this.props.fallbackLabel ?? 'unknown'}]:`, error, info.componentStack);
+    console.error(
+      `ErrorBoundary [${this.props.fallbackLabel ?? 'unknown'}]:`,
+      error,
+      info.componentStack,
+    );
   }
 
   private handleRetry = () => {

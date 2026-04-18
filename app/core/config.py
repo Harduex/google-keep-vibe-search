@@ -56,7 +56,7 @@ class Settings(BaseSettings):
     enable_gap_analysis: bool = True
 
     # Image search
-    enable_image_search: bool = True
+    enable_image_search: bool = False
 
     # Cache
     cache_dir: str = ""

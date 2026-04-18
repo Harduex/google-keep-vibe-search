@@ -1,12 +1,10 @@
-import json
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
-
-import httpx
 
 from app.prompts.system_prompts import FOLLOW_UP_PROMPT
 from app.services.citation_service import extract_citations
 from app.services.context_builder import ContextBuilder
 from app.services.conversation_manager import ConversationManager
+from app.services.llm_client import LLMClient
 from app.services.retrieval_orchestrator import RetrievalOrchestrator
 from app.services.streaming_protocol import StreamingProtocol
 
@@ -21,16 +19,14 @@ class ChatService:
         conversation_mgr: ConversationManager,
         protocol: StreamingProtocol,
         verification_service=None,
-        client: httpx.AsyncClient = None,
-        model: str = "llama3",
+        llm: LLMClient = None,
     ):
         self.retrieval = retrieval
         self.context_builder = context_builder
         self.conversation_mgr = conversation_mgr
         self.protocol = protocol
         self.verification_service = verification_service
-        self.client = client
-        self.model = model
+        self.llm = llm
 
     def _detect_conflicts(self, notes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Run conflict detection if verification service is available."""
@@ -63,17 +59,7 @@ class ChatService:
         )
 
         try:
-            response = await self.client.post(
-                "chat/completions",
-                json={
-                    "model": self.model,
-                    "messages": prepared,
-                    "stream": False,
-                },
-            )
-            response.raise_for_status()
-            data = response.json()
-            text = data["choices"][0]["message"]["content"]
+            text = await self.llm.complete(prepared)
             return text, relevant_notes
         except Exception as e:
             return f"Error calling LLM API: {str(e)}", relevant_notes
@@ -108,36 +94,9 @@ class ChatService:
         yield self.protocol.phase("generating")
         try:
             full_response = ""
-            async with self.client.stream(
-                "POST",
-                "chat/completions",
-                json={
-                    "model": self.model,
-                    "messages": prepared,
-                    "stream": True,
-                },
-            ) as response:
-                response.raise_for_status()
-                async for line in response.aiter_lines():
-                    line = line.strip()
-                    if not line:
-                        continue
-
-                    if line.startswith("data: "):
-                        data_str = line[6:]
-                        if data_str == "[DONE]":
-                            break
-                        try:
-                            data = json.loads(data_str)
-                            choices = data.get("choices", [])
-                            if choices:
-                                delta = choices[0].get("delta", {})
-                                chunk = delta.get("content", "")
-                                if chunk:
-                                    full_response += chunk
-                                    yield self.protocol.delta(chunk)
-                        except json.JSONDecodeError:
-                            continue
+            async for delta in self.llm.stream(prepared):
+                full_response += delta
+                yield self.protocol.delta(delta)
 
             # Phase 5: Citations
             citations = extract_citations(full_response, relevant_notes)
@@ -167,24 +126,14 @@ class ChatService:
             return []
         try:
             context = f"Response: {response[:500]}\nNotes used: {len(notes)}"
-            result = await self.client.post(
-                "chat/completions",
-                json={
-                    "model": self.model,
-                    "messages": [
-                        {"role": "system", "content": FOLLOW_UP_PROMPT},
-                        {"role": "user", "content": context},
-                    ],
-                    "stream": False,
-                    "max_tokens": 200,
-                },
+            text = await self.llm.complete(
+                [
+                    {"role": "system", "content": FOLLOW_UP_PROMPT},
+                    {"role": "user", "content": context},
+                ],
+                max_tokens=200,
             )
-            result.raise_for_status()
-            text = result.json()["choices"][0]["message"]["content"]
             lines = [line.strip().lstrip("0123456789.-) ") for line in text.strip().split("\n")]
             return [q for q in lines if q and len(q) < 80][:3]
         except Exception:
             return []
-
-    async def close(self):
-        await self.client.aclose()

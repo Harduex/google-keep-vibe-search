@@ -26,7 +26,14 @@ class Settings(BaseSettings):
     llm_api_base_url: str = ""
     llm_api_key: str = ""
     llm_model: str = "llama3"
+    llm_provider: str = "ollama"
+    llm_temperature: float = 0.1
+    llm_max_tokens: int = 2048
     chat_context_notes: int = 5
+
+    # Agent mode (Phase 8B)
+    enable_agent_mode: bool = False
+    agent_max_steps: int = 5
 
     # Legacy Ollama (used as fallback for llm_api_base_url)
     ollama_api_url: str = "http://localhost:11434"
@@ -81,6 +88,16 @@ class Settings(BaseSettings):
         if self.llm_api_base_url:
             return self.llm_api_base_url.rstrip("/") + "/"
         return f"{self.ollama_api_url}/v1/"
+
+    @property
+    def resolved_litellm_model(self) -> str:
+        """Build the LiteLLM model string based on provider."""
+        provider = self.llm_provider.lower()
+        if provider == "ollama":
+            return f"ollama_chat/{self.llm_model}"
+        if provider == "openai":
+            return self.llm_model
+        return f"{provider}/{self.llm_model}"
 
     @property
     def resolved_cache_dir(self) -> str:

@@ -3,13 +3,25 @@
 import re
 from typing import Any, Callable, Dict, List, Tuple
 
-import httpx
-
+from app.services.llm_client import LLMClient
 
 COMPLEXITY_MARKERS = [
-    "compared to", "versus", "vs", "before", "after", "between",
-    "and also", "as well as", "last week", "last month", "yesterday",
-    "recently", "both", "difference", "similar", "changed",
+    "compared to",
+    "versus",
+    "vs",
+    "before",
+    "after",
+    "between",
+    "and also",
+    "as well as",
+    "last week",
+    "last month",
+    "yesterday",
+    "recently",
+    "both",
+    "difference",
+    "similar",
+    "changed",
 ]
 
 DECOMPOSE_PROMPT = """Break this question into 2-3 simpler search queries that each focus on one topic. Return ONLY the queries, one per line, no numbering or bullets.
@@ -18,9 +30,8 @@ Question: {query}"""
 
 
 class QueryService:
-    def __init__(self, client: httpx.AsyncClient, model: str):
-        self.client = client
-        self.model = model
+    def __init__(self, llm: LLMClient):
+        self.llm = llm
 
     def _is_complex(self, query: str) -> bool:
         if len(query.split()) > 10:
@@ -34,21 +45,11 @@ class QueryService:
             return [query]
 
         try:
-            response = await self.client.post(
-                "chat/completions",
-                json={
-                    "model": self.model,
-                    "messages": [
-                        {"role": "user", "content": DECOMPOSE_PROMPT.format(query=query)},
-                    ],
-                    "stream": False,
-                    "max_tokens": 100,
-                    "temperature": 0.0,
-                },
+            text = await self.llm.complete(
+                [{"role": "user", "content": DECOMPOSE_PROMPT.format(query=query)}],
+                max_tokens=100,
+                temperature=0.0,
             )
-            response.raise_for_status()
-            data = response.json()
-            text = data["choices"][0]["message"]["content"].strip()
 
             sub_queries = []
             for line in text.split("\n"):
@@ -87,19 +88,11 @@ class QueryService:
             )
 
             try:
-                response = await self.client.post(
-                    "chat/completions",
-                    json={
-                        "model": self.model,
-                        "messages": [{"role": "user", "content": prompt}],
-                        "stream": False,
-                        "max_tokens": 60,
-                        "temperature": 0.0,
-                    },
+                text = await self.llm.complete(
+                    [{"role": "user", "content": prompt}],
+                    max_tokens=60,
+                    temperature=0.0,
                 )
-                response.raise_for_status()
-                data = response.json()
-                text = data["choices"][0]["message"]["content"].strip()
             except Exception as e:
                 print(f"[query] Gap analysis LLM error: {e}")
                 return notes, "sufficient"

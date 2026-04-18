@@ -1,8 +1,7 @@
-from typing import Any, Dict, List, Optional
-
-import httpx
+from typing import Dict, List, Optional
 
 from app.prompts.system_prompts import CONVERSATION_SUMMARY_PROMPT
+from app.services.llm_client import LLMClient
 
 
 class ConversationManager:
@@ -10,13 +9,11 @@ class ConversationManager:
 
     def __init__(
         self,
-        client: httpx.AsyncClient,
-        model: str,
+        llm: LLMClient,
         max_recent_messages: int = 6,
         summarization_threshold: int = 12,
     ):
-        self.client = client
-        self.model = model
+        self.llm = llm
         self.max_recent_messages = max_recent_messages
         self.summarization_threshold = summarization_threshold
 
@@ -47,20 +44,12 @@ class ConversationManager:
         prompt_text = CONVERSATION_SUMMARY_PROMPT.format(conversation=conversation)
 
         try:
-            response = await self.client.post(
-                "chat/completions",
-                json={
-                    "model": self.model,
-                    "messages": [
-                        {"role": "system", "content": "You are a concise summarizer."},
-                        {"role": "user", "content": prompt_text},
-                    ],
-                    "stream": False,
-                    "max_tokens": 300,
-                },
+            return await self.llm.complete(
+                [
+                    {"role": "system", "content": "You are a concise summarizer."},
+                    {"role": "user", "content": prompt_text},
+                ],
+                max_tokens=300,
             )
-            response.raise_for_status()
-            data = response.json()
-            return data["choices"][0]["message"]["content"]
         except Exception:
             return None

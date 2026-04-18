@@ -105,36 +105,36 @@ class TestRerankerService:
 class TestChatServiceRerankerIntegration:
     def test_merge_and_rerank_uses_reranker(self):
         """_merge_and_rerank should apply cross-encoder reranking when reranker is set."""
-        from app.services.chat_service import ChatService
+        from app.services.retrieval_orchestrator import RetrievalOrchestrator
 
-        cs = ChatService.__new__(ChatService)
-        cs.max_context_notes = 5
-        cs.entity_service = None
+        ro = RetrievalOrchestrator.__new__(RetrievalOrchestrator)
+        ro.max_context_notes = 5
+        ro.entity_service = None
 
         mock_reranker = MagicMock()
         mock_reranker.rerank.return_value = [
             {"id": "b", "score": 0.9},
             {"id": "a", "score": 0.5},
         ]
-        cs.reranker = mock_reranker
+        ro.reranker = mock_reranker
 
         primary = [{"id": "a", "score": 0.8}, {"id": "b", "score": 0.6}]
-        result = cs._merge_and_rerank(primary, [], [], None, query="test query")
+        result = ro._merge_and_rerank(primary, [], [], None, query="test query")
 
         mock_reranker.rerank.assert_called_once()
         assert result[0]["id"] == "b"
 
     def test_merge_and_rerank_without_reranker(self):
         """_merge_and_rerank should work without reranker (RRF only)."""
-        from app.services.chat_service import ChatService
+        from app.services.retrieval_orchestrator import RetrievalOrchestrator
 
-        cs = ChatService.__new__(ChatService)
-        cs.max_context_notes = 5
-        cs.reranker = None
-        cs.entity_service = None
+        ro = RetrievalOrchestrator.__new__(RetrievalOrchestrator)
+        ro.max_context_notes = 5
+        ro.reranker = None
+        ro.entity_service = None
 
         primary = [{"id": "a", "score": 0.8}, {"id": "b", "score": 0.6}]
-        result = cs._merge_and_rerank(primary, [], [], None, query="test")
+        result = ro._merge_and_rerank(primary, [], [], None, query="test")
 
         # Should still return results from RRF
         assert len(result) == 2

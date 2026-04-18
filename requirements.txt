@@ -31,3 +31,4 @@ rank-bm25>=0.2.2
 spacy>=3.0
 jellyfish
 networkx
+litellm>=1.40

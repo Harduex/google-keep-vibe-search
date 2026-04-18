@@ -300,6 +300,7 @@ export const useChat = () => {
         }
 
         let accumulatedContent = '';
+        let finalAssistantContent = '';
         const decoder = new TextDecoder();
         let buffer = '';
         streamingContentRef.current = '';
@@ -371,13 +372,14 @@ export const useChat = () => {
                     rafIdRef.current = null;
                   }
                   setCurrentPhase(null);
+                  finalAssistantContent = data.full_response || accumulatedContent;
                   // Final message with citations
                   setMessages((prevMessages) =>
                     prevMessages.map((msg) =>
                       msg.timestamp === assistantMessageId && msg.role === 'assistant'
                         ? {
                             ...msg,
-                            content: data.full_response || accumulatedContent,
+                            content: finalAssistantContent,
                             citations: data.citations,
                           }
                         : msg,
@@ -438,20 +440,19 @@ export const useChat = () => {
           }
         }
 
-        // Save session after completion
-        if (currentSessionId) {
-          const finalMessages: ChatMessage[] = [];
-          setMessages((prev) => {
-            finalMessages.push(...prev);
-            return prev;
-          });
-          // Use a small delay to ensure state is settled
-          setTimeout(() => {
-            setMessages((currentMsgs) => {
-              saveSessionMessages(currentSessionId!, currentMsgs);
-              return currentMsgs;
-            });
-          }, 100);
+        const completedAssistantContent =
+          finalAssistantContent || accumulatedContent || streamingContentRef.current;
+
+        if (currentSessionId && completedAssistantContent) {
+          await saveSessionMessages(currentSessionId, [
+            ...messages,
+            userMessage,
+            {
+              role: 'assistant',
+              content: completedAssistantContent,
+              timestamp: assistantMessageId,
+            },
+          ]);
         }
       } catch (err) {
         if ((err as Error).name !== 'AbortError') {

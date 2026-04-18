@@ -270,6 +270,8 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
 
             <div className="input-wrapper">
               <textarea
+                id="chat-message-input"
+                name="message"
                 ref={textareaRef}
                 value={inputValue}
                 onChange={handleInputChange}

@@ -1,7 +1,7 @@
 # Chat System Refactoring Plan
 
 *Created: 2026-04-18*
-*Based on: [chat-system-research.md](chat-system-research.md)*
+*Based on: [chat-system-research.md](../done/chat-system-research.md)*
 *Target: NotebookLM-comparable conversational AI over personal notes*
 
 ---
@@ -16,7 +16,7 @@
 
 ---
 
-## Phase 7A: Critical Bug Fixes (Day 1)
+## Phase 7A: Critical Bug Fixes (Day 1) ✅ DONE
 
 ### 7A.1 Fix Citation Click Handler
 

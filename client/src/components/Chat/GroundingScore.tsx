@@ -9,8 +9,12 @@ interface GroundingScoreProps {
 }
 
 const getScoreColor = (score: number): string => {
-  if (score >= 0.7) return '#4caf50';
-  if (score >= 0.4) return '#ff9800';
+  if (score >= 0.7) {
+    return '#4caf50';
+  }
+  if (score >= 0.4) {
+    return '#ff9800';
+  }
   return '#f44336';
 };
 

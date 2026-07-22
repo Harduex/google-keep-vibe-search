@@ -46,9 +46,7 @@ class CategorizationService:
 
             if len(note_indices) < min_cluster_size:
                 all_ids = [notes[idx]["id"] for idx in note_indices]
-                sample = [
-                    self._truncate_note(notes[idx]) for idx in note_indices[:5]
-                ]
+                sample = [self._truncate_note(notes[idx]) for idx in note_indices[:5]]
                 proposals = [
                     {
                         "tag_name": "All Notes",
@@ -63,12 +61,14 @@ class CategorizationService:
                 return
 
             # Stage 1: UMAP dimensionality reduction
-            yield self._line({
-                "type": "progress",
-                "stage": "reducing",
-                "message": "Analyzing semantic maps...",
-                "progress": 0.1,
-            })
+            yield self._line(
+                {
+                    "type": "progress",
+                    "stage": "reducing",
+                    "message": "Analyzing semantic maps...",
+                    "progress": 0.1,
+                }
+            )
 
             import umap
 
@@ -81,20 +81,24 @@ class CategorizationService:
             )
             reduced = reducer.fit_transform(embeddings)
 
-            yield self._line({
-                "type": "progress",
-                "stage": "reducing",
-                "message": "Analyzing semantic maps...",
-                "progress": 0.33,
-            })
+            yield self._line(
+                {
+                    "type": "progress",
+                    "stage": "reducing",
+                    "message": "Analyzing semantic maps...",
+                    "progress": 0.33,
+                }
+            )
 
             # Stage 2: HDBSCAN clustering
-            yield self._line({
-                "type": "progress",
-                "stage": "clustering",
-                "message": "Grouping related notes...",
-                "progress": 0.4,
-            })
+            yield self._line(
+                {
+                    "type": "progress",
+                    "stage": "clustering",
+                    "message": "Grouping related notes...",
+                    "progress": 0.4,
+                }
+            )
 
             import hdbscan
 
@@ -107,12 +111,14 @@ class CategorizationService:
             labels = clusterer.fit_predict(reduced)
             probabilities = clusterer.probabilities_
 
-            yield self._line({
-                "type": "progress",
-                "stage": "clustering",
-                "message": "Grouping related notes...",
-                "progress": 0.66,
-            })
+            yield self._line(
+                {
+                    "type": "progress",
+                    "stage": "clustering",
+                    "message": "Grouping related notes...",
+                    "progress": 0.66,
+                }
+            )
 
             # Group notes by cluster
             clusters: Dict[int, List[int]] = {}
@@ -125,10 +131,7 @@ class CategorizationService:
 
             total_clusters = len(clusters)
             if total_clusters == 0:
-                all_ids = [
-                    notes[note_indices[idx]]["id"]
-                    for idx in range(len(note_indices))
-                ]
+                all_ids = [notes[note_indices[idx]]["id"] for idx in range(len(note_indices))]
                 sample = [
                     self._truncate_note(notes[note_indices[idx]])
                     for idx in range(min(5, len(note_indices)))
@@ -154,23 +157,23 @@ class CategorizationService:
                 sorted(clusters.items(), key=lambda x: len(x[1]), reverse=True)
             ):
                 progress = 0.66 + (cluster_idx / total_clusters) * 0.30
-                yield self._line({
-                    "type": "progress",
-                    "stage": "naming",
-                    "message": "Generating tag names...",
-                    "progress": round(progress, 2),
-                    "current": cluster_idx + 1,
-                    "total": total_clusters,
-                })
+                yield self._line(
+                    {
+                        "type": "progress",
+                        "stage": "naming",
+                        "message": "Generating tag names...",
+                        "progress": round(progress, 2),
+                        "current": cluster_idx + 1,
+                        "total": total_clusters,
+                    }
+                )
 
                 # Find notes closest to cluster centroid
                 cluster_embeddings = reduced[member_indices]
                 centroid = cluster_embeddings.mean(axis=0)
                 distances = np.linalg.norm(cluster_embeddings - centroid, axis=1)
                 closest_order = np.argsort(distances)
-                representative_indices = [
-                    member_indices[j] for j in closest_order[:5]
-                ]
+                representative_indices = [member_indices[j] for j in closest_order[:5]]
 
                 # Build representative notes text
                 rep_notes_text = []
@@ -187,18 +190,14 @@ class CategorizationService:
 
                 # Fallback to keyword extraction
                 if not tag_name:
-                    cluster_notes = [
-                        notes[note_indices[mi]] for mi in member_indices
-                    ]
+                    cluster_notes = [notes[note_indices[mi]] for mi in member_indices]
                     tag_name = self._extract_keywords_fallback(cluster_notes)
 
                 # Deduplicate tag names
                 tag_name = self._deduplicate_name(tag_name, seen_names)
 
                 # Build note IDs and samples
-                cluster_note_ids = [
-                    notes[note_indices[mi]]["id"] for mi in member_indices
-                ]
+                cluster_note_ids = [notes[note_indices[mi]]["id"] for mi in member_indices]
                 sample_notes = [
                     self._truncate_note(notes[note_indices[member_indices[j]]])
                     for j in closest_order[:5]
@@ -207,34 +206,33 @@ class CategorizationService:
 
                 # Cluster confidence
                 cluster_probs = [probabilities[mi] for mi in member_indices]
-                confidence = (
-                    float(np.mean(cluster_probs)) if cluster_probs else 0.0
-                )
+                confidence = float(np.mean(cluster_probs)) if cluster_probs else 0.0
 
-                proposals.append({
-                    "tag_name": tag_name,
-                    "note_ids": cluster_note_ids,
-                    "note_count": len(cluster_note_ids),
-                    "sample_notes": sample_notes,
-                    "confidence": round(confidence, 2),
-                })
+                proposals.append(
+                    {
+                        "tag_name": tag_name,
+                        "note_ids": cluster_note_ids,
+                        "note_count": len(cluster_note_ids),
+                        "sample_notes": sample_notes,
+                        "confidence": round(confidence, 2),
+                    }
+                )
 
             # Add uncategorized group for noise
             if noise_indices:
-                noise_ids = [
-                    notes[note_indices[ni]]["id"] for ni in noise_indices
-                ]
+                noise_ids = [notes[note_indices[ni]]["id"] for ni in noise_indices]
                 noise_samples = [
-                    self._truncate_note(notes[note_indices[ni]])
-                    for ni in noise_indices[:5]
+                    self._truncate_note(notes[note_indices[ni]]) for ni in noise_indices[:5]
                 ]
-                proposals.append({
-                    "tag_name": "Uncategorized",
-                    "note_ids": noise_ids,
-                    "note_count": len(noise_ids),
-                    "sample_notes": noise_samples,
-                    "confidence": 0.0,
-                })
+                proposals.append(
+                    {
+                        "tag_name": "Uncategorized",
+                        "note_ids": noise_ids,
+                        "note_count": len(noise_ids),
+                        "sample_notes": noise_samples,
+                        "confidence": 0.0,
+                    }
+                )
 
             yield self._line({"type": "proposals", "proposals": proposals})
             yield self._line({"type": "done"})
@@ -257,28 +255,63 @@ class CategorizationService:
             response.raise_for_status()
             data = response.json()
             raw = data["choices"][0]["message"]["content"].strip()
-            cleaned = raw.strip('"\'.').strip()
+            cleaned = raw.strip("\"'.").strip()
             if len(cleaned) > 40:
                 cleaned = cleaned[:40].rsplit(" ", 1)[0]
             return cleaned if cleaned else ""
         except Exception:
             return ""
 
-    def _extract_keywords_fallback(
-        self, cluster_notes: List[Dict[str, Any]]
-    ) -> str:
-        all_text = " ".join(
-            f"{n.get('title', '')} {n.get('content', '')}"
-            for n in cluster_notes
-        )
+    def _extract_keywords_fallback(self, cluster_notes: List[Dict[str, Any]]) -> str:
+        all_text = " ".join(f"{n.get('title', '')} {n.get('content', '')}" for n in cluster_notes)
         words = re.findall(r"\b[a-zA-Z]{3,}\b", all_text.lower())
         stop = {
-            "the", "and", "for", "are", "but", "not", "you", "all", "can",
-            "her", "was", "one", "our", "out", "has", "have", "from",
-            "this", "that", "with", "they", "been", "will", "would",
-            "could", "should", "their", "there", "about", "which", "when",
-            "what", "where", "than", "then", "also", "into", "just",
-            "more", "some", "very", "like", "http", "https", "www", "com",
+            "the",
+            "and",
+            "for",
+            "are",
+            "but",
+            "not",
+            "you",
+            "all",
+            "can",
+            "her",
+            "was",
+            "one",
+            "our",
+            "out",
+            "has",
+            "have",
+            "from",
+            "this",
+            "that",
+            "with",
+            "they",
+            "been",
+            "will",
+            "would",
+            "could",
+            "should",
+            "their",
+            "there",
+            "about",
+            "which",
+            "when",
+            "what",
+            "where",
+            "than",
+            "then",
+            "also",
+            "into",
+            "just",
+            "more",
+            "some",
+            "very",
+            "like",
+            "http",
+            "https",
+            "www",
+            "com",
         }
         filtered = [w for w in words if w not in stop]
         counts = Counter(filtered)

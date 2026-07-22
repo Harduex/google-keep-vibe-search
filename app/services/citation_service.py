@@ -2,7 +2,9 @@ import re
 from typing import Any, Dict, List
 
 
-def extract_citations(response_text: str, context_notes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def extract_citations(
+    response_text: str, context_notes: List[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
     pattern = r"\[Note #(\d+)(?:,\s*#(\d+))*\]"
     citations = []
     seen = set()

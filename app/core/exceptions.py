@@ -18,16 +18,12 @@ class ImageSearchDisabled(HTTPException):
 
 class ImageProcessorNotInitialized(HTTPException):
     def __init__(self):
-        super().__init__(
-            status_code=503, detail="Image processor not initialized"
-        )
+        super().__init__(status_code=503, detail="Image processor not initialized")
 
 
 class InvalidFileType(HTTPException):
     def __init__(self, expected: str):
-        super().__init__(
-            status_code=400, detail=f"Uploaded file must be {expected}"
-        )
+        super().__init__(status_code=400, detail=f"Uploaded file must be {expected}")
 
 
 class NoteNotTagged(HTTPException):
@@ -37,20 +33,14 @@ class NoteNotTagged(HTTPException):
 
 class TagNotFound(HTTPException):
     def __init__(self, tag_name: str):
-        super().__init__(
-            status_code=404, detail=f"No notes found with tag '{tag_name}'"
-        )
+        super().__init__(status_code=404, detail=f"No notes found with tag '{tag_name}'")
 
 
 class DuplicateTagName(HTTPException):
     def __init__(self, tag_name: str):
-        super().__init__(
-            status_code=409, detail=f"A tag named '{tag_name}' already exists"
-        )
+        super().__init__(status_code=409, detail=f"A tag named '{tag_name}' already exists")
 
 
 class SessionNotFound(HTTPException):
     def __init__(self, session_id: str):
-        super().__init__(
-            status_code=404, detail=f"Chat session '{session_id}' not found"
-        )
+        super().__init__(status_code=404, detail=f"Chat session '{session_id}' not found")

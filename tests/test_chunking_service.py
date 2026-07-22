@@ -1,4 +1,5 @@
 """Tests for the chunking service (logic only, no embeddings)."""
+
 import pytest
 
 from app.services.chunking_service import (

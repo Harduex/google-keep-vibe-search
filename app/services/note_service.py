@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Set
 
 from app.core.config import settings
-from app.parser import get_latest_modification_time, parse_notes, compute_notes_hash
+from app.parser import compute_notes_hash, get_latest_modification_time, parse_notes
 from app.services.cache_service import (
     load_excluded_tags_from_cache,
     load_notes_from_cache,
@@ -50,10 +50,7 @@ class NoteService:
         return [
             note
             for note in notes_list
-            if not any(
-                t in self.excluded_tags
-                for t in self.note_tags.get(note.get("id"), [])
-            )
+            if not any(t in self.excluded_tags for t in self.note_tags.get(note.get("id"), []))
         ]
 
     def tag_notes(self, note_ids: List[str], tag_name: str) -> int:

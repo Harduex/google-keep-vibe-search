@@ -2,15 +2,14 @@ import hashlib
 import json
 import os
 import warnings
-from typing import Dict, List, Optional, Set, Tuple, Any
+from typing import Any, Dict, List, Optional, Set, Tuple
 
+# Import CLIP model (installed via requirements.txt)
+import clip
 import numpy as np
 import torch
 from PIL import Image, UnidentifiedImageError
 from tqdm import tqdm
-
-# Import CLIP model (installed via requirements.txt)
-import clip
 
 from app.core.config import settings
 
@@ -30,11 +29,11 @@ class ImageProcessor:
 
         # Load CLIP model
         self.model, self.preprocess = clip.load("ViT-B/32", device=self.device)
-        
+
         # Dictionary to store image embeddings
         self.image_embeddings: Dict[str, np.ndarray] = {}
         self.processed_image_paths: Set[str] = set()
-        
+
         # CLIP has a maximum context length of 77 tokens, but we'll use a conservative limit
         self.max_query_length = 75
 
@@ -53,22 +52,22 @@ class ImageProcessor:
 
         # Get all unique image paths from notes
         image_paths = self._get_all_image_paths(notes)
-        
+
         # Try to load cached embeddings first
         self._load_embeddings_from_cache()
-        
+
         # Find which images need processing (not in cache)
         images_to_process = [path for path in image_paths if path not in self.processed_image_paths]
-        
+
         if images_to_process:
             print(f"Processing {len(images_to_process)} new images with CLIP...")
             self._process_images(images_to_process)
-            
+
             # Save updated embeddings to cache
             self._save_embeddings_to_cache()
         else:
             print("All images already processed and loaded from cache.")
-            
+
         return self.image_embeddings
 
     def search_images(self, query_text: str, threshold: float = 0.2) -> List[Tuple[str, float]]:
@@ -84,18 +83,20 @@ class ImageProcessor:
         """
         if not self.image_embeddings:
             return []
-            
+
         # Limit query text length for CLIP tokenizer
         if len(query_text) > self.max_query_length:
-            print(f"Query text truncated from {len(query_text)} to {self.max_query_length} characters")
-            query_text = query_text[:self.max_query_length]
-            
+            print(
+                f"Query text truncated from {len(query_text)} to {self.max_query_length} characters"
+            )
+            query_text = query_text[: self.max_query_length]
+
         # Encode the text query
         with torch.no_grad():
             text_features = self.model.encode_text(clip.tokenize([query_text]).to(self.device))
             text_features = text_features / text_features.norm(dim=-1, keepdim=True)
             text_features = text_features.cpu().numpy()
-        
+
         # Compare against all image embeddings
         results = []
         for image_path, embedding in self.image_embeddings.items():
@@ -103,7 +104,7 @@ class ImageProcessor:
             similarity = np.dot(text_features[0], embedding)
             if similarity > threshold:
                 results.append((image_path, float(similarity)))
-                
+
         # Sort by similarity score (descending)
         results.sort(key=lambda x: x[1], reverse=True)
         return results
@@ -111,32 +112,40 @@ class ImageProcessor:
     def search_with_image(self, image_file, threshold: float = 0.2) -> List[Tuple[str, float]]:
         """
         Search for images similar to the uploaded query image.
-        
+
         Args:
             image_file: File-like object or path to the image to search with
             threshold: Similarity threshold (0-1)
-            
+
         Returns:
             List of tuples containing (image_path, similarity_score)
         """
         if not self.image_embeddings:
             return []
-        
+
         try:
             # Load and preprocess the query image
             if isinstance(image_file, str):
                 # If a path was provided
-                query_image = self.preprocess(Image.open(image_file).convert("RGB")).unsqueeze(0).to(self.device)
+                query_image = (
+                    self.preprocess(Image.open(image_file).convert("RGB"))
+                    .unsqueeze(0)
+                    .to(self.device)
+                )
             else:
                 # If a file-like object was provided
-                query_image = self.preprocess(Image.open(image_file).convert("RGB")).unsqueeze(0).to(self.device)
-            
+                query_image = (
+                    self.preprocess(Image.open(image_file).convert("RGB"))
+                    .unsqueeze(0)
+                    .to(self.device)
+                )
+
             # Generate embedding for the query image
             with torch.no_grad():
                 image_features = self.model.encode_image(query_image)
                 image_features = image_features / image_features.norm(dim=-1, keepdim=True)
                 query_embedding = image_features.cpu().numpy()[0]
-            
+
             # Compare against all image embeddings
             results = []
             for image_path, embedding in self.image_embeddings.items():
@@ -144,11 +153,11 @@ class ImageProcessor:
                 similarity = np.dot(query_embedding, embedding)
                 if similarity > threshold:
                     results.append((image_path, float(similarity)))
-            
+
             # Sort by similarity score (descending)
             results.sort(key=lambda x: x[1], reverse=True)
             return results
-            
+
         except Exception as e:
             print(f"Error processing query image: {str(e)}")
             return []
@@ -156,23 +165,25 @@ class ImageProcessor:
     def encode_uploaded_image(self, image_file) -> Optional[np.ndarray]:
         """
         Generate an embedding for an uploaded image.
-        
+
         Args:
             image_file: File-like object containing the image
-            
+
         Returns:
             Numpy array containing the image embedding, or None if processing failed
         """
         try:
             # Load and preprocess the image
-            query_image = self.preprocess(Image.open(image_file).convert("RGB")).unsqueeze(0).to(self.device)
-            
+            query_image = (
+                self.preprocess(Image.open(image_file).convert("RGB")).unsqueeze(0).to(self.device)
+            )
+
             # Generate embedding
             with torch.no_grad():
                 image_features = self.model.encode_image(query_image)
                 image_features = image_features / image_features.norm(dim=-1, keepdim=True)
                 embedding = image_features.cpu().numpy()[0]
-                
+
             return embedding
         except Exception as e:
             print(f"Error encoding uploaded image: {str(e)}")
@@ -198,21 +209,25 @@ class ImageProcessor:
                 if not os.path.exists(full_path):
                     print(f"Warning: Image not found: {full_path}")
                     continue
-                
+
                 # Load and preprocess image
-                image = self.preprocess(Image.open(full_path).convert("RGB")).unsqueeze(0).to(self.device)
-                
+                image = (
+                    self.preprocess(Image.open(full_path).convert("RGB"))
+                    .unsqueeze(0)
+                    .to(self.device)
+                )
+
                 # Generate embedding
                 with torch.no_grad():
                     image_features = self.model.encode_image(image)
                     image_features = image_features / image_features.norm(dim=-1, keepdim=True)
                     # Convert to numpy and flatten
                     embedding = image_features.cpu().numpy()[0]
-                
+
                 # Store embedding
                 self.image_embeddings[image_path] = embedding
                 self.processed_image_paths.add(image_path)
-                
+
             except (UnidentifiedImageError, OSError, Exception) as e:
                 print(f"Error processing image {image_path}: {str(e)}")
                 continue
@@ -229,52 +244,54 @@ class ImageProcessor:
         """Save image embeddings to cache file."""
         if not self.image_embeddings:
             return
-            
+
         # Convert embeddings dict to arrays for saving
         paths = []
         embeddings = []
-        
+
         for path, embedding in self.image_embeddings.items():
             paths.append(path)
             embeddings.append(embedding)
-            
+
         # Save embeddings array
         np.savez_compressed(
             settings.image_embeddings_cache_file,
             paths=np.array(paths, dtype=object),
             embeddings=np.array(embeddings),
         )
-        
+
         # Save hash for cache validation
         hash_info = {
             "hash": self._compute_embeddings_hash(),
             "count": len(self.image_embeddings),
         }
-        
+
         with open(settings.image_hash_file, "w") as f:
             json.dump(hash_info, f)
-            
+
         print(f"Saved {len(self.image_embeddings)} image embeddings to cache")
 
     def _load_embeddings_from_cache(self) -> None:
         """Load image embeddings from cache if available."""
-        if not os.path.exists(settings.image_embeddings_cache_file) or not os.path.exists(settings.image_hash_file):
+        if not os.path.exists(settings.image_embeddings_cache_file) or not os.path.exists(
+            settings.image_hash_file
+        ):
             print("No image embeddings cache found")
             return
-            
+
         try:
             # Load embeddings
             data = np.load(settings.image_embeddings_cache_file, allow_pickle=True)
             paths = data["paths"].tolist()
             embeddings = data["embeddings"]
-            
+
             # Recreate the embeddings dictionary
             for i, path in enumerate(paths):
                 self.image_embeddings[path] = embeddings[i]
                 self.processed_image_paths.add(path)
-                
+
             print(f"Loaded {len(self.image_embeddings)} image embeddings from cache")
-            
+
         except Exception as e:
             print(f"Error loading image embeddings from cache: {e}")
             # Reset in case of partial loading

@@ -1,9 +1,10 @@
 """Tests for NoteService caching behavior."""
+
 import time
 
 from app.core.config import settings
-from app.services.note_service import NoteService
 from app.parser import parse_notes
+from app.services.note_service import NoteService
 
 
 def test_note_service_uses_cache(tmp_keep_dir, tmp_path, monkeypatch):
@@ -33,7 +34,7 @@ def test_note_service_invalidate_when_files_change(tmp_keep_dir, tmp_path, monke
     assert len(first) == 4
 
     # edit one of the source files to change its content
-    (tmp_keep_dir / "note1.json").write_text("{\"title\": \"X\"}\"", encoding="utf-8")
+    (tmp_keep_dir / "note1.json").write_text('{"title": "X"}"', encoding="utf-8")
     # ensure mtime increases
     time.sleep(0.01)
 

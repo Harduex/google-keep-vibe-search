@@ -21,7 +21,9 @@ def save_notes_to_cache(notes_data: List[Dict[str, Any]], notes_hash: str) -> No
         print(f"Error caching notes: {e}")
 
 
-def load_notes_from_cache(latest_mod_time: float, current_hash: str) -> Optional[List[Dict[str, Any]]]:
+def load_notes_from_cache(
+    latest_mod_time: float, current_hash: str
+) -> Optional[List[Dict[str, Any]]]:
     """Return cached notes if still valid.
 
     The cache is considered stale if any of the following are true:

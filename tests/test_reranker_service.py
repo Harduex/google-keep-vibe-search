@@ -4,9 +4,10 @@ import os
 
 os.environ.setdefault("ENABLE_IMAGE_SEARCH", "false")
 
-import pytest
 from unittest.mock import MagicMock, patch
+
 import numpy as np
+import pytest
 
 
 class TestRerankerService:

@@ -1,4 +1,5 @@
 """Tests for the Google Keep note parser."""
+
 import json
 import os
 from unittest.mock import patch

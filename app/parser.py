@@ -12,10 +12,10 @@ from app.core.config import settings
 def get_latest_modification_time(directory: str) -> float:
     """Get the latest modification time of any JSON file in the directory."""
     json_files = glob.glob(os.path.join(directory, "*.json"))
-    
+
     if not json_files:
         return 0
-        
+
     mod_times = [os.path.getmtime(file) for file in json_files]
     return max(mod_times) if mod_times else 0
 

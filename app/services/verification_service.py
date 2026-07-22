@@ -64,12 +64,16 @@ class VerificationService:
             # NLI prediction: returns raw logits for [contradiction, entailment, neutral]
             scores = self.nli_model.predict([(note_text, claim)])
             # scores shape: (1, 3) — one pair, three classes
-            score_arr = scores[0] if hasattr(scores[0], '__len__') else [scores[0]]
+            score_arr = scores[0] if hasattr(scores[0], "__len__") else [scores[0]]
 
             if len(score_arr) == 3:
                 # Model label order: 0=contradiction, 1=entailment, 2=neutral
                 probs = self._softmax(np.array(score_arr))
-                contradiction, entailment, neutral = float(probs[0]), float(probs[1]), float(probs[2])
+                contradiction, entailment, neutral = (
+                    float(probs[0]),
+                    float(probs[1]),
+                    float(probs[2]),
+                )
             else:
                 # Fallback: single score (shouldn't happen with this model)
                 entailment = float(score_arr[0])
@@ -84,13 +88,15 @@ class VerificationService:
             else:
                 verdict = "neutral"
 
-            results.append({
-                **citation,
-                "claim": claim[:200],
-                "support_score": round(entailment, 2),
-                "contradiction_score": round(contradiction, 2),
-                "verdict": verdict,
-            })
+            results.append(
+                {
+                    **citation,
+                    "claim": claim[:200],
+                    "support_score": round(entailment, 2),
+                    "contradiction_score": round(contradiction, 2),
+                    "verdict": verdict,
+                }
+            )
 
         return results
 
@@ -98,18 +104,18 @@ class VerificationService:
         """Extract the sentence(s) around a [Note #N] citation in the response."""
         # Split by bullet points, newlines, and sentence boundaries for finer granularity
         # First split by lines to handle markdown lists
-        lines = response.split('\n')
+        lines = response.split("\n")
         segments = []
         for line in lines:
             line = line.strip()
             if not line:
                 continue
             # Split sentences within each line
-            sents = re.split(r'(?<=[.!?])\s+', line)
+            sents = re.split(r"(?<=[.!?])\s+", line)
             segments.extend(sents)
 
         # Find segments that reference this note number
-        pattern = re.compile(rf'\[Note\s*#\s*{note_number}(?:\s*,\s*#\s*\d+)*\]')
+        pattern = re.compile(rf"\[Note\s*#\s*{note_number}(?:\s*,\s*#\s*\d+)*\]")
         matching = []
         for i, seg in enumerate(segments):
             if pattern.search(seg):
@@ -122,9 +128,9 @@ class VerificationService:
         context_sentences = [segments[i] for i in matching]
         # Strip citation markers from the claim
         claim = " ".join(context_sentences)
-        claim = re.sub(r'\[Note\s*#\s*\d+(?:\s*,\s*#\s*\d+)*\]', '', claim).strip()
+        claim = re.sub(r"\[Note\s*#\s*\d+(?:\s*,\s*#\s*\d+)*\]", "", claim).strip()
         # Strip leading markdown (bullets, headers)
-        claim = re.sub(r'^[\s\-*#>]+', '', claim).strip()
+        claim = re.sub(r"^[\s\-*#>]+", "", claim).strip()
         return claim if claim else None
 
     def detect_conflicts(
@@ -173,15 +179,17 @@ class VerificationService:
             contradiction_prob = float(probs[0])
 
             if contradiction_prob > probs[1] and contradiction_prob > probs[2]:
-                conflicts.append({
-                    "note_a_index": i + 1,  # 1-indexed to match [Note #N]
-                    "note_b_index": j + 1,
-                    "note_a_title": notes[i].get("title", "") or f"Note #{i + 1}",
-                    "note_b_title": notes[j].get("title", "") or f"Note #{j + 1}",
-                    "note_a_edited": notes[i].get("edited", ""),
-                    "note_b_edited": notes[j].get("edited", ""),
-                    "contradiction_score": round(contradiction_prob, 2),
-                    "similarity": round(float(sims[i][j]), 2),
-                })
+                conflicts.append(
+                    {
+                        "note_a_index": i + 1,  # 1-indexed to match [Note #N]
+                        "note_b_index": j + 1,
+                        "note_a_title": notes[i].get("title", "") or f"Note #{i + 1}",
+                        "note_b_title": notes[j].get("title", "") or f"Note #{j + 1}",
+                        "note_a_edited": notes[i].get("edited", ""),
+                        "note_b_edited": notes[j].get("edited", ""),
+                        "contradiction_score": round(contradiction_prob, 2),
+                        "similarity": round(float(sims[i][j]), 2),
+                    }
+                )
 
         return conflicts

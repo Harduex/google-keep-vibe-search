@@ -38,24 +38,30 @@ Google Keep Vibe Search is a full-stack note search and chat application for Goo
 
 ## Setup And Run
 
-- Initial setup on Linux/macOS: `bash scripts/setup.sh`
-- Initial setup on Windows: `./scripts/setup.ps1`
-- Start both dev servers on Linux/macOS: `bash scripts/dev.sh`
-- Start both dev servers on Windows: `./scripts/dev.ps1`
-- Start backend directly: `python -m uvicorn app.main:app --reload`
+- Use the unified `make` commands:
+  - Setup: `make setup`
+  - Start servers: `make dev`
+  - Lint: `make lint`
+  - Test: `make test`
+  - Build frontend: `make build`
+- Start backend directly: `uv run uvicorn app.main:app --reload`
 - Start frontend directly: `cd client && npm run dev`
 - Docker: `docker compose up -d`
+- GPU/CUDA available (RTX 3060 12GB, CUDA 12.1) — see docs/memories/gpu-cuda-setup.md
 
 ## Validation Commands
 
 Run the smallest relevant checks for the files you changed. Prefer targeted validation first, then broader checks when appropriate.
 
-- Backend tests: `pytest`
+- Format single file: `uv run black <file>` or `cd client && npx prettier --write <file>`
+- Test single file: `uv run pytest tests/test_<module>.py` or `cd client && npx vitest run <file>`
+- Backend tests: `make test` (or `uv run pytest`)
 - Frontend tests: `cd client && npm test`
 - Frontend lint: `cd client && npm run lint`
-- Frontend build: `cd client && npm run build`
-- Python format: `black app tests`
-- Python import sort: `isort app tests`
+- Frontend format: `cd client && npm run fix`
+- Frontend build: `make build`
+- Python format: `make lint` (or `uv run black app tests` and `uv run isort app tests`)
+- Pre-commit hooks enforce formatting. If a commit fails, fix formatting and retry.
 
 ## Working Conventions
 
@@ -94,6 +100,8 @@ Skills include architecture, debugging, design, engineering, planning, research,
 ## Important Rules
 - When reporting information to me, be extremely concise. Sacrifice grammar for the sake of concision and clarity.
 - When ambiguity cannot be resolved from the codebase, ask a clarifying question instead of guessing.
+- When context hits 75%, use the compact tool.
+- After final implementation, ask: "Would you like me to apply any corrections, or should we conclude the session now?"
 
 ## Architecture Notes
 

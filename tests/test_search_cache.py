@@ -24,9 +24,7 @@ class DummyModel:
 def test_vibesearch_cache_hits(tmp_path, sample_notes, monkeypatch, capsys):
     settings.cache_dir = str(tmp_path)
     # replace SentenceTransformer with our dummy
-    monkeypatch.setattr(
-        "app.search.SentenceTransformer", lambda *args, **kwargs: DummyModel()
-    )
+    monkeypatch.setattr("app.search.SentenceTransformer", lambda *args, **kwargs: DummyModel())
 
     # first instantiation should compute embeddings
     vs1 = VibeSearch(sample_notes)

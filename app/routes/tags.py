@@ -71,7 +71,9 @@ def rename_tag(
 ):
     try:
         count = note_service.rename_tag(request.old_name, request.new_name)
-        return {"message": f"Renamed tag '{request.old_name}' to '{request.new_name}' on {count} notes"}
+        return {
+            "message": f"Renamed tag '{request.old_name}' to '{request.new_name}' on {count} notes"
+        }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except KeyError:

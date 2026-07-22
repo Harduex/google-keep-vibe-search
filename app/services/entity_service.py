@@ -48,7 +48,9 @@ class EntityService:
 
         # Save to cache
         self._save_to_cache(cache_file, current_hash)
-        print(f"[entities] Built entity index: {len(self.entity_index)} entities from {len(notes)} notes")
+        print(
+            f"[entities] Built entity index: {len(self.entity_index)} entities from {len(notes)} notes"
+        )
 
     def _compute_hash(self, notes: List[Dict[str, Any]]) -> str:
         h = hashlib.md5()
@@ -95,9 +97,7 @@ class EntityService:
             text = (note.get("title", "") + " " + note.get("content", ""))[:5000]
             doc = self.nlp(text)
             entities = [
-                (ent.text, ent.label_)
-                for ent in doc.ents
-                if ent.label_ in self.ENTITY_LABELS
+                (ent.text, ent.label_) for ent in doc.ents if ent.label_ in self.ENTITY_LABELS
             ]
             if entities:
                 results[note.get("id", "")] = entities

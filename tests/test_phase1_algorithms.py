@@ -1,6 +1,7 @@
 """Tests for Phase 1 algorithms: RRF fusion, BM25 keyword search, retrieval stopping."""
 
 import os
+
 os.environ.setdefault("ENABLE_IMAGE_SEARCH", "false")
 
 import numpy as np
@@ -33,17 +34,30 @@ class DummyModel:
 @pytest.fixture
 def search_notes():
     return [
-        {"id": "n1", "title": "Python Tutorial", "content": "Learn Python programming language basics"},
+        {
+            "id": "n1",
+            "title": "Python Tutorial",
+            "content": "Learn Python programming language basics",
+        },
         {"id": "n2", "title": "Grocery List", "content": "Milk eggs bread butter cheese"},
-        {"id": "n3", "title": "Meeting Notes", "content": "Python project review with team budget approved"},
+        {
+            "id": "n3",
+            "title": "Meeting Notes",
+            "content": "Python project review with team budget approved",
+        },
         {"id": "n4", "title": "Recipe", "content": "Bread recipe with milk and eggs baking tips"},
-        {"id": "n5", "title": "Travel Plan", "content": "Visit Paris France in summer vacation itinerary"},
+        {
+            "id": "n5",
+            "title": "Travel Plan",
+            "content": "Visit Paris France in summer vacation itinerary",
+        },
     ]
 
 
 @pytest.fixture
 def vibe_search(tmp_path, search_notes, monkeypatch):
     from app.core.config import settings
+
     settings.cache_dir = str(tmp_path)
     monkeypatch.setattr("app.search.SentenceTransformer", lambda *a, **kw: DummyModel())
     return VibeSearch(search_notes)
@@ -133,6 +147,7 @@ class TestRetrievalStopping:
         FakeSearchService.engine.model.encode = fake_encode
 
         from app.services.retrieval_orchestrator import RetrievalOrchestrator
+
         ro = RetrievalOrchestrator.__new__(RetrievalOrchestrator)
         ro.search_service = FakeSearchService()
 
@@ -156,6 +171,7 @@ class TestRetrievalStopping:
         FakeSearchService.engine.model.encode = fake_encode
 
         from app.services.retrieval_orchestrator import RetrievalOrchestrator
+
         ro = RetrievalOrchestrator.__new__(RetrievalOrchestrator)
         ro.search_service = FakeSearchService()
 
@@ -174,6 +190,7 @@ class TestRetrievalStopping:
         FakeSearchService.engine.model.encode = fake_encode
 
         from app.services.retrieval_orchestrator import RetrievalOrchestrator
+
         ro = RetrievalOrchestrator.__new__(RetrievalOrchestrator)
         ro.search_service = FakeSearchService()
 
@@ -198,10 +215,13 @@ class TestRetrievalStopping:
         FakeSearchService.engine.model.encode = fake_encode
 
         from app.services.retrieval_orchestrator import RetrievalOrchestrator
+
         ro = RetrievalOrchestrator.__new__(RetrievalOrchestrator)
         ro.search_service = FakeSearchService()
 
-        notes = [{"title": f"Topic {i}", "content": f"Very different content about subject {i * 100}"} for i in range(10)]
+        notes = [
+            {"title": f"Topic {i}", "content": f"Very different content about subject {i * 100}"}
+            for i in range(10)
+        ]
         result = ro._cap_if_saturated(notes, threshold=0.9, cap=5)
         assert len(result) == 10  # Not capped because they're diverse
-

@@ -16,7 +16,7 @@ def stats(
     search_service: SearchService = Depends(get_search_service),
 ):
     image_search_status = {
-            "enabled": settings.enable_image_search,
+        "enabled": settings.enable_image_search,
         "initialized": search_service.image_processor is not None,
         "images_count": len(search_service.image_note_map),
     }

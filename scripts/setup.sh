@@ -7,28 +7,18 @@ ROOT=$(pwd)
 echo "=== Google Keep Vibe Search - Setup ==="
 echo ""
 
-# 1. Python virtual environment
-if [ ! -d "venv" ]; then
-  echo "Creating Python virtual environment..."
-  python3 -m venv venv
-else
-  echo "Virtual environment already exists."
-fi
-
-echo "Installing Python dependencies..."
-venv/bin/pip install -q -r requirements.txt
+echo "Installing Python dependencies with uv..."
+uv sync --all-groups
 
 # Load nvm so npm/node are available in non-interactive shells
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 
-# 2. Node.js dependencies
 echo "Installing frontend dependencies..."
 cd client
-npm install --silent
+npm ci
 cd "$ROOT"
 
-# 3. Environment file
 if [ ! -f ".env" ]; then
   echo "Creating .env from .env.example..."
   cp .env.example .env
@@ -41,5 +31,5 @@ fi
 
 echo ""
 echo "Setup complete! To start developing:"
-echo "  ./scripts/dev.sh"
+echo "  make dev"
 echo ""

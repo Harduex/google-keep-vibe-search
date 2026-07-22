@@ -1,13 +1,11 @@
 """Tests for cache_service behaviour."""
+
 import time
 
 import pytest
 
 from app.core.config import settings
-from app.services.cache_service import (
-    load_notes_from_cache,
-    save_notes_to_cache,
-)
+from app.services.cache_service import load_notes_from_cache, save_notes_to_cache
 
 
 def test_save_and_load_notes_cache(tmp_path):

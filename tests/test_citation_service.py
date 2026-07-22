@@ -1,4 +1,5 @@
 """Tests for the citation extraction service."""
+
 import pytest
 
 from app.services.citation_service import extract_citations

@@ -6,8 +6,9 @@ os.environ.setdefault("ENABLE_IMAGE_SEARCH", "false")
 os.environ.setdefault("ENABLE_ENTITY_RESOLUTION", "false")
 
 import json
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 class MockDoc:
@@ -42,11 +43,21 @@ class TestEntityExtraction:
         from app.services.entity_service import EntityService
 
         svc = EntityService.__new__(EntityService)
-        svc.nlp = MockNLP({
-            "Meeting Notes Discussion with John Smith about project": [("John Smith", "PERSON")],
-        })
+        svc.nlp = MockNLP(
+            {
+                "Meeting Notes Discussion with John Smith about project": [
+                    ("John Smith", "PERSON")
+                ],
+            }
+        )
 
-        notes = [{"id": "n1", "title": "Meeting Notes", "content": "Discussion with John Smith about project"}]
+        notes = [
+            {
+                "id": "n1",
+                "title": "Meeting Notes",
+                "content": "Discussion with John Smith about project",
+            }
+        ]
         result = svc._extract_entities(notes)
         assert "n1" in result
         assert ("John Smith", "PERSON") in result["n1"]
@@ -55,9 +66,11 @@ class TestEntityExtraction:
         from app.services.entity_service import EntityService
 
         svc = EntityService.__new__(EntityService)
-        svc.nlp = MockNLP({
-            " Note content": [("Monday", "DATE"), ("Google", "ORG")],
-        })
+        svc.nlp = MockNLP(
+            {
+                " Note content": [("Monday", "DATE"), ("Google", "ORG")],
+            }
+        )
 
         notes = [{"id": "n1", "title": "", "content": "Note content"}]
         result = svc._extract_entities(notes)

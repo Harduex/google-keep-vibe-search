@@ -1,7 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 import { API_ROUTES } from '@/const';
-import { AgentStep, Citation, ChatSessionSummary, ConflictInfo, GroundingResult, Note } from '@/types';
+import {
+  AgentStep,
+  Citation,
+  ChatSessionSummary,
+  ConflictInfo,
+  GroundingResult,
+  Note,
+} from '@/types';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -117,11 +124,6 @@ export const useChat = () => {
     fetchModelInfo();
   }, []);
 
-  // Load sessions on mount
-  useEffect(() => {
-    fetchSessions();
-  }, []);
-
   const fetchSessions = useCallback(async () => {
     try {
       const response = await fetch(API_ROUTES.CHAT_SESSIONS);
@@ -132,6 +134,11 @@ export const useChat = () => {
       console.error('Error fetching sessions:', err);
     }
   }, []);
+
+  // Load sessions on mount
+  useEffect(() => {
+    fetchSessions();
+  }, [fetchSessions]);
 
   const createSession = useCallback(async (): Promise<string | null> => {
     try {

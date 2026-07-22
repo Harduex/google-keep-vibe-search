@@ -32,7 +32,7 @@ export const LoadingScreen = memo(({ message }: LoadingScreenProps) => (
       <p className="mt-6 text-lg font-medium text-secondary-color">
         {message || 'Preparing your search experience…'}
       </p>
-      <p className="mt-2 text-sm text-gray-500">Google Keep Vibe Search</p>
+      <p className="mt-2 text-sm text-gray-500">Google Keep Vibe Search</p>
     </div>
   </div>
 ));

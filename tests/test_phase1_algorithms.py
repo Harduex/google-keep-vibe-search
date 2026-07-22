@@ -132,12 +132,12 @@ class TestRetrievalStopping:
 
         FakeSearchService.engine.model.encode = fake_encode
 
-        from app.services.chat_service import ChatService
-        cs = ChatService.__new__(ChatService)
-        cs.search_service = FakeSearchService()
+        from app.services.retrieval_orchestrator import RetrievalOrchestrator
+        ro = RetrievalOrchestrator.__new__(RetrievalOrchestrator)
+        ro.search_service = FakeSearchService()
 
         # Same text should be duplicate
-        assert cs._is_duplicate_query("hello world", ["hello world"]) is True
+        assert ro._is_duplicate_query("hello world", ["hello world"]) is True
 
     def test_non_duplicate_query(self, monkeypatch):
         """_is_duplicate_query returns False for different queries."""
@@ -155,11 +155,11 @@ class TestRetrievalStopping:
 
         FakeSearchService.engine.model.encode = fake_encode
 
-        from app.services.chat_service import ChatService
-        cs = ChatService.__new__(ChatService)
-        cs.search_service = FakeSearchService()
+        from app.services.retrieval_orchestrator import RetrievalOrchestrator
+        ro = RetrievalOrchestrator.__new__(RetrievalOrchestrator)
+        ro.search_service = FakeSearchService()
 
-        assert cs._is_duplicate_query("python tutorial", ["milk bread eggs"]) is False
+        assert ro._is_duplicate_query("python tutorial", ["milk bread eggs"]) is False
 
     def test_cap_if_saturated_with_identical_notes(self, monkeypatch):
         """Identical notes should be capped."""
@@ -173,12 +173,12 @@ class TestRetrievalStopping:
 
         FakeSearchService.engine.model.encode = fake_encode
 
-        from app.services.chat_service import ChatService
-        cs = ChatService.__new__(ChatService)
-        cs.search_service = FakeSearchService()
+        from app.services.retrieval_orchestrator import RetrievalOrchestrator
+        ro = RetrievalOrchestrator.__new__(RetrievalOrchestrator)
+        ro.search_service = FakeSearchService()
 
         notes = [{"title": "Same", "content": "Same content"} for _ in range(10)]
-        result = cs._cap_if_saturated(notes, threshold=0.9, cap=5)
+        result = ro._cap_if_saturated(notes, threshold=0.9, cap=5)
         assert len(result) == 5
 
     def test_cap_if_saturated_diverse_notes_not_capped(self, monkeypatch):
@@ -197,10 +197,11 @@ class TestRetrievalStopping:
 
         FakeSearchService.engine.model.encode = fake_encode
 
-        from app.services.chat_service import ChatService
-        cs = ChatService.__new__(ChatService)
-        cs.search_service = FakeSearchService()
+        from app.services.retrieval_orchestrator import RetrievalOrchestrator
+        ro = RetrievalOrchestrator.__new__(RetrievalOrchestrator)
+        ro.search_service = FakeSearchService()
 
         notes = [{"title": f"Topic {i}", "content": f"Very different content about subject {i * 100}"} for i in range(10)]
-        result = cs._cap_if_saturated(notes, threshold=0.9, cap=5)
+        result = ro._cap_if_saturated(notes, threshold=0.9, cap=5)
         assert len(result) == 10  # Not capped because they're diverse
+

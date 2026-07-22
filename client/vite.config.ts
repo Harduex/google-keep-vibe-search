@@ -24,6 +24,7 @@ export default defineConfig({
             // Suppress ECONNREFUSED during backend startup, log real errors
             const msg = err.message || '';
             if (!msg.includes('ECONNREFUSED') && err.name !== 'AggregateError') {
+              // eslint-disable-next-line no-console
               console.error('[proxy]', msg);
             }
           });

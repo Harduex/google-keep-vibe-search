@@ -213,9 +213,7 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
                 </span>
               </div>
             ) : null}
-            {groundingResult && !isLoading && (
-              <GroundingScore result={groundingResult} />
-            )}
+            {groundingResult && !isLoading && <GroundingScore result={groundingResult} />}
             {suggestions.length > 0 && !isLoading && (
               <div className="suggestion-chips">
                 <span className="suggestions-label">Follow-up:</span>

@@ -75,7 +75,7 @@ export default tseslint.config(
         }
       ],
       'react-hooks/exhaustive-deps': 'error',
-      'react/jsx-no-bind': 'error',
+      'react/jsx-no-bind': ['error', { allowArrowFunctions: true }],
       'prettier/prettier': 'error',
       'react/jsx-uses-react': 'error',
       'react/jsx-uses-vars': 'error'

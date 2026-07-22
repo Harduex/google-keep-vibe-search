@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Any, Dict, List
 
 from app.core.config import settings
+from tqdm import tqdm
 
 
 def get_latest_modification_time(directory: str) -> float:
@@ -33,8 +34,9 @@ def parse_notes() -> List[Dict[str, Any]]:
     """Parse all Google Keep notes from the export directory."""
     json_files = glob.glob(os.path.join(settings.google_keep_path, "*.json"))
     notes = []
+    failed_count = 0
 
-    for file_path in json_files:
+    for file_path in tqdm(json_files, desc="Parsing notes", unit="note"):
         try:
             with open(file_path, "r", encoding="utf-8") as f:
                 note_data = json.load(f)
@@ -65,8 +67,11 @@ def parse_notes() -> List[Dict[str, Any]]:
 
             notes.append(note)
 
-        except Exception as e:
-            print(f"Error parsing {file_path}: {e}")
+        except Exception:
+            failed_count += 1
+
+    if failed_count > 0:
+        print(f"Warning: Failed to parse {failed_count} notes.")
 
     return notes
 
@@ -80,7 +85,7 @@ def compute_notes_hash(directory: str) -> str:
     """
     hash_obj = hashlib.md5()
     json_files = sorted(glob.glob(os.path.join(directory, "*.json")))
-    for file_path in json_files:
+    for file_path in tqdm(json_files, desc="Hashing notes", unit="note", leave=False):
         try:
             with open(file_path, "r", encoding="utf-8") as f:
                 data = json.load(f)

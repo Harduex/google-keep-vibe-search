@@ -12,7 +12,9 @@ from app.prompts.system_prompts import TAG_NAMING_SYSTEM_PROMPT, TAG_NAMING_USER
 from app.services.llm_client import LLMClient
 from app.services.note_service import NoteService
 from app.services.search_service import SearchService
+from app.services.tagging.cluster import cluster_notes, compute_centroids
 from app.services.tagging.preprocess import clean_note
+
 
 
 MAX_TAGS = 40
@@ -590,16 +592,7 @@ class CategorizationService:
                 }
             )
 
-            import hdbscan
-
-            clusterer = hdbscan.HDBSCAN(
-                min_cluster_size=min_cluster_size,
-                min_samples=min_samples,
-                metric="euclidean",
-                cluster_selection_method="eom",
-            )
-            labels = clusterer.fit_predict(reduced)
-            probabilities = clusterer.probabilities_
+            labels, probabilities = cluster_notes(embeddings)
 
             yield self._line(
                 {

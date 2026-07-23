@@ -98,6 +98,7 @@ Skills include architecture, debugging, design, engineering, planning, research,
 - Keep memory entries brief and practical: problem, root cause, solution, lesson.
 
 ## Important Rules
+- **STRICT PRIVACY BOUNDARY**: Under NO circumstances should any agent read, summarize, query, or log the raw source notes (personal notes, cache data, or database contents) either explicitly or implicitly. Do not execute SQL queries on the notes database to read contents. Do not output note contents to files for debugging. Ensure any debugging of the categorization/LLM pipelines strips out the user's personal context locally before it is read into the agent's context.
 - When reporting information to me, be extremely concise. Sacrifice grammar for the sake of concision and clarity.
 - When ambiguity cannot be resolved from the codebase, ask a clarifying question instead of guessing.
 - When context hits 75%, use the compact tool.

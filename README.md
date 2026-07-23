@@ -37,7 +37,7 @@ A semantic search and AI chat assistant for your Google Keep notes export. Searc
 
 **Linux / macOS:**
 ```bash
-bash scripts/setup.sh
+make setup
 ```
 
 **Windows (PowerShell):**
@@ -45,7 +45,7 @@ bash scripts/setup.sh
 .\scripts\setup.ps1
 ```
 
-This creates a Python virtual environment, installs all dependencies, installs frontend packages, and copies `.env.example` → `.env` on first run.
+This creates a Python virtual environment via `uv`, installs all dependencies, installs frontend packages, and copies `.env.example` → `.env` on first run.
 
 ### 3. Edit `.env`
 
@@ -62,7 +62,7 @@ See [Configuration](#configuration) for all options.
 
 **Linux / macOS:**
 ```bash
-bash scripts/dev.sh
+make dev
 ```
 
 **Windows (PowerShell):**
@@ -188,27 +188,37 @@ tests/                  # pytest backend tests
 
 ### Running tests
 
-**Backend:**
+**Unified Command (Linux / macOS):**
 ```bash
-venv/bin/pytest          # Linux/macOS
-venv\Scripts\pytest      # Windows
+make test
 ```
 
-**Frontend:**
+**Backend (manual):**
 ```bash
-cd client
-npm test
+uv run pytest
+```
+
+**Frontend (manual):**
+```bash
+cd client && npm test
 ```
 
 ### Code formatting
 
+**Unified Command (Linux / macOS):**
 ```bash
-# Python
-venv/bin/black app/
-venv/bin/isort app/
+make lint
+```
 
-# TypeScript
-cd client && npm run format
+**Python (manual):**
+```bash
+uv run black app tests
+uv run isort app tests
+```
+
+**TypeScript (manual):**
+```bash
+cd client && npm run fix
 ```
 
 ---

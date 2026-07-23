@@ -11,7 +11,10 @@ const ACTION_CONFIG: Record<string, { icon: string; label: string }> = {
   search_notes: { icon: 'search', label: 'Searching notes' },
   search_chunks: { icon: 'find_in_page', label: 'Searching chunks' },
   filter_by_tag: { icon: 'label', label: 'Filtering by tag' },
-  evaluate_coverage: { icon: 'checklist', label: 'Evaluating coverage' },
+  error: {
+    icon: 'warning',
+    label: 'Search assistant hit a snag — answering from notes found so far',
+  },
   respond: { icon: 'check_circle', label: 'Context gathering complete' },
 };
 

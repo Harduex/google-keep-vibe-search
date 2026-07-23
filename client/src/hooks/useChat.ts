@@ -107,6 +107,7 @@ export const useChat = () => {
   const abortControllerRef = useRef<AbortController | null>(null);
   const streamingContentRef = useRef<string>('');
   const rafIdRef = useRef<number | null>(null);
+  const lastSeqRef = useRef<number | null>(null);
 
   // Fetch the model name on mount
   useEffect(() => {
@@ -265,6 +266,7 @@ export const useChat = () => {
       setSuggestions([]);
       setAgentSteps([]);
       setGroundingResult(null);
+      lastSeqRef.current = null;
 
       // Create a placeholder for the assistant's response
       const assistantMessageId = Date.now() + 1;
@@ -350,7 +352,17 @@ export const useChat = () => {
             }
 
             try {
-              const data: StreamMessage = JSON.parse(trimmed);
+              const data: StreamMessage & { seq?: number } = JSON.parse(trimmed);
+
+              if (typeof data.seq === 'number') {
+                if (lastSeqRef.current !== null && data.seq !== lastSeqRef.current + 1) {
+                  // eslint-disable-next-line no-console
+                  console.warn(
+                    `Stream sequence gap detected: expected ${lastSeqRef.current + 1}, got ${data.seq}`,
+                  );
+                }
+                lastSeqRef.current = data.seq;
+              }
 
               switch (data.type) {
                 case 'context':

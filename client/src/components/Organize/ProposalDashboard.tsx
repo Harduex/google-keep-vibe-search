@@ -38,7 +38,7 @@ export const ProposalDashboard = memo(
     const pending = proposals.filter((p) => p.action === 'pending').length;
     const totalNotes = proposals.reduce((sum, p) => {
       if (p.action !== 'reject') {
-        return sum + p.proposal.note_count;
+        return sum + (p.proposal.note_count ?? 0);
       }
       return sum;
     }, 0);
@@ -101,7 +101,7 @@ export const ProposalDashboard = memo(
         <div className="proposals-list">
           {proposals.map((state, index) => (
             <ProposalCard
-              key={`${state.proposal.tag_name}-${index}`}
+              key={`${state.proposal.tag_name ?? state.proposal.action ?? state.proposal.type}-${index}`}
               state={state}
               index={index}
               allProposals={proposals}

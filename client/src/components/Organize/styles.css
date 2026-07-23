@@ -381,6 +381,21 @@
   border-left: 4px solid #ab47bc;
 }
 
+.proposal-card.info-card {
+  border-left: 4px solid #9aa0a6;
+  background: rgba(154, 160, 166, 0.08);
+}
+
+.info-icon {
+  font-size: 20px;
+  color: #9aa0a6;
+}
+
+.info-message {
+  font-size: 0.9rem;
+  color: #5f6368;
+}
+
 .proposal-header {
   display: flex;
   justify-content: space-between;

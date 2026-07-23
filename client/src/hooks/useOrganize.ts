@@ -7,7 +7,49 @@ import {
   ProposalState,
   Granularity,
   CategorizationProgress,
+  isInfoProposal,
+  isMergeProposal,
+  isAssignProposal,
 } from '@/types';
+
+export interface ApplyActionPayload {
+  action: string;
+  tag_name?: string;
+  note_ids?: string[];
+  new_name?: string;
+  source_tag?: string;
+  target_tag?: string;
+  note_id?: string;
+  tag?: string;
+}
+
+/** Build the /apply payload for one staged proposal, or null if not actionable. */
+export const buildApplyAction = (state: ProposalState): ApplyActionPayload | null => {
+  const { proposal, action, newName } = state;
+  if (action === 'pending' || action === 'reject' || isInfoProposal(proposal)) {
+    return null;
+  }
+
+  if (isMergeProposal(proposal)) {
+    return {
+      action: 'merge_tags',
+      source_tag: proposal.source_tag,
+      target_tag: proposal.target_tag,
+    };
+  }
+
+  if (isAssignProposal(proposal)) {
+    return { action: 'assign_tag', note_id: proposal.note_id, tag: proposal.tag };
+  }
+
+  // Classic cluster tag proposal.
+  return {
+    action: action === 'rename' ? 'rename' : action === 'merge' ? 'merge' : 'approve',
+    tag_name: proposal.tag_name,
+    note_ids: proposal.note_ids,
+    new_name: action === 'rename' ? newName : undefined,
+  };
+};
 
 interface StreamProgressMessage {
   type: 'progress';
@@ -196,7 +238,11 @@ export const useOrganize = () => {
 
   const approveAll = useCallback(() => {
     setProposals((prev) =>
-      prev.map((p) => (p.action === 'pending' ? { ...p, action: 'approve' as ProposalAction } : p)),
+      prev.map((p) =>
+        p.action === 'pending' && !isInfoProposal(p.proposal)
+          ? { ...p, action: 'approve' as ProposalAction }
+          : p,
+      ),
     );
   }, []);
 
@@ -205,9 +251,11 @@ export const useOrganize = () => {
   }, []);
 
   const applyProposals = useCallback(async () => {
-    const actionable = proposals.filter((p) => p.action !== 'pending' && p.action !== 'reject');
+    const actions = proposals
+      .map(buildApplyAction)
+      .filter((a): a is ApplyActionPayload => a !== null);
 
-    if (actionable.length === 0) {
+    if (actions.length === 0) {
       return;
     }
 
@@ -215,13 +263,6 @@ export const useOrganize = () => {
     setError(null);
 
     try {
-      const actions = actionable.map((p) => ({
-        action: p.action === 'rename' ? 'rename' : p.action === 'merge' ? 'merge' : 'approve',
-        tag_name: p.proposal.tag_name,
-        note_ids: p.proposal.note_ids,
-        new_name: p.action === 'rename' ? p.newName : undefined,
-      }));
-
       const response = await fetch(API_ROUTES.ORGANIZE_APPLY, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -246,7 +287,7 @@ export const useOrganize = () => {
   }, [proposals]);
 
   const actionablCount = proposals.filter(
-    (p) => p.action !== 'pending' && p.action !== 'reject',
+    (p) => p.action !== 'pending' && p.action !== 'reject' && !isInfoProposal(p.proposal),
   ).length;
 
   const hasProposals = proposals.length > 0;

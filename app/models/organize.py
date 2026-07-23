@@ -9,9 +9,16 @@ class CategorizeRequest(BaseModel):
 
 class ApplyAction(BaseModel):
     action: str
-    tag_name: str
-    note_ids: List[str]
+    # Classic tag-proposal actions (approve / rename / merge).
+    tag_name: Optional[str] = None
+    note_ids: List[str] = []
     new_name: Optional[str] = None
+    # Gray-zone merge proposal (action == "merge_tags").
+    source_tag: Optional[str] = None
+    target_tag: Optional[str] = None
+    # Review-queue assignment (action == "assign_tag").
+    note_id: Optional[str] = None
+    tag: Optional[str] = None
 
 
 class ApplyProposalsRequest(BaseModel):

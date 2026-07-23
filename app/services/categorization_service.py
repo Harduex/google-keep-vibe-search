@@ -13,9 +13,12 @@ from app.services.llm_client import LLMClient
 from app.services.note_service import NoteService
 from app.services.search_service import SearchService
 from app.services.tagging.cluster import cluster_notes, compute_centroids
+from app.services.tagging.dashboard_stream import (
+    auto_merge_info,
+    gray_zone_merge_proposals,
+    review_assignment_proposals,
+)
 from app.services.tagging.preprocess import clean_note
-
-
 
 MAX_TAGS = 40
 PREFIX_MIN_COUNT = 5
@@ -94,6 +97,27 @@ class CategorizationService:
         return text
 
     @staticmethod
+    def _merge_pairs(merge_map: Dict[str, Any]) -> List[Tuple[str, str]]:
+        """Flatten a merge map into (source_tag, target_tag) pairs for info cards."""
+        pairs: List[Tuple[str, str]] = []
+        if not merge_map or not isinstance(merge_map, dict):
+            return pairs
+        for merge in merge_map.get("merges", []) or []:
+            if not isinstance(merge, dict):
+                continue
+            into_raw = merge.get("into")
+            from_list = merge.get("from", [])
+            if not into_raw or not isinstance(from_list, list):
+                continue
+            into = CategorizationService._sanitize_tag_name(into_raw)
+            if not into:
+                continue
+            for src in from_list:
+                if src and src != into:
+                    pairs.append((src, into))
+        return pairs
+
+    @staticmethod
     def _apply_merge_map(vocab: LabelVocabulary, merge_map: Dict[str, Any]) -> None:
         if not merge_map or not isinstance(merge_map, dict):
             return
@@ -170,7 +194,9 @@ class CategorizationService:
             result = []
             for cluster_notes in clusters:
                 all_text = " ".join(
-                    n.get("cleaned_text") or clean_note(f"{n.get('title', '')} {n.get('content', '')}") for n in cluster_notes
+                    n.get("cleaned_text")
+                    or clean_note(f"{n.get('title', '')} {n.get('content', '')}")
+                    for n in cluster_notes
                 )
                 words = re.findall(r"\b[a-zA-Zа-яА-Я]{3,}\b", all_text.lower())
                 try:
@@ -292,7 +318,8 @@ class CategorizationService:
         documents = []
         for cluster_notes in clusters:
             doc_text = " ".join(
-                n.get("cleaned_text") or clean_note(f"{n.get('title', '')} {n.get('content', '')}") for n in cluster_notes
+                n.get("cleaned_text") or clean_note(f"{n.get('title', '')} {n.get('content', '')}")
+                for n in cluster_notes
             )
             documents.append(doc_text)
 
@@ -734,6 +761,10 @@ class CategorizationService:
             queue = asyncio.Queue()
 
             async def _name_labels_async():
+                # (source_tag, target_tag) for every merge auto-applied during
+                # consolidation; surfaced as informational dashboard cards.
+                applied_merges: List[Tuple[str, str]] = []
+                review_items: List[Dict[str, Any]] = []
                 try:
                     total_llm = len(llm_tasks)
                     for i, (lbl, n_text, kw_str, neighbor_kw) in enumerate(llm_tasks):
@@ -832,6 +863,7 @@ class CategorizationService:
                             auto_merges["merges"].append({"into": r, "from": children})
 
                         if auto_merges["merges"]:
+                            applied_merges.extend(self._merge_pairs(auto_merges))
                             self._apply_merge_map(vocab, auto_merges)
 
                         remaining_labels = [
@@ -932,6 +964,7 @@ class CategorizationService:
                                     raw_stripped = "\n".join(lines[1:-1]).strip()
 
                             merge_map = json.loads(raw_stripped)
+                            applied_merges.extend(self._merge_pairs(merge_map))
                             self._apply_merge_map(vocab, merge_map)
 
                             # Fallback aggressive merge if still over max_tags
@@ -957,14 +990,11 @@ class CategorizationService:
                                                 remaining_labels[j].name,
                                             )
                                 if best_pair:
-                                    self._apply_merge_map(
-                                        vocab,
-                                        {
-                                            "merges": [
-                                                {"into": best_pair[0], "from": [best_pair[1]]}
-                                            ]
-                                        },
-                                    )
+                                    fallback_map = {
+                                        "merges": [{"into": best_pair[0], "from": [best_pair[1]]}]
+                                    }
+                                    applied_merges.extend(self._merge_pairs(fallback_map))
+                                    self._apply_merge_map(vocab, fallback_map)
                                     remaining_labels = [
                                         lbl for lbl in vocab.labels if lbl.name != "Uncategorized"
                                     ]
@@ -997,7 +1027,9 @@ class CategorizationService:
                     )
                     # Rebuild prototypes for the consolidated tags before assignment
                     self._build_prototype_vectors(vocab, embeddings, notes, note_indices)
-                    self._assign_labels_via_embeddings(vocab, embeddings, notes, note_indices)
+                    review_items = self._assign_labels_via_embeddings(
+                        vocab, embeddings, notes, note_indices
+                    )
 
                     await queue.put(
                         self._line(
@@ -1010,9 +1042,25 @@ class CategorizationService:
                         )
                     )
 
-                    await queue.put(
-                        self._line({"type": "label_updates", "proposals": vocab.to_proposals()})
-                    )
+                    # Layer dashboard proposals (B6 gray-zone merges, B7 review
+                    # queue) on top of the classic tag proposals. Additive and
+                    # guarded: any failure just means no extra proposals.
+                    extra_proposals: List[Dict[str, Any]] = []
+                    try:
+                        extra_proposals.extend(auto_merge_info(applied_merges))
+                        final_labels = [
+                            (lbl.name, len(lbl.seed_note_ids), lbl.prototype_vector)
+                            for lbl in vocab.labels
+                            if lbl.name not in ("Uncategorized", "All Notes")
+                        ]
+                        extra_proposals.extend(gray_zone_merge_proposals(final_labels))
+                        extra_proposals.extend(review_assignment_proposals(review_items))
+                    except Exception as e:
+                        print(f"Dashboard proposal formatting failed: {e}")
+                        extra_proposals = []
+
+                    proposals = vocab.to_proposals() + extra_proposals
+                    await queue.put(self._line({"type": "label_updates", "proposals": proposals}))
                     await queue.put(self._line({"type": "done"}))
                 except Exception as e:
                     import traceback
@@ -1077,10 +1125,10 @@ class CategorizationService:
         embeddings: np.ndarray,
         notes: List[Dict[str, Any]],
         note_indices: List[int],
-    ) -> None:
+    ) -> List[Dict[str, Any]]:
         valid_labels = [lbl for lbl in vocab.labels if lbl.prototype_vector is not None]
         if not valid_labels:
-            return
+            return []
 
         proto_matrix = np.array([lbl.prototype_vector for lbl in valid_labels])
 
@@ -1114,6 +1162,7 @@ class CategorizationService:
 
         new_assignments = {lbl.name: set() for lbl in valid_labels}
         uncategorized_ids = set()
+        review_items: List[Dict[str, Any]] = []
 
         catch_all_threshold = CATCH_ALL_THRESHOLD
 
@@ -1129,8 +1178,19 @@ class CategorizationService:
 
             if not assigned:
                 best_j = int(np.argmax(sims))
-                if sims[best_j] >= catch_all_threshold:
-                    new_assignments[valid_labels[best_j].name].add(nid)
+                best_score = float(sims[best_j])
+                if best_score >= catch_all_threshold:
+                    # Low-confidence match: queue for dashboard review instead of
+                    # auto-applying (B7). Handled here so it is neither auto-tagged
+                    # nor dropped into Uncategorized.
+                    review_items.append(
+                        {
+                            "note_id": nid,
+                            "tag": valid_labels[best_j].name,
+                            "confidence": best_score,
+                            "title": notes[idx].get("title", ""),
+                        }
+                    )
                     assigned = True
 
             if not assigned:
@@ -1177,6 +1237,8 @@ class CategorizationService:
         vocab.labels = [
             lbl for lbl in vocab.labels if lbl.seed_note_ids or lbl.name == "Uncategorized"
         ]
+
+        return review_items
 
     def _deduplicate_name(self, name: str, seen: Dict[str, int]) -> str:
         if name not in seen:

@@ -80,13 +80,50 @@ export interface ChatSessionSummary {
   updated_at: string;
 }
 
-export interface TagProposal {
-  tag_name: string;
-  note_ids: string[];
-  note_count: number;
-  sample_notes: { id: string; title: string; content: string }[];
-  confidence: number;
+export interface NoteSample {
+  id: string;
+  title: string;
+  content: string;
 }
+
+/**
+ * A dashboard proposal. The categorize stream emits four shapes over one list:
+ * - classic cluster tag (no `type`): tag_name/note_ids/note_count/sample_notes/confidence
+ * - `type: "info"`: read-only auto-merge notice (message only)
+ * - `type: "proposal", action: "merge_tags"`: gray-zone merge (source_tag/target_tag)
+ * - `type: "proposal", action: "assign_tag"`: review-queue assignment (note_id/tag)
+ */
+export interface TagProposal {
+  type?: 'proposal' | 'info';
+  action?: 'merge_tags' | 'assign_tag';
+  // Classic cluster tag proposal.
+  tag_name?: string;
+  note_ids?: string[];
+  note_count?: number;
+  sample_notes?: NoteSample[];
+  confidence?: number;
+  // Gray-zone merge proposal.
+  source_tag?: string;
+  target_tag?: string;
+  // Review-queue assignment proposal.
+  note_id?: string;
+  tag?: string;
+  note_title?: string;
+  // Message shared by info + actionable proposals.
+  message?: string;
+}
+
+export const isInfoProposal = (p: TagProposal): boolean => p.type === 'info';
+
+export const isMergeProposal = (p: TagProposal): boolean =>
+  p.type === 'proposal' && p.action === 'merge_tags';
+
+export const isAssignProposal = (p: TagProposal): boolean =>
+  p.type === 'proposal' && p.action === 'assign_tag';
+
+/** Classic cluster tag proposal (the original approve/rename/merge card). */
+export const isClassicProposal = (p: TagProposal): boolean =>
+  !p.type && !p.action && p.tag_name !== undefined;
 
 export type ProposalAction = 'approve' | 'reject' | 'rename' | 'merge' | 'pending';
 

@@ -1,6 +1,6 @@
 import { memo, useState, useCallback } from 'react';
 
-import { ProposalState } from '@/types';
+import { ProposalState, isInfoProposal, isMergeProposal, isAssignProposal } from '@/types';
 
 interface ProposalCardProps {
   state: ProposalState;
@@ -12,19 +12,53 @@ interface ProposalCardProps {
   onMerge: (sourceIndex: number, targetIndex: number) => void;
 }
 
+/** Approve / reject controls shared by the gray-zone merge and review cards. */
+const ApproveRejectActions = memo(
+  ({
+    index,
+    action,
+    onApprove,
+    onReject,
+  }: {
+    index: number;
+    action: ProposalState['action'];
+    onApprove: (index: number) => void;
+    onReject: (index: number) => void;
+  }) => (
+    <div className="proposal-actions">
+      <button
+        className={`proposal-action-btn approve ${action === 'approve' ? 'active' : ''}`}
+        onClick={() => onApprove(index)}
+        title="Approve"
+      >
+        <span className="material-icons">check</span>
+      </button>
+      <button
+        className={`proposal-action-btn reject ${action === 'reject' ? 'active' : ''}`}
+        onClick={() => onReject(index)}
+        title="Reject"
+      >
+        <span className="material-icons">close</span>
+      </button>
+    </div>
+  ),
+);
+
 export const ProposalCard = memo(
   ({ state, index, allProposals, onApprove, onReject, onRename, onMerge }: ProposalCardProps) => {
     const [isExpanded, setIsExpanded] = useState(false);
     const [isRenaming, setIsRenaming] = useState(false);
-    const [renameValue, setRenameValue] = useState(state.proposal.tag_name);
+    const [renameValue, setRenameValue] = useState(state.proposal.tag_name ?? '');
     const [isMerging, setIsMerging] = useState(false);
 
+    const proposal = state.proposal;
+
     const handleRenameSubmit = useCallback(() => {
-      if (renameValue.trim() && renameValue !== state.proposal.tag_name) {
+      if (renameValue.trim() && renameValue !== proposal.tag_name) {
         onRename(index, renameValue.trim());
       }
       setIsRenaming(false);
-    }, [renameValue, state.proposal.tag_name, index, onRename]);
+    }, [renameValue, proposal.tag_name, index, onRename]);
 
     const handleMergeSelect = useCallback(
       (targetIndex: number) => {
@@ -34,12 +68,9 @@ export const ProposalCard = memo(
       [index, onMerge],
     );
 
+    const confidence = proposal.confidence ?? 1;
     const confidenceColor =
-      state.proposal.confidence >= 0.7
-        ? '#0f9d58'
-        : state.proposal.confidence >= 0.4
-          ? '#f9ab00'
-          : '#ea4335';
+      confidence >= 0.7 ? '#0f9d58' : confidence >= 0.4 ? '#f9ab00' : '#ea4335';
 
     const actionClass =
       state.action === 'approve'
@@ -51,6 +82,93 @@ export const ProposalCard = memo(
             : state.action === 'merge'
               ? 'merged'
               : '';
+
+    // Read-only auto-merge notice — no buttons.
+    if (isInfoProposal(proposal)) {
+      return (
+        <div className="proposal-card info-card">
+          <div className="proposal-header">
+            <div className="proposal-tag-info">
+              <span className="material-icons info-icon">info</span>
+              <span className="info-message">
+                {proposal.message ||
+                  `Auto-merged '${proposal.source_tag}' into '${proposal.target_tag}'`}
+              </span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Gray-zone merge: "Merge X into Y?" with approve/reject only.
+    if (isMergeProposal(proposal)) {
+      return (
+        <div className={`proposal-card ${actionClass}`}>
+          <div className="proposal-header">
+            <div className="proposal-tag-info">
+              <div className="proposal-tag-name">
+                <span className="material-icons">merge_type</span>
+                <span className="tag-name-text">
+                  Merge &lsquo;{proposal.source_tag}&rsquo; into &lsquo;{proposal.target_tag}
+                  &rsquo;?
+                </span>
+              </div>
+            </div>
+            <div className="proposal-meta">
+              {proposal.note_count != null && (
+                <span className="proposal-count">
+                  <span className="material-icons">description</span>
+                  {proposal.note_count}
+                </span>
+              )}
+              <span className="proposal-confidence" style={{ color: confidenceColor }}>
+                {Math.round(confidence * 100)}%
+              </span>
+            </div>
+          </div>
+          <ApproveRejectActions
+            index={index}
+            action={state.action}
+            onApprove={onApprove}
+            onReject={onReject}
+          />
+        </div>
+      );
+    }
+
+    // Review queue: low-confidence note-to-tag assignment with approve/reject.
+    if (isAssignProposal(proposal)) {
+      return (
+        <div className={`proposal-card ${actionClass}`}>
+          <div className="proposal-header">
+            <div className="proposal-tag-info">
+              <div className="proposal-tag-name">
+                <span className="material-icons">label</span>
+                <span className="tag-name-text">
+                  Note &ldquo;{proposal.note_title || 'Untitled'}&rdquo;: suggest #{proposal.tag}
+                </span>
+              </div>
+            </div>
+            <div className="proposal-meta">
+              <span className="proposal-confidence" style={{ color: confidenceColor }}>
+                {Math.round(confidence * 100)}%
+              </span>
+            </div>
+          </div>
+          <ApproveRejectActions
+            index={index}
+            action={state.action}
+            onApprove={onApprove}
+            onReject={onReject}
+          />
+        </div>
+      );
+    }
+
+    // Classic cluster tag proposal — full approve / rename / merge / reject.
+    const mergeTargets = allProposals.filter(
+      (p, i) => i !== index && p.proposal.tag_name !== undefined,
+    );
 
     return (
       <div className={`proposal-card ${actionClass}`}>
@@ -84,12 +202,10 @@ export const ProposalCard = memo(
               <div className="proposal-tag-name">
                 <span className="material-icons">label</span>
                 <span className="tag-name-text">
-                  {state.action === 'rename' && state.newName
-                    ? `${state.newName}`
-                    : state.proposal.tag_name}
+                  {state.action === 'rename' && state.newName ? state.newName : proposal.tag_name}
                 </span>
                 {state.action === 'rename' && state.newName && (
-                  <span className="original-name">(was: {state.proposal.tag_name})</span>
+                  <span className="original-name">(was: {proposal.tag_name})</span>
                 )}
                 {state.action === 'merge' && state.mergeTarget && (
                   <span className="merge-info">
@@ -104,10 +220,10 @@ export const ProposalCard = memo(
           <div className="proposal-meta">
             <span className="proposal-count">
               <span className="material-icons">description</span>
-              {state.proposal.note_count}
+              {proposal.note_count ?? 0}
             </span>
             <span className="proposal-confidence" style={{ color: confidenceColor }}>
-              {Math.round(state.proposal.confidence * 100)}%
+              {Math.round(confidence * 100)}%
             </span>
           </div>
         </div>
@@ -123,7 +239,7 @@ export const ProposalCard = memo(
           <button
             className="proposal-action-btn rename"
             onClick={() => {
-              setRenameValue(state.proposal.tag_name);
+              setRenameValue(proposal.tag_name ?? '');
               setIsRenaming(true);
             }}
             title="Rename"
@@ -149,20 +265,18 @@ export const ProposalCard = memo(
         {isMerging && (
           <div className="merge-selector">
             <span className="merge-label">Merge into:</span>
-            {allProposals
-              .filter((_, i) => i !== index)
-              .map((p) => {
-                const originalIndex = allProposals.findIndex((ap) => ap === p);
-                return (
-                  <button
-                    key={originalIndex}
-                    className="merge-target-btn"
-                    onClick={() => handleMergeSelect(originalIndex)}
-                  >
-                    {p.proposal.tag_name}
-                  </button>
-                );
-              })}
+            {mergeTargets.map((p) => {
+              const originalIndex = allProposals.findIndex((ap) => ap === p);
+              return (
+                <button
+                  key={originalIndex}
+                  className="merge-target-btn"
+                  onClick={() => handleMergeSelect(originalIndex)}
+                >
+                  {p.proposal.tag_name}
+                </button>
+              );
+            })}
           </div>
         )}
 
@@ -173,7 +287,7 @@ export const ProposalCard = memo(
 
         {isExpanded && (
           <div className="proposal-preview-notes">
-            {state.proposal.sample_notes.map((note) => (
+            {(proposal.sample_notes ?? []).map((note) => (
               <div key={note.id} className="preview-note">
                 {note.title && <div className="preview-note-title">{note.title}</div>}
                 <div className="preview-note-content">{note.content}</div>

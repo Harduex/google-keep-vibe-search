@@ -90,93 +90,87 @@ class ChatService:
         topic: Optional[str] = None,
         session_id: Optional[str] = None,
     ) -> AsyncGenerator[bytes, None]:
-        """Agentic retrieval: agent iteratively searches, then generates response."""
-        # Extract latest user query
+        """Agentic retrieval: PydanticAI agent iteratively searches, then generates response."""
+        import json
+        from app.services.agent.pydantic_agent import gather_context_pydantic_agent
+
         query = ""
         for msg in reversed(messages):
             if msg.get("role") == "user":
                 query = msg["content"]
                 break
 
-        # Build conversation context for the agent
-        conversation_context = None
-        if topic:
-            conversation_context = f"Topic: {topic}"
+        seq = 0
 
-        # Phase 1: Agent gathers context with live step streaming
-        yield self.protocol.phase("searching", "Agent searching your notes...")
+        def emit(chunk_bytes: bytes) -> bytes:
+            nonlocal seq
+            data = json.loads(chunk_bytes.decode())
+            data["seq"] = seq
+            seq += 1
+            return json.dumps(data).encode() + b"\n"
+
+        yield emit(self.protocol.phase("searching", "Agent searching your notes..."))
         relevant_notes = []
         gap_status = "sufficient"
 
-        async for item in self.agent.gather_context(query, conversation_context):
+        async for item in gather_context_pydantic_agent(query, self.retrieval.search_service):
             if isinstance(item, AgentStep):
-                yield self.protocol.agent_step(
-                    step_number=item.step_number,
-                    action=item.action,
-                    params=item.params,
-                    result_summary=item.result_summary,
-                    notes_found=item.notes_found,
-                    reasoning=item.reasoning,
+                yield emit(
+                    self.protocol.agent_step(
+                        step_number=item.step_number,
+                        action=item.action,
+                        params=item.params,
+                        result_summary=item.result_summary,
+                        notes_found=item.notes_found,
+                        reasoning=item.reasoning,
+                    )
                 )
             elif isinstance(item, AgentResult):
                 relevant_notes = item.notes
                 gap_status = item.gap_status
 
-        # Rebuild full notes from agent's truncated results
-        note_map = {n.get("id"): n for n in self.agent.tools.note_service.notes}
-        full_notes = []
-        for n in relevant_notes:
-            nid = n.get("id", "")
-            if nid in note_map:
-                full_notes.append(note_map[nid])
-            else:
-                full_notes.append(n)
-        relevant_notes = full_notes
-
-        # Common path: conflict detection → context → prompt → LLM → citations
         conflicts = self._detect_conflicts(relevant_notes)
-        yield self.protocol.context(relevant_notes, conflicts, session_id or "")
+        yield emit(self.protocol.context(relevant_notes, conflicts, session_id or ""))
 
         windowed = await self.conversation_mgr.maybe_summarize(messages)
         prepared = self.context_builder.build_messages(
             windowed, relevant_notes, conflicts, gap_status
         )
 
-        yield self.protocol.phase("generating")
+        yield emit(self.protocol.phase("generating"))
         try:
             full_response = ""
             async for delta in self.llm.stream(prepared):
                 full_response += delta
-                yield self.protocol.delta(delta)
+                yield emit(self.protocol.delta(delta))
 
             citations = extract_citations(full_response, relevant_notes)
-            yield self.protocol.done(full_response, citations)
+            yield emit(self.protocol.done(full_response, citations))
 
             suggestions = await self._generate_suggestions(full_response, relevant_notes)
             if suggestions:
-                yield self.protocol.suggestions(suggestions)
+                yield emit(self.protocol.suggestions(suggestions))
 
             if self.verification_service and citations:
                 try:
                     verification_results = self.verification_service.verify_citations(
                         full_response, citations, relevant_notes
                     )
-                    yield self.protocol.verification(verification_results)
+                    yield emit(self.protocol.verification(verification_results))
                 except Exception as e:
                     print(f"[verification] Error: {e}")
 
-            # Grounding score
             if self.grounding_service and relevant_notes:
                 try:
                     grounding_result = self.grounding_service.score_response(
                         full_response, relevant_notes
                     )
-                    yield self.protocol.grounding(grounding_result)
+                    yield emit(self.protocol.grounding(grounding_result))
                 except Exception as e:
                     print(f"[grounding] Error: {e}")
 
         except Exception as e:
-            yield self.protocol.error(str(e))
+            yield emit(self.protocol.error(str(e)))
 
     async def _stream_legacy(
         self,

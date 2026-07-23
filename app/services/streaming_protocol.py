@@ -5,17 +5,18 @@ from typing import Any, Dict, List, Optional
 class StreamingProtocol:
     """Encodes all NDJSON message types for the chat streaming protocol."""
 
-    def phase(self, name: str, detail: str = "") -> bytes:
+    def phase(self, name: str, detail: str = "", seq: Optional[int] = None) -> bytes:
         msg: Dict[str, Any] = {"type": "phase", "phase": name}
         if detail:
             msg["detail"] = detail
-        return self._encode(msg)
+        return self._encode(msg, seq=seq)
 
     def context(
         self,
         notes: List[Dict[str, Any]],
         conflicts: List[Dict[str, Any]],
         session_id: str = "",
+        seq: Optional[int] = None,
     ) -> bytes:
         return self._encode(
             {
@@ -23,26 +24,29 @@ class StreamingProtocol:
                 "notes": notes,
                 "conflicts": conflicts,
                 "session_id": session_id,
-            }
+            },
+            seq=seq,
         )
 
-    def delta(self, content: str) -> bytes:
-        return self._encode({"type": "delta", "content": content})
+    def delta(self, content: str, seq: Optional[int] = None) -> bytes:
+        return self._encode({"type": "delta", "content": content}, seq=seq)
 
     def done(
         self,
         full_response: str,
         citations: List[Dict[str, Any]],
+        seq: Optional[int] = None,
     ) -> bytes:
         return self._encode(
-            {"type": "done", "citations": citations, "full_response": full_response}
+            {"type": "done", "citations": citations, "full_response": full_response},
+            seq=seq,
         )
 
-    def suggestions(self, questions: List[str]) -> bytes:
-        return self._encode({"type": "suggestions", "questions": questions})
+    def suggestions(self, questions: List[str], seq: Optional[int] = None) -> bytes:
+        return self._encode({"type": "suggestions", "questions": questions}, seq=seq)
 
-    def verification(self, citations: List[Dict[str, Any]]) -> bytes:
-        return self._encode({"type": "verification", "citations": citations})
+    def verification(self, citations: List[Dict[str, Any]], seq: Optional[int] = None) -> bytes:
+        return self._encode({"type": "verification", "citations": citations}, seq=seq)
 
     def agent_step(
         self,
@@ -52,6 +56,7 @@ class StreamingProtocol:
         result_summary: str,
         notes_found: int,
         reasoning: str = "",
+        seq: Optional[int] = None,
     ) -> bytes:
         return self._encode(
             {
@@ -62,15 +67,18 @@ class StreamingProtocol:
                 "result_summary": result_summary,
                 "notes_found": notes_found,
                 "reasoning": reasoning,
-            }
+            },
+            seq=seq,
         )
 
-    def grounding(self, grounding_result: Dict[str, Any]) -> bytes:
-        return self._encode({"type": "grounding", **grounding_result})
+    def grounding(self, grounding_result: Dict[str, Any], seq: Optional[int] = None) -> bytes:
+        return self._encode({"type": "grounding", **grounding_result}, seq=seq)
 
-    def error(self, message: str) -> bytes:
-        return self._encode({"type": "error", "error": message})
+    def error(self, message: str, seq: Optional[int] = None) -> bytes:
+        return self._encode({"type": "error", "error": message}, seq=seq)
 
     @staticmethod
-    def _encode(data: Dict[str, Any]) -> bytes:
+    def _encode(data: Dict[str, Any], seq: Optional[int] = None) -> bytes:
+        if seq is not None:
+            data["seq"] = seq
         return json.dumps(data).encode() + b"\n"

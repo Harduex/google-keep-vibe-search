@@ -8,6 +8,8 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 
 from app.core.config import settings
+from app.services.tagging.preprocess import clean_note
+
 
 
 class NoteChunk:
@@ -67,7 +69,7 @@ class ChunkingService:
             self._note_id_to_note[note_id] = note
             title = note.get("title", "")
             content = note.get("content", "")
-            full_text = f"{title} {content}".strip()
+            full_text = note.get("cleaned_text") or clean_note(f"{title} {content}".strip())
 
             if not full_text:
                 continue

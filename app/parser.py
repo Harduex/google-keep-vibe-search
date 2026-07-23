@@ -9,6 +9,7 @@ from typing import Any, Dict, List
 from tqdm import tqdm
 
 from app.core.config import settings
+from app.services.tagging.preprocess import clean_note
 
 
 def get_latest_modification_time(directory: str) -> float:
@@ -46,11 +47,18 @@ def parse_notes() -> List[Dict[str, Any]]:
             if note_data.get("isTrashed", False):
                 continue
 
+            title = note_data.get("title", "")
+            content = note_data.get("textContent", "")
+            raw_text = f"{title} {content}".strip()
+            cleaned_text = clean_note(raw_text)
+
             # Create a clean note object
             note = {
                 "id": os.path.basename(file_path),
-                "title": note_data.get("title", ""),
-                "content": note_data.get("textContent", ""),
+                "title": title,
+                "content": content,
+                "raw_text": raw_text,
+                "cleaned_text": cleaned_text,
                 "created": parse_timestamp(note_data.get("createdTimestampUsec", 0)),
                 "edited": parse_timestamp(note_data.get("userEditedTimestampUsec", 0)),
                 "archived": note_data.get("isArchived", False),

@@ -13,6 +13,8 @@ from sklearn.cluster import KMeans
 from sklearn.metrics.pairwise import cosine_similarity
 
 from app.core.config import settings
+from app.services.tagging.preprocess import clean_note
+
 
 DEFAULT_NUM_CLUSTERS = 20
 
@@ -53,10 +55,12 @@ class VibeSearch:
                 pattern = r"^\s*" + re.escape(prefix) + r"\s*[:\-—]\s+"
                 title = re.sub(pattern, "", title, flags=re.IGNORECASE)
 
-            # Combine title and content for embedding
-            text = f"{title} {note.get('content', '')}"
-            if text.strip():  # Only add non-empty notes
-                self.texts.append(text)
+            # Combine title and content for embedding, using cleaned_text
+            cleaned = note.get("cleaned_text")
+            if not cleaned:
+                cleaned = clean_note(f"{title} {note.get('content', '')}")
+            if cleaned.strip():  # Only add non-empty notes
+                self.texts.append(cleaned)
                 self.note_indices.append(i)
 
         # Try to load embeddings from cache or compute new ones
@@ -453,8 +457,8 @@ class VibeSearch:
         self, notes: List[Dict[str, Any]], num_keywords: int = 5
     ) -> List[str]:
         """Extract representative keywords for a cluster of notes."""
-        # Combine all text from notes in cluster
-        all_text = " ".join([f"{note['title']} {note['content']}" for note in notes])
+        # Combine all text from notes in cluster using cleaned_text
+        all_text = " ".join([note.get("cleaned_text") or clean_note(f"{note.get('title', '')} {note.get('content', '')}") for note in notes])
 
         # Get standard stopwords (English + Bulgarian)
         try:

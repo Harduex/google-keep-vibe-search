@@ -7,6 +7,8 @@ class Note(BaseModel):
     id: str
     title: str = ""
     content: str = ""
+    raw_text: str = ""
+    cleaned_text: str = ""
     created: str = "Unknown date"
     edited: str = "Unknown date"
     archived: bool = False

@@ -12,6 +12,8 @@ from app.prompts.system_prompts import TAG_NAMING_SYSTEM_PROMPT, TAG_NAMING_USER
 from app.services.llm_client import LLMClient
 from app.services.note_service import NoteService
 from app.services.search_service import SearchService
+from app.services.tagging.preprocess import clean_note
+
 
 MAX_TAGS = 40
 PREFIX_MIN_COUNT = 5
@@ -166,7 +168,7 @@ class CategorizationService:
             result = []
             for cluster_notes in clusters:
                 all_text = " ".join(
-                    f"{n.get('title', '')} {n.get('content', '')}" for n in cluster_notes
+                    n.get("cleaned_text") or clean_note(f"{n.get('title', '')} {n.get('content', '')}") for n in cluster_notes
                 )
                 words = re.findall(r"\b[a-zA-Zа-яА-Я]{3,}\b", all_text.lower())
                 try:
@@ -288,7 +290,7 @@ class CategorizationService:
         documents = []
         for cluster_notes in clusters:
             doc_text = " ".join(
-                f"{n.get('title', '')} {n.get('content', '')}" for n in cluster_notes
+                n.get("cleaned_text") or clean_note(f"{n.get('title', '')} {n.get('content', '')}") for n in cluster_notes
             )
             documents.append(doc_text)
 

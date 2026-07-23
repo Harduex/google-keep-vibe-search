@@ -75,50 +75,11 @@ TOOL_SCHEMAS = [
             },
         },
     },
-    {
-        "type": "function",
-        "function": {
-            "name": "evaluate_coverage",
-            "description": (
-                "Check if collected notes sufficiently answer the user's question. "
-                "Call this after gathering notes to decide if more searching is needed."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "The original user question",
-                    },
-                    "collected_summaries": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Summaries of notes collected so far",
-                    },
-                },
-                "required": ["query", "collected_summaries"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "respond",
-            "description": (
-                "Signal that you have gathered enough context and are ready to "
-                "generate the final response. Call this when coverage is sufficient."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {},
-            },
-        },
-    },
 ]
 
 
 class AgentTools:
-    """Wraps existing services as callable tools for the NoteAgent."""
+    """Wraps existing services as callable tools for search actions."""
 
     def __init__(
         self,
@@ -144,12 +105,6 @@ class AgentTools:
             return self._search_chunks(params.get("query", ""), params.get("max_results", 10))
         elif tool_name == "filter_by_tag":
             return self._filter_by_tag(params.get("tag", ""))
-        elif tool_name == "evaluate_coverage":
-            return self._evaluate_coverage(
-                params.get("query", ""), params.get("collected_summaries", [])
-            )
-        elif tool_name == "respond":
-            return {"action": "respond", "message": "Ready to generate response."}
         else:
             return {"error": f"Unknown tool: {tool_name}"}
 
@@ -231,65 +186,6 @@ class AgentTools:
                 )
 
         return {"notes": notes, "count": len(notes)}
-
-    def _evaluate_coverage(self, query: str, collected_summaries: List[str]) -> Dict[str, Any]:
-        """Heuristic coverage evaluation — no LLM call needed."""
-        if not collected_summaries:
-            return {"sufficient": False, "reason": "No notes collected yet.", "coverage": 0.0}
-
-        # Simple heuristic: check keyword overlap between query and collected notes
-        query_words = set(query.lower().split())
-        stop_words = {
-            "the",
-            "a",
-            "an",
-            "is",
-            "are",
-            "was",
-            "were",
-            "do",
-            "does",
-            "did",
-            "i",
-            "my",
-            "me",
-            "we",
-            "our",
-            "what",
-            "which",
-            "how",
-            "have",
-            "has",
-            "about",
-            "that",
-            "this",
-            "with",
-            "for",
-            "from",
-            "to",
-            "in",
-            "on",
-            "of",
-        }
-        query_keywords = query_words - stop_words
-
-        if not query_keywords:
-            return {"sufficient": True, "reason": "Query too generic to evaluate.", "coverage": 1.0}
-
-        combined = " ".join(collected_summaries).lower()
-        hits = sum(1 for kw in query_keywords if kw in combined)
-        coverage = hits / len(query_keywords) if query_keywords else 0
-
-        sufficient = coverage >= 0.5 and len(collected_summaries) >= 2
-
-        reason = (
-            f"Coverage: {coverage:.0%} keyword overlap, {len(collected_summaries)} notes collected."
-        )
-        if not sufficient and coverage < 0.5:
-            missing = [kw for kw in query_keywords if kw not in combined]
-            reason += f" Missing keywords: {', '.join(missing[:5])}"
-
-        return {"sufficient": sufficient, "reason": reason, "coverage": round(coverage, 2)}
 
     def _get_available_tags(self) -> List[str]:
         """Return list of all unique tags in the system."""

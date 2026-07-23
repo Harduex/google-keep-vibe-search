@@ -11,7 +11,7 @@ from app.services.agent.constants import STEP_TIMEOUT_SECONDS, TOOL_RETRIES
 from app.services.agent.coverage import coverage_is_sufficient
 from app.services.agent.decision import SearchDecision
 from app.services.agent.model_factory import build_agent_model
-from app.services.agent.note_agent import AgentResult, AgentStep
+from app.services.agent.models import AgentResult, AgentStep
 from app.services.agent.state import AgentRunState
 from app.services.search_service import SearchService
 

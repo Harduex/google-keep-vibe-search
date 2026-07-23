@@ -114,16 +114,7 @@ async def lifespan(app: FastAPI):
     # Agentic retrieval (feature-flagged)
     agent = None
     if settings.enable_agent_mode:
-        from app.services.agent.note_agent import NoteAgent
-        from app.services.agent.tools import AgentTools
-
-        agent_tools = AgentTools(
-            search_service=search_service,
-            chunking_service=chunking_service,
-            note_service=note_service,
-            reranker=reranker,
-        )
-        agent = NoteAgent(llm=llm, tools=agent_tools, max_steps=settings.agent_max_steps)
+        agent = True
         t = _step("Agent mode enabled", t)
 
     chat_service = ChatService(

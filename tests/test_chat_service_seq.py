@@ -48,7 +48,7 @@ class DummyConversationMgr:
 async def test_stream_agentic_seq_numbers(monkeypatch):
     # Stub gather_context_pydantic_agent
     async def stub_agent(query, search_service):
-        from app.services.agent.note_agent import AgentResult, AgentStep
+        from app.services.agent.models import AgentResult, AgentStep
         yield AgentStep(
             step_number=1,
             action="search_notes",

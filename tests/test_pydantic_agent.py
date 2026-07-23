@@ -2,7 +2,7 @@ import pytest
 from pydantic_ai.models.test import TestModel
 
 from app.services.agent.decision import SearchDecision
-from app.services.agent.note_agent import AgentResult, AgentStep
+from app.services.agent.models import AgentResult, AgentStep
 from app.services.agent.pydantic_agent import gather_context_pydantic_agent
 
 

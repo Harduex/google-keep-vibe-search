@@ -77,7 +77,6 @@ class LLMClient:
         """Completion with tool/function calling support.
 
         Returns the full response dict including any tool_calls.
-        Used by the NoteAgent in Phase 8B.
         """
         call_kwargs = self._base_kwargs(**kwargs)
         response = await litellm.acompletion(

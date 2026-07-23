@@ -1,7 +1,6 @@
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
-from app.prompts.system_prompts import FOLLOW_UP_PROMPT
-from app.services.agent.note_agent import AgentResult, AgentStep, NoteAgent
+from app.services.agent.models import AgentResult, AgentStep
 from app.services.citation_service import extract_citations
 from app.services.context_builder import ContextBuilder
 from app.services.conversation_manager import ConversationManager
@@ -22,7 +21,7 @@ class ChatService:
         verification_service=None,
         grounding_service=None,
         llm: LLMClient = None,
-        agent: Optional[NoteAgent] = None,
+        agent: Any = None,
     ):
         self.retrieval = retrieval
         self.context_builder = context_builder

@@ -382,11 +382,22 @@ h1 {
   color: var(--accent-color);
 }
 
+.note-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.note-header .note-badge {
+  margin: 0;
+}
+
 .note-badge.badge-tag {
   background: var(--accent-color);
   color: white;
   font-weight: 500;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 4px;
 }

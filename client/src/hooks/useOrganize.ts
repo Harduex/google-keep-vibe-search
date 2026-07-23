@@ -32,9 +32,15 @@ interface StreamErrorMessage {
   error: string;
 }
 
+interface StreamLabelUpdatesMessage {
+  type: 'label_updates';
+  proposals: TagProposal[];
+}
+
 type StreamMessage =
   | StreamProgressMessage
   | StreamProposalsMessage
+  | StreamLabelUpdatesMessage
   | StreamDoneMessage
   | StreamErrorMessage;
 
@@ -106,6 +112,7 @@ export const useOrganize = () => {
                 });
                 break;
 
+              case 'label_updates':
               case 'proposals':
                 setProposals(
                   data.proposals.map((p) => ({

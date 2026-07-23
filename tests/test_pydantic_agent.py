@@ -1,9 +1,28 @@
+import dataclasses
+import inspect
+
 import pytest
+from pydantic_ai import Agent
 from pydantic_ai.models.test import TestModel
+from pydantic_ai.run import AgentRunResult
 
 from app.services.agent.decision import SearchDecision
+from app.services.agent.model_factory import build_agent_model
 from app.services.agent.models import AgentResult, AgentStep
 from app.services.agent.pydantic_agent import gather_context_pydantic_agent
+
+
+def test_pydantic_ai_api_compatibility():
+    """Guard against pydantic-ai API drift that the stubbed agent path hides.
+
+    The real agent uses `Agent(output_type=...)` and reads `result.output`;
+    these were `result_type`/`result.data` in older versions. Assert the
+    installed API still matches so a live chat run cannot 500 undetected.
+    """
+    assert "output_type" in inspect.signature(Agent.__init__).parameters
+    assert "output" in {f.name for f in dataclasses.fields(AgentRunResult)}
+    # Model factory must import + build without touching the network.
+    assert build_agent_model() is not None
 
 
 class StubSearchEngine:
@@ -29,7 +48,11 @@ class StubSearchService:
 
     def search(self, query: str):
         # Return notes matching query string substring
-        return [n for n in self.notes if query.lower() in (n.get("title", "") + " " + n.get("content", "")).lower()]
+        return [
+            n
+            for n in self.notes
+            if query.lower() in (n.get("title", "") + " " + n.get("content", "")).lower()
+        ]
 
 
 @pytest.mark.asyncio
@@ -51,12 +74,14 @@ async def test_pydantic_agent_loop_multi_query_and_novelty_stop():
 
         async def run(self, prompt):
             self.call_count += 1
+
             class Result:
-                data = SearchDecision(
+                output = SearchDecision(
                     tool="search_notes",
                     queries=["keyboard", "python"],
                     reasoning=f"Step {self.call_count} multi-query search",
                 )
+
             return Result()
 
     custom_agent = CustomStubAgent()

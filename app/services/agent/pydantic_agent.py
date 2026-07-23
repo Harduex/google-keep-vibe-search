@@ -73,7 +73,7 @@ async def gather_context_pydantic_agent(
         model = build_agent_model()
         agent = Agent(
             model,
-            result_type=SearchDecision,
+            output_type=SearchDecision,
             retries=TOOL_RETRIES,
             model_settings={"temperature": settings.llm_temperature},
         )
@@ -104,16 +104,11 @@ async def gather_context_pydantic_agent(
 
         # 2. Prepare step prompt
         past_q_text = (
-            "\n".join([f"- {pq}" for pq in state.past_queries])
-            if state.past_queries
-            else "(none)"
+            "\n".join([f"- {pq}" for pq in state.past_queries]) if state.past_queries else "(none)"
         )
         recent_titles_text = (
             "\n".join(
-                [
-                    f"- {n.get('title') or n.get('id')}"
-                    for n in list(state.collected.values())[-5:]
-                ]
+                [f"- {n.get('title') or n.get('id')}" for n in list(state.collected.values())[-5:]]
             )
             if state.collected
             else "(none)"
@@ -128,10 +123,8 @@ async def gather_context_pydantic_agent(
 
         # 3. Decision step via agent with timeout
         try:
-            res = await asyncio.wait_for(
-                agent.run(step_prompt), timeout=STEP_TIMEOUT_SECONDS
-            )
-            decision: SearchDecision = res.data
+            res = await asyncio.wait_for(agent.run(step_prompt), timeout=STEP_TIMEOUT_SECONDS)
+            decision: SearchDecision = res.output
         except Exception as e:
             step = AgentStep(
                 step_number=state.steps_taken + 1,

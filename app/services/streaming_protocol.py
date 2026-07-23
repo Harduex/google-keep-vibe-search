@@ -36,11 +36,16 @@ class StreamingProtocol:
         full_response: str,
         citations: List[Dict[str, Any]],
         seq: Optional[int] = None,
+        citation_warnings: Optional[int] = None,
     ) -> bytes:
-        return self._encode(
-            {"type": "done", "citations": citations, "full_response": full_response},
-            seq=seq,
-        )
+        data: Dict[str, Any] = {
+            "type": "done",
+            "citations": citations,
+            "full_response": full_response,
+        }
+        if citation_warnings is not None:
+            data["citation_warnings"] = citation_warnings
+        return self._encode(data, seq=seq)
 
     def suggestions(self, questions: List[str], seq: Optional[int] = None) -> bytes:
         return self._encode({"type": "suggestions", "questions": questions}, seq=seq)

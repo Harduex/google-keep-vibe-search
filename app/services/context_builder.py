@@ -67,6 +67,21 @@ class ContextBuilder:
                     + "\nPlease acknowledge these conflicts in your response "
                     "and prefer the most recently edited note."
                 )
+
+            system_content += """
+
+GROUNDING RULES:
+1. The notes provided above are your ONLY source of facts. General knowledge may
+   shape language and structure, never facts.
+2. Every factual claim must cite its note as [Note #N].
+3. If the notes do not contain the answer, say plainly: "Your notes don't mention
+   this." Then point to the closest related notes that ARE present. Never fill
+   gaps silently.
+4. If you add anything beyond the notes, fence it visibly: "Outside your notes: ...".
+5. Preserve the notes' own wording for numbers, names, and hedges. If a note says
+   "may", never write "does".
+6. If the provided notes conflict with each other, present both sides with their
+   citations and say the disagreement exists. Do not silently pick one."""
         else:
             system_content = NO_NOTES_SYSTEM_PROMPT
 

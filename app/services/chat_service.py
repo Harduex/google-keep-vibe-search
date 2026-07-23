@@ -144,8 +144,21 @@ class ChatService:
                 full_response += delta
                 yield emit(self.protocol.delta(delta))
 
+            from app.services.citation_service import verify_citations
+
+            full_response, valid_cites, invalid_cites = verify_citations(
+                full_response, len(relevant_notes)
+            )
             citations = extract_citations(full_response, relevant_notes)
-            yield emit(self.protocol.done(full_response, citations))
+            if invalid_cites:
+                print(f"Warning: stripped invalid citations: {invalid_cites}")
+                yield emit(
+                    self.protocol.done(
+                        full_response, citations, citation_warnings=len(invalid_cites)
+                    )
+                )
+            else:
+                yield emit(self.protocol.done(full_response, citations))
 
             suggestions = await self._generate_suggestions(full_response, relevant_notes)
             if suggestions:

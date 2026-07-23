@@ -17,6 +17,10 @@ class Settings(BaseSettings):
 
     # Clustering
     default_num_clusters: int = 8
+    max_tags: int = 40
+    prefix_min_count: int = 5
+    broad_cluster_divisor: int = 50
+    specific_cluster_divisor: int = 100
 
     # Server
     host: str = "127.0.0.1"
@@ -58,6 +62,10 @@ class Settings(BaseSettings):
     # Image search
     enable_image_search: bool = False
 
+    # Embedding Assignment
+    global_assignment_threshold: float = 0.75
+    catch_all_threshold: float = 0.5
+
     # Cache
     cache_dir: str = ""
 
@@ -96,7 +104,7 @@ class Settings(BaseSettings):
         if provider == "ollama":
             return f"ollama_chat/{self.llm_model}"
         if provider == "openai":
-            return self.llm_model
+            return f"openai/{self.llm_model}"
         return f"{provider}/{self.llm_model}"
 
     @property

@@ -37,7 +37,16 @@ async def lifespan(app: FastAPI):
     note_service.load_tags()
     t = _step(f"Notes loaded ({len(note_service.notes)} notes)", t0)
 
-    search_engine = VibeSearch(note_service.notes, force_refresh=settings.force_cache_refresh)
+    # Get type prefixes to strip
+    type_prefixes = []
+    for tag_list in note_service.note_tags.values():
+        for tag in tag_list:
+            if tag.startswith("type:"):
+                prefix = tag[5:]
+                if prefix not in type_prefixes:
+                    type_prefixes.append(prefix)
+
+    search_engine = VibeSearch(note_service.notes, force_refresh=settings.force_cache_refresh, type_prefixes=type_prefixes)
     search_service = SearchService(search_engine)
     t = _step("Search engine ready", t)
 
@@ -153,7 +162,7 @@ async def lifespan(app: FastAPI):
     _step(f"Chat service ready (model: {settings.resolved_litellm_model})", t)
 
     session_service = SessionService()
-    categorization_service = CategorizationService(search_service, note_service)
+    categorization_service = CategorizationService(search_service, note_service, llm)
 
     # mark app as ready once all heavy initialization is complete
     app.state.note_service = note_service

@@ -51,12 +51,20 @@ Conversation:
 {conversation}"""
 
 
-TAG_NAMING_PROMPT = """Below are several related personal notes from a collection. Generate a short, descriptive tag name (2-4 words) that captures the common theme of these notes. Return ONLY the tag name, nothing else.
+TAG_NAMING_SYSTEM_PROMPT = """You are a precise categorization engine. Your task is to analyze personal notes (which may be in Bulgarian or English) and generate a single, highly descriptive 1-2 word English tag that captures their common theme (e.g., "Web Development", "Fitness").
+
+RULES:
+1. Output EXACTLY 1-2 words in Title Case.
+2. Must be a descriptive noun or noun phrase.
+3. DO NOT use generic words: Misc, Various, Notes, Use, Learn, Https, Link.
+4. Output valid JSON only: {"tag": "Your Tag"}"""
+
+
+TAG_NAMING_USER_PROMPT = """Hint keywords: {keywords}
+Nearest neighbor topic (avoid overlapping): {neighbor_keywords}
 
 Notes:
-{notes_text}
-
-Tag name:"""
+{notes_text}"""
 
 
 FOLLOW_UP_PROMPT = """Based on this conversation and the notes used, suggest 3 brief follow-up questions the user might want to ask. Return ONLY the questions, one per line. Keep each under 60 characters."""

@@ -27,8 +27,9 @@ if settings.enable_image_search:
 
 
 class VibeSearch:
-    def __init__(self, notes: List[Dict[str, Any]], force_refresh: bool = False):
+    def __init__(self, notes: List[Dict[str, Any]], force_refresh: bool = False, type_prefixes: List[str] = None):
         self.notes = notes
+        self.type_prefixes = type_prefixes or []
         import torch
 
         device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -39,8 +40,14 @@ class VibeSearch:
         self.note_indices = []
 
         for i, note in enumerate(self.notes):
+            # Strip type prefixes from title
+            title = note.get('title', '')
+            for prefix in self.type_prefixes:
+                pattern = r"^\s*" + re.escape(prefix) + r"\s*[:\-—]\s+"
+                title = re.sub(pattern, "", title, flags=re.IGNORECASE)
+                
             # Combine title and content for embedding
-            text = f"{note['title']} {note['content']}"
+            text = f"{title} {note.get('content', '')}"
             if text.strip():  # Only add non-empty notes
                 self.texts.append(text)
                 self.note_indices.append(i)

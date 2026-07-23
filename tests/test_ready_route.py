@@ -11,6 +11,7 @@ def test_ready_endpoint_returns_true(monkeypatch):
     class DummyNoteService:
         def __init__(self):
             self.notes = []
+            self.note_tags = {}
 
         def load_notes(self, force_refresh=False):
             return self.notes
@@ -19,9 +20,10 @@ def test_ready_endpoint_returns_true(monkeypatch):
             pass
 
     class DummySearchEngine:
-        def __init__(self, notes, force_refresh=False):
+        def __init__(self, notes, force_refresh=False, type_prefixes=None):
             # attributes accessed by SearchService
             self.notes = notes
+            self.type_prefixes = type_prefixes or []
             self.embeddings = []
             self.note_indices = []
             self.image_processor = None

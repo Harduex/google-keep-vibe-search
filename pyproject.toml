@@ -32,6 +32,7 @@ dependencies = [
     "jellyfish",
     "networkx",
     "litellm>=1.40",
+    "tbb>=2021.6.0",
     "tqdm"
 ]
 

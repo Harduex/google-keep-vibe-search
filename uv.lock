@@ -814,6 +814,7 @@ dependencies = [
     { name = "sentence-transformers" },
     { name = "spacy" },
     { name = "starlette" },
+    { name = "tbb" },
     { name = "tokenizers" },
     { name = "torch" },
     { name = "torchvision" },
@@ -856,6 +857,7 @@ requires-dist = [
     { name = "sentence-transformers", specifier = ">=2.6,<3.0" },
     { name = "spacy", specifier = ">=3.0" },
     { name = "starlette", specifier = "==0.52.1" },
+    { name = "tbb", specifier = ">=2021.6.0" },
     { name = "tokenizers", specifier = ">=0.14" },
     { name = "torch", specifier = "==2.1.2+cu121", index = "https://download.pytorch.org/whl/cu121" },
     { name = "torchvision", specifier = "==0.16.2+cu121", index = "https://download.pytorch.org/whl/cu121" },
@@ -3034,6 +3036,27 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/83/d3/803453b36afefb7c2bb238361cd4ae6125a569b4db67cd9e79846ba2d68c/sympy-1.14.0.tar.gz", hash = "sha256:d3d3fe8df1e5a0b42f0e7bdf50541697dbe7d23746e894990c030e2b05e72517", size = 7793921, upload-time = "2025-04-27T18:05:01.611Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a2/09/77d55d46fd61b4a135c444fc97158ef34a095e5681d0a6c10b75bf356191/sympy-1.14.0-py3-none-any.whl", hash = "sha256:e091cc3e99d2141a0ba2847328f5479b05d94a6635cb96148ccb3f34671bd8f5", size = 6299353, upload-time = "2025-04-27T18:04:59.103Z" },
+]
+
+[[package]]
+name = "tbb"
+version = "2023.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "tcmlib" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/25/0c/0266c71e3fa50a71db5ce8a1d0807863df3215c5f7b5fe7c98b257561138/tbb-2023.1.0-py2.py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:64ad35241c736a595498f5343abec8eaaa203e9fe0dbdbf4b86d37c5a3ab1d9c", size = 6840282, upload-time = "2026-07-01T15:10:33.348Z" },
+    { url = "https://files.pythonhosted.org/packages/ac/ff/168d3498762069b0cd2dff20ab34d53fa48a0a35ffd1965cf456c603f292/tbb-2023.1.0-py3-none-win_amd64.whl", hash = "sha256:27df1315202defc67a73800c667ba4fbd03cf8924f73949373d4a34d1443fca2", size = 428501, upload-time = "2026-07-01T15:12:55.771Z" },
+]
+
+[[package]]
+name = "tcmlib"
+version = "1.5.0"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/60/24/aa409bb20703acc70cf4d3bc620a55c789639c2995b2667fb44ae7236ec9/tcmlib-1.5.0-py2.py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:9d7c01cff35aae9bf5390b620680ebdf10a7d211c22d6488a27a029502e7d0aa", size = 2812669, upload-time = "2026-04-24T14:14:18.557Z" },
+    { url = "https://files.pythonhosted.org/packages/67/6d/9095c93326d0f8a5469ab22480d02795f24c08f1e7f383c73316ff106347/tcmlib-1.5.0-py2.py3-none-win_amd64.whl", hash = "sha256:f7b62787214083d490b39d7650f1e477eeacc875e7f86799feb9aa1fd34460d4", size = 366719, upload-time = "2026-04-24T14:09:45.977Z" },
 ]
 
 [[package]]

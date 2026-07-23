@@ -40,3 +40,7 @@ lint:
 build:
 	@echo "=== Building Node frontend ==="
 	cd client && $(NVM_SOURCE) && npm run build
+
+eval:
+	@echo "=== Evaluating Categorization Pipeline ==="
+	uv run python scripts/eval_categorization.py

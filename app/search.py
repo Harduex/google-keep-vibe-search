@@ -7,13 +7,14 @@ from typing import Any, BinaryIO, Dict, List, Optional, Set, Tuple, Union
 import nltk
 import numpy as np
 from nltk.corpus import stopwords
-from rank_bm25 import BM25Okapi
 from sentence_transformers import SentenceTransformer
 from sklearn.cluster import KMeans
 from sklearn.metrics.pairwise import cosine_similarity
 
 from app.core.config import settings
+from app.services.search.bm25 import BM25Index
 from app.services.tagging.preprocess import clean_note
+
 
 
 DEFAULT_NUM_CLUSTERS = 20
@@ -66,8 +67,8 @@ class VibeSearch:
         # Try to load embeddings from cache or compute new ones
         self.load_or_compute_embeddings(force_refresh)
 
-        # Build BM25 index for keyword search
-        self._build_bm25_index()
+        # Build multilingual BM25 index over note texts for keyword search
+        self.bm25_index = BM25Index(self.notes)
 
         # Initialize image processor if enabled
         self.image_processor = None
@@ -196,21 +197,16 @@ class VibeSearch:
             # Fall back to computing new embeddings
             self.embeddings = self.model.encode(self.texts)
 
-    def _build_bm25_index(self):
-        """Build BM25 index over note texts for keyword search."""
-        tokenized = [text.lower().split() for text in self.texts]
-        self.bm25 = BM25Okapi(tokenized)
-
     def _keyword_search(self, query: str) -> List[Tuple[int, float]]:
-        """Perform BM25 keyword search."""
-        tokens = query.lower().split()
-        if not tokens:
-            return []
-        scores = self.bm25.get_scores(tokens)
+        """Perform multilingual BM25 keyword search."""
+        if not hasattr(self, "bm25_index") or self.bm25_index is None:
+            self.bm25_index = BM25Index(self.notes)
+        bm25_results = self.bm25_index.search(query, k=len(self.notes))
+        id_to_idx = {note.get("id", str(i)): i for i, note in enumerate(self.notes)}
         results = []
-        for i, score in enumerate(scores):
-            if score > 0:
-                results.append((self.note_indices[i], float(score)))
+        for nid, score in bm25_results:
+            if nid in id_to_idx:
+                results.append((id_to_idx[nid], float(score)))
         return results
 
     @staticmethod

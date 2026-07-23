@@ -84,7 +84,7 @@ Set `LLM_API_BASE_URL` and `LLM_MODEL` in your `.env` to point at any OpenAI-com
 
 | Provider     | `LLM_API_BASE_URL`                  | `LLM_API_KEY`       |
 |--------------|-------------------------------------|---------------------|
-| Ollama (default) | *(leave empty, uses `OLLAMA_API_URL`/v1)* | *(empty)*       |
+| Ollama (default) | `http://localhost:11434`         | *(empty)*           |
 | LM Studio    | `http://localhost:1234/v1`          | *(empty)*           |
 | OpenAI       | `https://api.openai.com/v1`         | your OpenAI key     |
 | Anthropic proxy | your proxy URL                   | your key            |
@@ -98,21 +98,18 @@ All settings are read from `.env`. Copy `.env.example` to get started.
 | Variable | Default | Description |
 |---|---|---|
 | `GOOGLE_KEEP_PATH` | *(required)* | Path to your Google Keep export folder |
+| `LLM_PROVIDER` | `ollama` | LLM provider (`ollama`, `openai`, `anthropic`, or any LiteLLM-supported) |
+| `LLM_API_BASE_URL` | `http://localhost:11434` | OpenAI-compatible API base URL |
+| `LLM_API_KEY` | *(empty)* | API key (leave empty for local providers) |
+| `LLM_MODEL` | `ornith-1.0-9b` | Model name to use for chat |
 | `MAX_RESULTS` | `300` | Maximum search results returned |
 | `SEARCH_THRESHOLD` | `0.3` | Minimum similarity score (0.0–1.0). Lower = more results |
-| `DEFAULT_NUM_CLUSTERS` | `20` | Number of clusters for the Clusters tab |
-| `HOST` | `127.0.0.1` | Backend bind address |
-| `PORT` | `8000` | Backend port |
-| `LLM_API_BASE_URL` | *(empty)* | OpenAI-compatible API base URL. If empty, derived from `OLLAMA_API_URL` |
-| `LLM_API_KEY` | *(empty)* | API key (leave empty for local providers) |
-| `LLM_MODEL` | `llama3` | Model name to use for chat |
 | `CHAT_CONTEXT_NOTES` | `10` | Number of notes injected as context per chat message |
 | `CHAT_MAX_RECENT_MESSAGES` | `6` | Number of recent messages kept verbatim in context window |
 | `CHAT_SUMMARIZATION_THRESHOLD` | `12` | Total messages before older ones are summarized |
-| `OLLAMA_API_URL` | `http://localhost:11434` | Ollama server URL (fallback if `LLM_API_BASE_URL` is empty) |
 | `ENABLE_IMAGE_SEARCH` | `true` | Enable CLIP-based image search (downloads ~350 MB model on first run) |
 | `IMAGE_SEARCH_THRESHOLD` | `0.2` | Minimum image similarity score |
-| `IMAGE_SEARCH_WEIGHT` | `0.3` | Weight of image score vs. text score in combined results |
+| `ENABLE_AGENT_MODE` | `false` | Enable agentic RAG (iterative search with tool calling) |
 | `CACHE_DIR` | `./cache/` | Directory for embeddings and session cache |
 | `FORCE_CACHE_REFRESH` | `false` | Set `true` to ignore cached notes/embeddings on startup |
 
@@ -130,7 +127,7 @@ Access the app at http://localhost (port 80 → frontend, port 8000 → backend 
 
 **Ollama networking in Docker:**
 
-| Setup | `OLLAMA_API_URL` |
+| Setup | `LLM_API_BASE_URL` |
 |---|---|
 | Native Ollama + Docker Desktop | `http://host.docker.internal:11434` |
 | Native Ollama + Linux Docker | `http://172.17.0.1:11434` |
@@ -229,7 +226,7 @@ cd client && npm run fix
 
 2. **Semantic search** — Your query is embedded with the same model. Cosine similarity ranks notes. An optional keyword overlap score is blended in for better precision on exact matches.
 
-3. **Image search** — If enabled, attached images are embedded with OpenAI CLIP. Image similarity scores are merged with text scores using `IMAGE_SEARCH_WEIGHT`.
+3. **Image search** — If enabled, attached images are embedded with OpenAI CLIP. Image similarity scores are merged with text scores via Reciprocal Rank Fusion.
 
 4. **Chat / RAG** — On each message, the backend runs multi-signal retrieval (latest message + recent context + topic + chunk-level search + continuity boost), injects the top notes into a structured system prompt, and streams the LLM response token-by-token. The final `done` event includes parsed `[Note #N]` citations.
 

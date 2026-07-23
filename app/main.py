@@ -2,7 +2,6 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.core.config import settings
 from app.core.lifespan import lifespan
 from app.routes import chat, embeddings, images, notes, organize, search, stats, tags
 
@@ -26,4 +25,4 @@ app.include_router(embeddings.router)
 app.include_router(organize.router)
 
 if __name__ == "__main__":
-    uvicorn.run("app.main:app", host=settings.host, port=settings.port, reload=True)
+    uvicorn.run("app.main:app", host="127.0.0.1", port=8000, reload=True)

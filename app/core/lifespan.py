@@ -10,13 +10,17 @@ from app.services.chat_service import ChatService
 from app.services.chunking_service import ChunkingService
 from app.services.context_builder import ContextBuilder
 from app.services.conversation_manager import ConversationManager
+from app.services.entity_service import EntityService
+from app.services.grounding_service import GroundingService
 from app.services.llm_client import LLMClient
 from app.services.note_service import NoteService
+from app.services.query_service import QueryService
 from app.services.reranker_service import RerankerService
 from app.services.retrieval_orchestrator import RetrievalOrchestrator
 from app.services.search_service import SearchService
 from app.services.session_service import SessionService
 from app.services.streaming_protocol import StreamingProtocol
+from app.services.verification_service import VerificationService
 
 
 def _step(label: str, start: float) -> float:
@@ -46,7 +50,9 @@ async def lifespan(app: FastAPI):
                 if prefix not in type_prefixes:
                     type_prefixes.append(prefix)
 
-    search_engine = VibeSearch(note_service.notes, force_refresh=settings.force_cache_refresh, type_prefixes=type_prefixes)
+    search_engine = VibeSearch(
+        note_service.notes, force_refresh=settings.force_cache_refresh, type_prefixes=type_prefixes
+    )
     search_service = SearchService(search_engine)
     t = _step("Search engine ready", t)
 
@@ -62,60 +68,31 @@ async def lifespan(app: FastAPI):
     t = _step("Chunking service ready", t)
 
     # Cross-encoder reranker for precision reranking
-    reranker = None
-    if settings.enable_reranker:
-        reranker = RerankerService()
-        search_engine.reranker = reranker
-        t = _step(f"Reranker loaded ({settings.reranker_model})", t)
+    reranker = RerankerService()
+    search_engine.reranker = reranker
+    t = _step("Reranker loaded", t)
 
     # Entity resolution for named entity-based retrieval
-    entity_service = None
-    if settings.enable_entity_resolution:
-        from app.services.entity_service import EntityService
+    entity_service = EntityService(note_service.notes)
+    search_engine.entity_service = entity_service
+    t = _step("Entity service ready", t)
 
-        entity_service = EntityService(note_service.notes)
-        search_engine.entity_service = entity_service
-        t = _step("Entity service ready", t)
-
-    # Citation verification (NLI-based)
-    verification_service = None
-    grounding_service = None
-    if settings.enable_citation_verification:
-        from app.services.verification_service import VerificationService
-
-        verification_service = VerificationService(model_name=settings.nli_model)
-
-        # Grounding service reuses the NLI model
-        from app.services.grounding_service import GroundingService
-
-        grounding_service = GroundingService(nli_model=verification_service.nli_model)
-        t = _step(f"Verification + grounding ready ({settings.nli_model})", t)
+    # Citation verification (NLI-based) + grounding
+    verification_service = VerificationService()
+    grounding_service = GroundingService(nli_model=verification_service.nli_model)
+    t = _step("Verification + grounding ready", t)
 
     # Shared LLM client (LiteLLM-powered)
-    # For Ollama, LiteLLM needs the raw base URL (no /v1/ suffix)
-    llm_api_base = settings.resolved_api_base_url
-    if settings.llm_provider.lower() == "ollama":
-        llm_api_base = settings.ollama_api_url.rstrip("/")
     llm = LLMClient(
         model=settings.resolved_litellm_model,
-        api_base=llm_api_base,
+        api_base=settings.resolved_api_base_url,
         api_key=settings.llm_api_key or None,
         temperature=settings.llm_temperature,
         max_tokens=settings.llm_max_tokens,
     )
 
     # Query intelligence (prompt decomposition + gap analysis)
-    query_service = None
-    if settings.enable_prompt_decomposition or settings.enable_gap_analysis:
-        from app.services.query_service import QueryService
-
-        query_service = QueryService(llm)
-        features = []
-        if settings.enable_prompt_decomposition:
-            features.append("decomposition")
-        if settings.enable_gap_analysis:
-            features.append("gap analysis")
-        print(f"  Query intelligence: {', '.join(features)}")
+    query_service = QueryService(llm)
 
     # Assemble chat service from focused components
     protocol = StreamingProtocol()

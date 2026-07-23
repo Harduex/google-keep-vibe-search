@@ -9,62 +9,26 @@ class Settings(BaseSettings):
     google_keep_path: str = ""
 
     # Search
-    max_results: int = 20
-    search_threshold: float = 0.0
+    max_results: int = 300
+    search_threshold: float = 0.3
     embedding_model: str = "paraphrase-multilingual-MiniLM-L12-v2"
     image_search_threshold: float = 0.2
-    image_search_weight: float = 0.3
-
-    # Clustering
-    default_num_clusters: int = 8
-    max_tags: int = 40
-    prefix_min_count: int = 5
-    broad_cluster_divisor: int = 50
-    specific_cluster_divisor: int = 100
-
-    # Server
-    host: str = "127.0.0.1"
-    port: int = 8000
 
     # LLM (OpenAI-compatible API)
-    llm_api_base_url: str = ""
+    llm_api_base_url: str = "http://localhost:11434"
     llm_api_key: str = ""
-    llm_model: str = "llama3"
+    llm_model: str = "ornith-1.0-9b"
     llm_provider: str = "ollama"
     llm_temperature: float = 0.1
     llm_max_tokens: int = 2048
-    chat_context_notes: int = 5
+    chat_context_notes: int = 10
 
-    # Agent mode (Phase 8B)
+    # Agent mode
     enable_agent_mode: bool = False
     agent_max_steps: int = 5
 
-    # Legacy Ollama (used as fallback for llm_api_base_url)
-    ollama_api_url: str = "http://localhost:11434"
-
-    # Reranker
-    enable_reranker: bool = True
-    reranker_model: str = "cross-encoder/ms-marco-MiniLM-L6-v2"
-
-    # Entity resolution
-    enable_entity_resolution: bool = True
-
-    # Citation verification (NLI)
-    enable_citation_verification: bool = True
-    nli_model: str = "cross-encoder/nli-deberta-v3-small"
-
-    # Prompt decomposition
-    enable_prompt_decomposition: bool = True
-
-    # Gap analysis (CRAG-style adaptive retrieval)
-    enable_gap_analysis: bool = True
-
     # Image search
     enable_image_search: bool = False
-
-    # Embedding Assignment
-    global_assignment_threshold: float = 0.75
-    catch_all_threshold: float = 0.5
 
     # Cache
     cache_dir: str = ""
@@ -74,7 +38,7 @@ class Settings(BaseSettings):
     chat_summarization_threshold: int = 12
 
     # Cache control
-    force_cache_refresh: bool = False  # if true, ignore caches on startup
+    force_cache_refresh: bool = False
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
@@ -93,9 +57,7 @@ class Settings(BaseSettings):
 
     @property
     def resolved_api_base_url(self) -> str:
-        if self.llm_api_base_url:
-            return self.llm_api_base_url.rstrip("/") + "/"
-        return f"{self.ollama_api_url}/v1/"
+        return self.llm_api_base_url.rstrip("/")
 
     @property
     def resolved_litellm_model(self) -> str:

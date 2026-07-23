@@ -6,8 +6,9 @@ import time
 from datetime import datetime
 from typing import Any, Dict, List
 
-from app.core.config import settings
 from tqdm import tqdm
+
+from app.core.config import settings
 
 
 def get_latest_modification_time(directory: str) -> float:

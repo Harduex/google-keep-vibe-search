@@ -2,7 +2,7 @@
 
 from typing import Any, Dict, List, Optional
 
-from app.core.config import settings
+RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L6-v2"
 
 
 class RerankerService:
@@ -11,7 +11,7 @@ class RerankerService:
     def __init__(self, model_name: Optional[str] = None):
         from sentence_transformers import CrossEncoder
 
-        self.model_name = model_name or settings.reranker_model
+        self.model_name = model_name or RERANKER_MODEL
         self.model = CrossEncoder(self.model_name, max_length=512)
         print(f"[reranker] Loaded cross-encoder: {self.model_name}")
 

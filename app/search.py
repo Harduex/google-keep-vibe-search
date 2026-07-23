@@ -14,6 +14,8 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 from app.core.config import settings
 
+DEFAULT_NUM_CLUSTERS = 20
+
 if settings.enable_image_search:
     try:
         from app.image_processor import ImageProcessor
@@ -27,7 +29,12 @@ if settings.enable_image_search:
 
 
 class VibeSearch:
-    def __init__(self, notes: List[Dict[str, Any]], force_refresh: bool = False, type_prefixes: List[str] = None):
+    def __init__(
+        self,
+        notes: List[Dict[str, Any]],
+        force_refresh: bool = False,
+        type_prefixes: List[str] = None,
+    ):
         self.notes = notes
         self.type_prefixes = type_prefixes or []
         import torch
@@ -41,11 +48,11 @@ class VibeSearch:
 
         for i, note in enumerate(self.notes):
             # Strip type prefixes from title
-            title = note.get('title', '')
+            title = note.get("title", "")
             for prefix in self.type_prefixes:
                 pattern = r"^\s*" + re.escape(prefix) + r"\s*[:\-—]\s+"
                 title = re.sub(pattern, "", title, flags=re.IGNORECASE)
-                
+
             # Combine title and content for embedding
             text = f"{title} {note.get('content', '')}"
             if text.strip():  # Only add non-empty notes
@@ -388,7 +395,7 @@ class VibeSearch:
             List of clusters with their notes
         """
         if num_clusters is None:
-            num_clusters = settings.default_num_clusters
+            num_clusters = DEFAULT_NUM_CLUSTERS
 
         # Limit num_clusters to at most 75% of the number of notes to avoid too many singleton clusters
         max_clusters = max(2, int(len(self.note_indices) * 0.75))

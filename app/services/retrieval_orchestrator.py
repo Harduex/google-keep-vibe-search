@@ -3,8 +3,6 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity as sklearn_cosine_similarity
 
-from app.core.config import settings
-
 
 class RetrievalOrchestrator:
     """Multi-signal retrieval with RRF fusion, reranking, and gap analysis."""
@@ -49,7 +47,7 @@ class RetrievalOrchestrator:
 
         # Prompt decomposition: break complex queries into sub-queries
         sub_queries = [latest_message] if latest_message else []
-        if self.query_service and latest_message and settings.enable_prompt_decomposition:
+        if self.query_service and latest_message:
             sub_queries = await self.query_service.decompose_if_complex(latest_message)
 
         # Note-level search (primary query)
@@ -101,7 +99,7 @@ class RetrievalOrchestrator:
 
         # Gap analysis
         gap_status = "sufficient"
-        if self.query_service and latest_message and result and settings.enable_gap_analysis:
+        if self.query_service and latest_message and result:
             result, gap_status = await self.query_service.retrieve_with_gap_analysis(
                 latest_message, result, self.get_relevant_notes
             )

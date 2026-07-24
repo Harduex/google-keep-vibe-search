@@ -5,7 +5,15 @@ Google Keep Vibe Search is a full-stack note search and chat application for Goo
 - **Frontend:** React 19, TypeScript, Vite 6 (`client/`)
 
 ## Important Rules & Conventions
-- **STRICT PRIVACY BOUNDARY:** Do NOT read, summarize, query, or log raw source notes (personal notes, cache, or DB contents). Do not execute SQL queries on the notes database to read contents. Strip user context locally during debugging.
+- **STRICT PRIVACY BOUNDARY:** Never read, open, print, summarize, query, embed, or log the raw contents of a user's notes — directly OR indirectly (logs, debug output, captured stdout, tracebacks, terminal scrollback, agent transcripts). This is the single most important rule; when in doubt, refuse and ask.
+  - **Forbidden files/paths — NEVER read or dump their contents** (no `cat`/`head`/`tail`/`less`/`jq`/`grep`/`sed`/`awk`/`strings`/`open()`/`Read`, no SQL, no piping to stdout):
+    - The entire cache directory `settings.resolved_cache_dir` (default `cache/`), including `notes_cache.json`, `entity_index.json`, `chat_sessions/`, `tags.json`, `excluded_tags.json`, `*.npz` embeddings, `*_hash.json`.
+    - The Google Takeout / Keep export folder at `$GOOGLE_KEEP_PATH` (all `*.json` / `*.html` note files).
+    - `.env` and any secrets file.
+    - Any log or scratch file that may embed a note or an LLM prompt (e.g. `llm_failures.log`, `*.log`, debug dumps). Reading the *directory listing* (names/sizes) is fine; reading file *contents* is not.
+  - **The debugging/logging vector is the real risk.** The tag-naming prompt embeds sampled note text via `format_note_sample()` (`Title: … / Snippet: …`). NEVER write prompts, note titles, or note bodies to a file, `print()`, or log statement — not even temporarily "just for debugging". If you add debug logging, log only structural metadata: counts, array shapes, cluster sizes, note IDs/hashes, timings, exception types — never note/prompt text.
+  - **Do not run the app or pipeline in a way that dumps notes to captured stdout** (e.g. verbose prompt logging while a tool captures output). If a traceback or command output would contain note text, redact it before saving or pasting anywhere.
+  - When you need to reproduce a bug involving notes, use synthetic/fixture data (see the fake-data generators), never the real corpus.
 - Be concise in responses.
 - Ask clarifying questions instead of guessing when codebase is ambiguous.
 - Read existing code before changing. Make minimal, surgical changes.

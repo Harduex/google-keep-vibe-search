@@ -80,7 +80,7 @@ report it instead of working around it.
 | T01 | 1 | 1 | Formatting baseline + `make check`/`make format` split | H2, lint errors | ¼ d | done |
 | T02 | 1 | 2 | CI workflow + fix 3 red tests | H1, B9 | ¼ d | done |
 | T03 | 2 A | 1 | Chat pipeline correctness | B1, B5, B6, B7, B11 | ½ d | todo |
-| T04 | 2 B | 1 | Reranker no longer caps search at 20 | B2 | ¼ d | todo |
+| T04 | 2 B | 1 | Reranker no longer caps search at 20 | B2 | ¼ d | done |
 | T05 | 2 B | 2 | BM25 precompute tf + normalized text | A9 | ¼ d | todo |
 | T06 | 2 C | 1 | Parser: flatten `listContent`, expose `labels` | B3a | ¼ d | todo |
 | T07 | 2 C | 2 | Keep labels → tags; excluded tags at the search choke point | B3b, B10 | ½ d | todo |
@@ -143,6 +143,7 @@ Tasks discovered while executing the plan. Add here instead of building them
 | T01 (recorded by T02) | `pre-commit` is invoked by `make setup` as `uv run pre-commit install` but is not a declared project dependency — it resolves to a global binary, so `make setup` breaks on a clean machine. `pyproject.toml` is wave 6 lane Q (T32). |
 | T02 | The CI-green portion of T02's checkpoint is unverified pending the first push to `origin`. |
 | ~~T02 (blocker)~~ **resolved** | `NVM_SOURCE` returned exit 1 when nvm was absent, failing the make recipe line before `npm run lint` / `tsc -b` / `npm run test` ran at all — so `ci.yml` could not go green on a runner (node from `actions/setup-node`, no nvm). Predated T01 (introduced in `365484d`). Fixed as a one-off orchestrator commit: the prelude is now an `if` that no-ops when nvm is absent while still propagating a genuine nvm failure. |
+| T04 | Lane B's ownership matrix row (`app/search.py`, `app/services/search/bm25.py`, `tests/test_hybrid_search.py`, `tests/test_bm25.py`) grants no `constants.py`, yet §5 requires new tuning values to live in one. Ruling (orchestrator): §5 outranks the matrix; no sibling lane owns `app/services/search/constants.py`, so creating it is a matrix gap, not a violation. New file added; matrix should be updated to list it under Lane B in a later pass. |
 
 ## Verification
 

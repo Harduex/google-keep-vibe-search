@@ -13,6 +13,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 from app.core.config import settings
 from app.services.search.bm25 import BM25Index
+from app.services.search.constants import RERANK_CANDIDATE_WINDOW
 from app.services.tagging.preprocess import clean_note
 
 DEFAULT_NUM_CLUSTERS = 20
@@ -366,11 +367,14 @@ class VibeSearch:
             note["score"] = float(fused_score)
             results.append(note)
 
-        # Cross-encoder reranking if available
+        # Cross-encoder reranking if available. Only the top RERANK_CANDIDATE_WINDOW
+        # fused results are sent through the cross-encoder (bounded, so latency stays
+        # predictable); the remainder is appended after in its original fused-RRF order
+        # so max_results is not truncated down to the reranker's candidate window.
         if self.reranker and len(results) > 1:
-            results = self.reranker.rerank(
-                query, results[:20], top_k=max_results or settings.max_results
-            )
+            window = results[:RERANK_CANDIDATE_WINDOW]
+            reranked_window = self.reranker.rerank(query, window, top_k=len(window))
+            results = reranked_window + results[RERANK_CANDIDATE_WINDOW:]
 
         return results[: max_results or settings.max_results]
 

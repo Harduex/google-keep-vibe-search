@@ -126,7 +126,7 @@ task of that wave lands.
 
 | Wave | Lanes | Rounds | State |
 |---|---|---|---|
-| 1 | — | T01 → T02 | todo |
+| 1 | — | T01 → T02 | done |
 | 2 | A B C D E | 5 lanes, 2 rounds | todo |
 | 3 | F G R T | T11·T33·T35 → T12·T13·T36 → T14 | todo |
 | 4 | H I J K | 4 lanes → T18 → T20 | todo |
@@ -142,6 +142,7 @@ Tasks discovered while executing the plan. Add here instead of building them
 |---|---|
 | T01 (recorded by T02) | `pre-commit` is invoked by `make setup` as `uv run pre-commit install` but is not a declared project dependency — it resolves to a global binary, so `make setup` breaks on a clean machine. `pyproject.toml` is wave 6 lane Q (T32). |
 | T02 | The CI-green portion of T02's checkpoint is unverified pending the first push to `origin`. |
+| T02 (blocker, no owning lane) | `make check`'s frontend steps use the `Makefile`'s `NVM_SOURCE` prelude, whose `[ -s "$$HOME/.nvm/nvm.sh" ] && …` chain **returns exit 1 when nvm is absent**, so the recipe line fails before `npm run lint` / `tsc -b` / `npm run test` run at all. CI runners have `actions/setup-node`'s node on `PATH` but no nvm, so `.github/workflows/ci.yml` cannot go green as written. Reproduced with `HOME=/tmp/fake-home-no-nvm`; predates T01 (introduced in `365484d`). Fix belongs in the `Makefile` (make the nvm branch a no-op when nvm is absent). **No lane owns the `Makefile` after wave 1** — wave 3 lane G owns eval targets only — so this needs an explicit assignment. |
 
 ## Verification
 

@@ -128,10 +128,10 @@ def compute_notes_hash(directory: str) -> str:
     fields of every JSON file (sorted by filename) so that modifications
     to note text are detected even if file modification times are unchanged.
 
-    NOTE (T06): this intentionally still hashes only title + textContent, not
-    listContent. A checkbox-only edit (e.g. ticking an item) will therefore not
-    invalidate the cache until T24 replaces this hashing scheme. Flagged, not
-    fixed here — see docs/plans/wave-2-bug-sweep.md T06.
+    Known limitation: the hash covers title + textContent only, not listContent,
+    so a checkbox-only edit (ticking an item) does not invalidate the cache. This
+    is deliberate rather than an oversight — fixing it means changing the cache
+    invalidation scheme, not this function.
     """
     hash_obj = hashlib.md5()
     json_files = sorted(glob.glob(os.path.join(directory, "*.json")))

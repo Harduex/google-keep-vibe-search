@@ -102,20 +102,37 @@ Deliver the verdict and stop. Do not offer to push; do not stage a push.
 
 **Checkpoint**
 ```
-# 1. comments only — no logic changed anywhere (the load-bearing check)
+# 1. comments only — no executable code changed anywhere (the load-bearing check)
+#
+# Docstrings are AST nodes, and this task legitimately rewrites some of them, so a
+# naive ast.dump comparison reports a false failure. Blank every docstring on both
+# sides first: what survives is executable code, which must be byte-identical.
 python3 - <<'PY'
 import ast, subprocess
-base = subprocess.run(['git','rev-parse','HEAD'],capture_output=True,text=True).stdout.strip()
-files = subprocess.run(['git','diff','--name-only','HEAD','--','app','tests','scripts','bench'],
-                       capture_output=True,text=True).stdout.split()
+
+def strip_docstrings(tree):
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        body = getattr(node, 'body', None)
+        if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant) \
+                and isinstance(body[0].value.value, str):
+            body[0].value.value = ''
+    return tree
+
+files = subprocess.run(['git', 'diff', '--name-only', 'HEAD', '--', 'app', 'tests', 'scripts', 'bench'],
+                       capture_output=True, text=True).stdout.split()
 bad = []
 for f in [f for f in files if f.endswith('.py')]:
-    old = subprocess.run(['git','show',f'HEAD:{f}'],capture_output=True,text=True).stdout
-    new = open(f).read()
+    old = subprocess.run(['git', 'show', f'HEAD:{f}'], capture_output=True, text=True).stdout
     try:
-        if ast.dump(ast.parse(old)) != ast.dump(ast.parse(new)): bad.append(f)
-    except SyntaxError: bad.append(f'{f} (syntax)')
-print("AST-identical:", not bad, "| offenders:", bad or "none")
+        a = ast.dump(strip_docstrings(ast.parse(old)))
+        b = ast.dump(strip_docstrings(ast.parse(open(f).read())))
+    except SyntaxError:
+        bad.append(f'{f} (syntax error)'); continue
+    if a != b:
+        bad.append(f)
+print("executable code identical:", not bad, "| offenders:", bad or "none")
 PY
 
 # 2. no plan coordinates left in shipped code (review every hit; expect zero)

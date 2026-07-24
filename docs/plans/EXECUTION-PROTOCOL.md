@@ -74,6 +74,13 @@ A task is done when **one** commit contains:
 - its tests,
 - the `PLANS.md` status update for that task (§2.3).
 
+**A wave's spec file is deleted in that wave's last commit.** Once every task in `wave-N-*.md` is
+committed and the barrier gate is green, the file has no readers left — `PLANS.md` and git history are
+the durable record. The deletion goes in the barrier commit alongside the § Status row update, so
+`docs/plans/` shrinks to exactly the work still ahead. Before deleting, grep for references to the
+file **by name**: a spec path quoted in a source comment becomes a dangling reference the moment the
+file goes, and must be rewritten to stand on its own in the same commit.
+
 Commit message: first line = the `Commit:` line from the task spec, verbatim. Body = checkpoint
 evidence: command output, test counts, before/after numbers, LOC removed, decisions taken. **No
 trailers** (no `Co-Authored-By`, no `Generated with`).

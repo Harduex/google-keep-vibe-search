@@ -37,6 +37,19 @@ def _get_query_str(past_query_entry: str) -> str:
     return past_query_entry.strip().lower()
 
 
+def _log_agent_step(step: AgentStep) -> None:
+    queries = step.params.get("queries", [])
+    queries_str = ", ".join(f'"{q}"' for q in queries) if queries else "None"
+    print(
+        f"[CHAT AGENT] ── Step {step.step_number} ──────────────────────────────────────\n"
+        f"  • Action     : {step.action}\n"
+        f"  • Queries    : [{queries_str}]\n"
+        f"  • Notes Found: {step.notes_found}\n"
+        f"  • Summary    : {step.result_summary}\n"
+        f"  • Reasoning  : {step.reasoning}"
+    )
+
+
 async def gather_context_pydantic_agent(
     query: str,
     search_service: SearchService,
@@ -78,6 +91,8 @@ async def gather_context_pydantic_agent(
             model_settings={"temperature": settings.llm_temperature},
         )
 
+    print("[CHAT AGENT] 🚀 Starting agentic context gathering loop...")
+
     while True:
         # 1. Deterministic coverage check
         is_done, reason = coverage_is_sufficient(
@@ -99,6 +114,7 @@ async def gather_context_pydantic_agent(
                 result_summary=reason,
             )
             steps_history.append(step)
+            _log_agent_step(step)
             yield step
             break
 
@@ -135,6 +151,7 @@ async def gather_context_pydantic_agent(
                 result_summary=str(e),
             )
             steps_history.append(step)
+            _log_agent_step(step)
             yield step
             break
 
@@ -157,6 +174,7 @@ async def gather_context_pydantic_agent(
                 result_summary="No new queries to run",
             )
             steps_history.append(step)
+            _log_agent_step(step)
             yield step
             continue
 
@@ -208,7 +226,12 @@ async def gather_context_pydantic_agent(
             result_summary=f"Found {new_notes_count} new notes",
         )
         steps_history.append(step)
+        _log_agent_step(step)
         yield step
+
+    print(
+        f"[Agentic Chat] Complete: Gathered {len(state.collected)} notes across {state.steps_taken} agent steps"
+    )
 
     yield AgentResult(
         notes=list(state.collected.values()),

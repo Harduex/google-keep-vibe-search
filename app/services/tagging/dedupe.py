@@ -142,6 +142,8 @@ def adjudicate_gray_pairs(gray_pairs: List[Dict[str, Any]]) -> List[MergeDecisio
     if not gray_pairs:
         return []
 
+    print(f"[TAGGING DEDUPE] Adjudicating {len(gray_pairs)} gray-zone tag pairs via LLM...")
+
     valid_pairs_set = set()
     pairs_lines = []
     for pair in gray_pairs:
@@ -194,6 +196,7 @@ def adjudicate_gray_pairs(gray_pairs: List[Dict[str, Any]]) -> List[MergeDecisio
         if (t1, t2) not in reviewed_pairs and (t2, t1) not in reviewed_pairs:
             decisions.append(MergeDecision(tag_a=t1, tag_b=t2, verdict="keep_both"))
 
+    print(f"          └─ Gray-zone adjudication complete ({len(decisions)} decisions)")
     return decisions
 
 

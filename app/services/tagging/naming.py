@@ -100,11 +100,12 @@ def name_clusters_sequential(clusters: List[Dict[str, Any]]) -> List[Dict[str, A
     sorted_clusters = sorted(clusters, key=lambda c: c.get("size", len(c.get("notes", []))), reverse=True)
     existing_tags: List[str] = []
 
-    for cluster in sorted_clusters:
+    for idx, cluster in enumerate(sorted_clusters):
         keywords = cluster.get("keywords", [])
         samples_text = cluster.get("samples_text", "")
         accepted = name_single_cluster(keywords, samples_text, existing_tags)
         cluster["name"] = accepted
+        print(f"          └─ [{idx+1}/{len(sorted_clusters)}] Cluster named ──► '{accepted}'")
         if accepted not in existing_tags:
             existing_tags.append(accepted)
 

@@ -85,7 +85,7 @@ report it instead of working around it.
 | T06 | 2 C | 1 | Parser: flatten `listContent`, expose `labels` | B3a | ¼ d | done |
 | T07 | 2 C | 2 | Keep labels → tags; excluded tags at the search choke point | B3b, B10 | ½ d | done |
 | T08 | 2 D | 1 | Close `/api/image` path traversal | B12 | ⅛ d | done |
-| T09 | 2 D | 2 | Make proposal "merge" actually merge | B8 | ¼ d | todo |
+| T09 | 2 D | 2 | Make proposal "merge" actually merge | B8 | ¼ d | done |
 | T10 | 2 E | 1 | Redaction helper; stop leaking prompts into logs | P1, P2, P3 | ¼ d | done |
 | T11 | 3 F | 1 | Synthetic fixture corpus + stubbed model/LLM `conftest` | T1, T2 | ½ d | todo |
 | T12 | 3 F | 2 | End-to-end API integration test | T2 | ½ d | todo |
@@ -143,6 +143,7 @@ Tasks discovered while executing the plan. Add here instead of building them
 | T01 (recorded by T02) | `pre-commit` is invoked by `make setup` as `uv run pre-commit install` but is not a declared project dependency — it resolves to a global binary, so `make setup` breaks on a clean machine. `pyproject.toml` is wave 6 lane Q (T32). |
 | T02 | The CI-green portion of T02's checkpoint is unverified pending the first push to `origin`. |
 | ~~T02 (blocker)~~ **resolved** | `NVM_SOURCE` returned exit 1 when nvm was absent, failing the make recipe line before `npm run lint` / `tsc -b` / `npm run test` ran at all — so `ci.yml` could not go green on a runner (node from `actions/setup-node`, no nvm). Predated T01 (introduced in `365484d`). Fixed as a one-off orchestrator commit: the prelude is now an `if` that no-ops when nvm is absent while still propagating a genuine nvm failure. |
+| T09 | `app/routes/organize.py`'s `classic = [a for a in request.actions if a.action in ("approve", "rename", "merge")]` still lists `"merge"` as an accepted action string, but the client no longer emits it (classic-proposal merges now go out as `merge_tags`) — the literal is dead, safe to delete, owned by whichever lane next touches that file. |
 | T04 | Lane B's ownership matrix row (`app/search.py`, `app/services/search/bm25.py`, `tests/test_hybrid_search.py`, `tests/test_bm25.py`) grants no `constants.py`, yet §5 requires new tuning values to live in one. Ruling (orchestrator): §5 outranks the matrix; no sibling lane owns `app/services/search/constants.py`, so creating it is a matrix gap, not a violation. New file added; matrix should be updated to list it under Lane B in a later pass. |
 | T10 | Route the remaining LLM-adjacent `str(e)`/`{e}` sites through `app/core/redact.py` (`safe_exc`) as **one dedicated task** — ~11 sites across `chat_service.py`, `query_service.py`, `tagging/dedupe.py`, `agent/pydantic_agent.py`, `routes/chat.py`, `routes/embeddings.py`, `routes/search.py`; several stream raw provider exceptions to the browser, the same P1 class as the `:1104` site T10 fixed. Spans multiple lanes and waves, so it needs its own task rather than piecemeal cross-lane edits. |
 | T10 | `pydantic_agent._log_agent_step` is **kept** (it prints the user's own question and generated probes — user text, not note text, and it is the debugging surface agent mode needs). Decision recorded as a one-line comment referencing T10 in Lane A's file, authorised separately by the orchestrator; not open work. |

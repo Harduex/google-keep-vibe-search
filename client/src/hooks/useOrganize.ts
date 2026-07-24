@@ -42,9 +42,27 @@ export const buildApplyAction = (state: ProposalState): ApplyActionPayload | nul
     return { action: 'assign_tag', note_id: proposal.note_id, tag: proposal.tag };
   }
 
-  // Classic cluster tag proposal.
+  if (action === 'merge') {
+    // A classic proposal staged for merge always carries `mergeTarget` (set by
+    // `mergeProposals`). If it's missing, there is nothing to merge into — drop
+    // the action rather than silently falling back to "approve" (the bug this
+    // fixes: notes would get tagged with their own name). A merge whose target
+    // equals its own tag_name is still emitted as `merge_tags`; the backend's
+    // `rename_tag` rejects old_name === new_name and the route's existing
+    // `except (KeyError, ValueError): continue` skips it gracefully.
+    if (!state.mergeTarget) {
+      return null;
+    }
+    return {
+      action: 'merge_tags',
+      source_tag: proposal.tag_name,
+      target_tag: state.mergeTarget,
+    };
+  }
+
+  // Classic cluster tag proposal (approve / rename).
   return {
-    action: action === 'rename' ? 'rename' : action === 'merge' ? 'merge' : 'approve',
+    action: action === 'rename' ? 'rename' : 'approve',
     tag_name: proposal.tag_name,
     note_ids: proposal.note_ids,
     new_name: action === 'rename' ? newName : undefined,

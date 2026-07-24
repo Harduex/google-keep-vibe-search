@@ -14,6 +14,10 @@ class FakeNoteService:
         return len(note_ids)
 
     def rename_tag(self, old_name, new_name):
+        # Mirrors NoteService.rename_tag's real guards so route-level tests of
+        # the degenerate cases (absent source, source == target) match production.
+        if old_name == new_name:
+            raise ValueError("New tag name must differ from old name")
         if old_name not in self.existing_tags:
             raise KeyError(old_name)
         self.renamed.append((old_name, new_name))
@@ -45,6 +49,23 @@ def test_apply_merge_skips_when_source_tag_absent():
     svc = FakeNoteService()
     req = ApplyProposalsRequest(
         actions=[ApplyAction(action="merge_tags", source_tag="Ghost", target_tag="Real")]
+    )
+
+    result = apply_proposals(req, note_service=svc)
+
+    assert svc.renamed == []  # gracefully skipped, no crash
+    assert result["notes_tagged"] == 0
+
+
+def test_apply_merge_skips_when_source_equals_target():
+    # Regression for B8 (client side): buildApplyAction now emits merge_tags
+    # even when a proposal's staged mergeTarget equals its own tag_name. The
+    # backend needs no change to handle this — NoteService.rename_tag already
+    # rejects old_name == new_name with ValueError, and the route's existing
+    # except (KeyError, ValueError): continue skips it gracefully.
+    svc = FakeNoteService(existing_tags={"Gym"})
+    req = ApplyProposalsRequest(
+        actions=[ApplyAction(action="merge_tags", source_tag="Gym", target_tag="Gym")]
     )
 
     result = apply_proposals(req, note_service=svc)

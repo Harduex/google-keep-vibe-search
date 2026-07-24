@@ -29,6 +29,7 @@ yourself (§2.5).
    | 4 | T15 · T16 · T17 · T19 | T18 | **T20** | |
    | 5 | **T21** | T22 · T23 | T24 · T25 | **T26** |
    | 6 | T27 · T29 · T30 · T31 · T32 · T34 | T28 | | |
+   | 7 | **T37** | | | |
 
    Bold = must run alone in its round; everything else in a round is concurrent.
    Round *n+1* of a wave starts when round *n* is committed — a soft barrier, not a CI gate.

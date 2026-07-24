@@ -27,6 +27,8 @@ Wave 4  deprecations        PARALLEL ── 4 agents (H clusters · I topic · J
 Wave 5  store & ingestion   T21 SERIAL, then PARALLEL ── 4 agents in 2 rounds, then T26 SERIAL
    │
 Wave 6  unify + quality     PARALLEL ── 6 agents (M tagging unification · N–Q quality · S sessions)
+   │
+Wave 7  release readiness   SERIAL  ── 1 agent   (comment sweep + pre-push safety audit; must run last)
 ```
 
 Waves are hard barriers: Wave *n+1* starts only when every lane in Wave *n* is committed and CI is
@@ -70,6 +72,8 @@ report it instead of working around it.
 |   |   | ↳ Lane P owns `client/package.json`, so **T30 must not add a client dependency** — build the data layer in-house. If T30 concludes a dependency is genuinely required, that is a blocker to report, not a cross-lane edit. |   |
 | 6 | **Q** ops | `Dockerfile`, `docker-compose.yml`, `pyproject.toml`, `client/Dockerfile` | T32 |
 | 6 | **S** sessions | `app/services/session_service.py`, `app/routes/chat.py`, `tests/test_session_service.py` | T34 |
+| 7 | — | everything (**comments only**) + `docs/audit/PRE-PUSH-AUDIT.md` (new) | T37 |
+|   |   | ↳ The comments-only restriction is what makes a whole-repo write set safe: T37's checkpoint asserts every changed Python file is **AST-identical** to its parent commit. Mirrors T01, which owned everything for formatting only. |   |
 
 ---
 
@@ -113,10 +117,12 @@ report it instead of working around it.
 | T34 | 6 S | 1 | Session service hygiene | B14, B16 | ¼ d | todo |
 | T35 | 3 T | 1 | Benchmark corpora, scale generator, shared metrics | T4 | 1 d | todo |
 | T36 | 3 T | 2 | Signal ablation, tagging correctness, baseline gate | T4 | 1 d | todo |
+| T37 | 7 — | 1 | Production-readiness comment sweep + pre-push safety audit | — | ½ d | todo |
 
-**Totals:** 36 tasks · ~20 developer-days serial · ~7½ wall-clock days at the lane parallelism above.
+**Totals:** 37 tasks · ~20½ developer-days serial · ~8 wall-clock days at the lane parallelism above.
 Every one of the 46 audit findings is owned by exactly one task — verified by the coverage script in
-§ Verification below.
+§ Verification below. **T37 owns no finding**: it was added at the repo owner's request (2026-07-25),
+not derived from the audit, so it does not affect the coverage invariant.
 
 ## Status
 
@@ -127,11 +133,12 @@ task of that wave lands.
 | Wave | Lanes | Rounds | State |
 |---|---|---|---|
 | 1 | — | T01 → T02 | done |
-| 2 | A B C D E | 5 lanes, 2 rounds | todo |
+| 2 | A B C D E | 5 lanes, 2 rounds | done |
 | 3 | F G R T | T11·T33·T35 → T12·T13·T36 → T14 | todo |
 | 4 | H I J K | 4 lanes → T18 → T20 | todo |
 | 5 | L1–L6 | T21 → T22·T23 → T24·T25 → T26 | todo |
 | 6 | M N O P Q S | 6 lanes → T28 | todo |
+| 7 | — | T37 | todo |
 
 ## Proposed follow-ups
 
@@ -149,6 +156,8 @@ Tasks discovered while executing the plan. Add here instead of building them
 | T10 | `pydantic_agent._log_agent_step` is **kept** (it prints the user's own question and generated probes — user text, not note text, and it is the debugging surface agent mode needs). Decision recorded as a one-line comment referencing T10 in Lane A's file, authorised separately by the orchestrator; not open work. |
 | T10 | Migrate the tagging pipeline's ad-hoc `print` + `llm_failures.log` writes to a named stdlib `logging` logger, so redaction is enforced by one handler instead of per-call discipline. §5 freezes config, so the level would be a constant, not an env var. |
 | T03 | B6's cross-encoder candidate window (`AGENT_RERANK_CANDIDATE_WINDOW = 20`) takes the agent's collected notes in **insertion order**, so notes discovered only in later agent steps can be dropped before the cross-encoder scores them. Scores from different agent probes are not comparable and `filter_by_tag` hits carry no score at all, so a pre-window score sort would systematically discard exactly the notes B5 made reachable. Deciding whether a comparable pre-window ranking signal is worth adding needs tier-2 measurement via `bench/run_retrieval.py` (T36). |
+| owner (2026-07-25) | **Decision, not open work:** `github.com/Harduex/deep-semantic-search` is **not** adopted in this project for now. It is currently referenced nowhere (no import, no dependency, no lockfile entry); the retrieval stack is built directly on `sentence-transformers` / `umap-learn` / `hdbscan` plus the in-repo `BM25Index`. Recorded so no later wave proposes swapping it in — doing so would replace much of what waves 5–6 restructure, and would be an architecture decision taken before wave 5, not a cleanup. |
+| orchestrator (2026-07-25) | `rank-bm25>=0.2.2` is a declared dependency in `pyproject.toml`, but the project ships its own `BM25Index` (`app/services/search/bm25.py`, rewritten in T05). Verify whether `rank_bm25` is imported anywhere; if not, drop it. Dependency weight matters here because the install already pulls ~2.5 GB of CUDA wheels. Belongs to wave 6 lane Q (**T32**, packaging hygiene) since it owns `pyproject.toml`. |
 | T07 | `tests/test_ready_route.py` is unowned by any wave-2 lane row in the matrix, yet it patches `app.core.lifespan` symbols and exercises the real FastAPI lifespan via `TestClient`, so any task that changes a startup call signature (as T07 did, adding `note_service.seed_tags_from_labels()`) can break it invisibly outside its own gate. Orchestrator authorised T07 to extend `DummyNoteService` with a no-op `seed_tags_from_labels` for this task only (§2.5 ruling: matrix gap, not a cross-lane violation, same basis as T04's `constants.py`). The matrix should assign this file to a lane in a later pass. |
 
 ## Verification

@@ -44,6 +44,42 @@ class NoteService:
         self.excluded_tags = load_excluded_tags_from_cache()
         print(f"Loaded {len(self.note_tags)} note tags and {len(self.excluded_tags)} excluded tags")
 
+    def seed_tags_from_labels(self) -> int:
+        """Seed ``note_tags`` from each note's parsed Keep ``labels`` (B3b/T07).
+
+        Additive and idempotent: a label is appended only when that exact tag name is
+        not already present for the note, so a user's existing tag of the same name is
+        never duplicated or clobbered, and no user tag is ever removed. Calling this
+        repeatedly (e.g. on every startup) after labels have already been applied once
+        makes no further changes and does not touch ``tags.json`` — required so startup
+        is safe to re-run without perturbing the persisted tag file.
+
+        Returns the number of notes that gained at least one tag from this call.
+        """
+        changed = False
+        notes_seeded = 0
+        for note in self.notes:
+            labels = note.get("labels") or []
+            if not labels:
+                continue
+            note_id = note.get("id")
+            if note_id is None:
+                continue
+            tags = self.note_tags.setdefault(note_id, [])
+            note_changed = False
+            for label in labels:
+                if label and label not in tags:
+                    tags.append(label)
+                    note_changed = True
+            if note_changed:
+                notes_seeded += 1
+                changed = True
+
+        if changed:
+            save_tags_to_cache(self.note_tags)
+
+        return notes_seeded
+
     def filter_by_excluded_tags(self, notes_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         if not self.excluded_tags:
             return notes_list

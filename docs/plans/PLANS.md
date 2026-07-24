@@ -83,7 +83,7 @@ report it instead of working around it.
 | T04 | 2 B | 1 | Reranker no longer caps search at 20 | B2 | ¼ d | done |
 | T05 | 2 B | 2 | BM25 precompute tf + normalized text | A9 | ¼ d | todo |
 | T06 | 2 C | 1 | Parser: flatten `listContent`, expose `labels` | B3a | ¼ d | done |
-| T07 | 2 C | 2 | Keep labels → tags; excluded tags at the search choke point | B3b, B10 | ½ d | todo |
+| T07 | 2 C | 2 | Keep labels → tags; excluded tags at the search choke point | B3b, B10 | ½ d | done |
 | T08 | 2 D | 1 | Close `/api/image` path traversal | B12 | ⅛ d | done |
 | T09 | 2 D | 2 | Make proposal "merge" actually merge | B8 | ¼ d | todo |
 | T10 | 2 E | 1 | Redaction helper; stop leaking prompts into logs | P1, P2, P3 | ¼ d | done |
@@ -148,6 +148,7 @@ Tasks discovered while executing the plan. Add here instead of building them
 | T10 | `pydantic_agent._log_agent_step` is **kept** (it prints the user's own question and generated probes — user text, not note text, and it is the debugging surface agent mode needs). Decision recorded as a one-line comment referencing T10 in Lane A's file, authorised separately by the orchestrator; not open work. |
 | T10 | Migrate the tagging pipeline's ad-hoc `print` + `llm_failures.log` writes to a named stdlib `logging` logger, so redaction is enforced by one handler instead of per-call discipline. §5 freezes config, so the level would be a constant, not an env var. |
 | T03 | B6's cross-encoder candidate window (`AGENT_RERANK_CANDIDATE_WINDOW = 20`) takes the agent's collected notes in **insertion order**, so notes discovered only in later agent steps can be dropped before the cross-encoder scores them. Scores from different agent probes are not comparable and `filter_by_tag` hits carry no score at all, so a pre-window score sort would systematically discard exactly the notes B5 made reachable. Deciding whether a comparable pre-window ranking signal is worth adding needs tier-2 measurement via `bench/run_retrieval.py` (T36). |
+| T07 | `tests/test_ready_route.py` is unowned by any wave-2 lane row in the matrix, yet it patches `app.core.lifespan` symbols and exercises the real FastAPI lifespan via `TestClient`, so any task that changes a startup call signature (as T07 did, adding `note_service.seed_tags_from_labels()`) can break it invisibly outside its own gate. Orchestrator authorised T07 to extend `DummyNoteService` with a no-op `seed_tags_from_labels` for this task only (§2.5 ruling: matrix gap, not a cross-lane violation, same basis as T04's `constants.py`). The matrix should assign this file to a lane in a later pass. |
 
 ## Verification
 

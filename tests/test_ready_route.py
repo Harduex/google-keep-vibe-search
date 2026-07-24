@@ -19,6 +19,12 @@ def test_ready_endpoint_returns_true(monkeypatch):
         def load_tags(self):
             pass
 
+        def seed_tags_from_labels(self):
+            # no-op: this double carries no notes/labels, so there is nothing to
+            # seed. Lifespan calls this unconditionally after load_tags() (T07);
+            # the seeding behavior itself is covered in tests/test_note_service.py.
+            return 0
+
     class DummySearchEngine:
         def __init__(self, notes, force_refresh=False, type_prefixes=None):
             # attributes accessed by SearchService

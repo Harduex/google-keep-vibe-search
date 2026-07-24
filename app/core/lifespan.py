@@ -39,6 +39,10 @@ async def lifespan(app: FastAPI):
     note_service = NoteService()
     note_service.load_notes(force_refresh=settings.force_cache_refresh)
     note_service.load_tags()
+    # B3b/T07: seed note_tags from Keep's own labels (additive + idempotent — see
+    # NoteService.seed_tags_from_labels docstring). Runs after load_tags so it only
+    # adds labels the user doesn't already have as a tag of that name.
+    note_service.seed_tags_from_labels()
     t = _step(f"Notes loaded ({len(note_service.notes)} notes)", t0)
 
     # Get type prefixes to strip
@@ -53,7 +57,12 @@ async def lifespan(app: FastAPI):
     search_engine = VibeSearch(
         note_service.notes, force_refresh=settings.force_cache_refresh, type_prefixes=type_prefixes
     )
-    search_service = SearchService(search_engine)
+    # B10/B5: give SearchService the note service so it can enforce excluded-tag
+    # filtering at this one choke point (every retrieval caller goes through
+    # SearchService.search), and — under this exact `note_service` attribute name —
+    # so ChatService._tag_lookup() can resolve a tag map for the agent's
+    # `filter_by_tag` tool (B5), which was fixed in T03 but not wired to anything live.
+    search_service = SearchService(search_engine, note_service=note_service)
     t = _step("Search engine ready", t)
 
     if settings.enable_image_search:

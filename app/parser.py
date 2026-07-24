@@ -32,6 +32,18 @@ def parse_timestamp(usec: int) -> str:
     return datetime.fromtimestamp(sec).strftime("%Y-%m-%d %H:%M:%S")
 
 
+def render_list_content(list_content: List[Dict[str, Any]]) -> str:
+    """Render Google Keep checkbox items into ``- [ ] item`` / ``- [x] item`` lines, in order."""
+    lines = []
+    for item in list_content:
+        if not isinstance(item, dict):
+            continue
+        text = item.get("text", "")
+        marker = "x" if item.get("isChecked", False) else " "
+        lines.append(f"- [{marker}] {text}")
+    return "\n".join(lines)
+
+
 def parse_notes() -> List[Dict[str, Any]]:
     """Parse all Google Keep notes from the export directory."""
     json_files = glob.glob(os.path.join(settings.google_keep_path, "*.json"))
@@ -48,7 +60,23 @@ def parse_notes() -> List[Dict[str, Any]]:
                 continue
 
             title = note_data.get("title", "")
-            content = note_data.get("textContent", "")
+            text_content = note_data.get("textContent", "")
+
+            # Checkbox (checklist) notes store their body in listContent instead of
+            # textContent, e.g. [{"text": "Milk", "isChecked": False}]. Flatten those
+            # into content lines so checklist-only notes aren't empty text that later
+            # gets dropped by the "if cleaned.strip()" guard in search.py. If a note has
+            # both, the list is appended after the free text.
+            list_content = note_data.get("listContent")
+            list_text = render_list_content(list_content) if list_content else ""
+
+            if text_content.strip() and list_text:
+                content = f"{text_content}\n{list_text}"
+            elif list_text:
+                content = list_text
+            else:
+                content = text_content
+
             raw_text = f"{title} {content}".strip()
             cleaned_text = clean_note(raw_text)
 
@@ -74,6 +102,14 @@ def parse_notes() -> List[Dict[str, Any]]:
             if note_data.get("attachments"):
                 note["attachments"] = note_data.get("attachments")
 
+            # Expose Keep's own labels as a plain list of names. Parse only: this task
+            # does not seed tags from labels (that's T07's job).
+            raw_labels = note_data.get("labels")
+            if raw_labels:
+                note["labels"] = [
+                    lbl.get("name", "") for lbl in raw_labels if isinstance(lbl, dict)
+                ]
+
             notes.append(note)
 
         except Exception:
@@ -91,6 +127,11 @@ def compute_notes_hash(directory: str) -> str:
     The hash is computed over the concatenation of the title and content
     fields of every JSON file (sorted by filename) so that modifications
     to note text are detected even if file modification times are unchanged.
+
+    NOTE (T06): this intentionally still hashes only title + textContent, not
+    listContent. A checkbox-only edit (e.g. ticking an item) will therefore not
+    invalidate the cache until T24 replaces this hashing scheme. Flagged, not
+    fixed here — see docs/plans/wave-2-bug-sweep.md T06.
     """
     hash_obj = hashlib.md5()
     json_files = sorted(glob.glob(os.path.join(directory, "*.json")))

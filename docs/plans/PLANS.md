@@ -82,7 +82,7 @@ report it instead of working around it.
 | T03 | 2 A | 1 | Chat pipeline correctness | B1, B5, B6, B7, B11 | ½ d | todo |
 | T04 | 2 B | 1 | Reranker no longer caps search at 20 | B2 | ¼ d | done |
 | T05 | 2 B | 2 | BM25 precompute tf + normalized text | A9 | ¼ d | todo |
-| T06 | 2 C | 1 | Parser: flatten `listContent`, expose `labels` | B3a | ¼ d | todo |
+| T06 | 2 C | 1 | Parser: flatten `listContent`, expose `labels` | B3a | ¼ d | done |
 | T07 | 2 C | 2 | Keep labels → tags; excluded tags at the search choke point | B3b, B10 | ½ d | todo |
 | T08 | 2 D | 1 | Close `/api/image` path traversal | B12 | ⅛ d | todo |
 | T09 | 2 D | 2 | Make proposal "merge" actually merge | B8 | ¼ d | todo |

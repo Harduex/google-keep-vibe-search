@@ -120,3 +120,127 @@ class TestParseNotes:
             notes = parse_notes()
 
         assert len(notes) == 4  # Original 4 non-trashed notes
+
+
+class TestParseNotesListContentAndLabels:
+    """B3a: checklist notes must not be invisible, and Keep labels must surface."""
+
+    def _write_note(self, directory, filename, data):
+        with open(os.path.join(str(directory), filename), "w", encoding="utf-8") as f:
+            json.dump(data, f)
+
+    def test_list_only_note_is_flattened_into_content(self, tmp_path):
+        # A pure checklist note: no textContent, only listContent. Before the fix
+        # this note's content is "" and it gets dropped by search.py's
+        # "if cleaned.strip()" guard -- invisible to search/chat/tagging.
+        self._write_note(
+            tmp_path,
+            "checklist.json",
+            {
+                "title": "Groceries",
+                "textContent": "",
+                "listContent": [
+                    {"text": "Milk", "isChecked": False},
+                    {"text": "Eggs", "isChecked": True},
+                ],
+                "isTrashed": False,
+            },
+        )
+
+        with patch("app.parser.settings") as mock_settings:
+            mock_settings.google_keep_path = str(tmp_path)
+            notes = parse_notes()
+
+        assert len(notes) == 1
+        note = notes[0]
+        assert note["content"] == "- [ ] Milk\n- [x] Eggs"
+        assert note["cleaned_text"].strip() != ""
+
+    def test_mixed_text_and_list_note_appends_list_after_text(self, tmp_path):
+        self._write_note(
+            tmp_path,
+            "mixed.json",
+            {
+                "title": "Trip prep",
+                "textContent": "Don't forget passports.",
+                "listContent": [
+                    {"text": "Book flights", "isChecked": True},
+                    {"text": "Reserve hotel", "isChecked": False},
+                ],
+                "isTrashed": False,
+            },
+        )
+
+        with patch("app.parser.settings") as mock_settings:
+            mock_settings.google_keep_path = str(tmp_path)
+            notes = parse_notes()
+
+        assert len(notes) == 1
+        note = notes[0]
+        assert note["content"] == (
+            "Don't forget passports.\n- [x] Book flights\n- [ ] Reserve hotel"
+        )
+
+    def test_note_with_labels_exposes_label_names(self, tmp_path):
+        self._write_note(
+            tmp_path,
+            "labeled.json",
+            {
+                "title": "Recipe",
+                "textContent": "Pasta with garlic.",
+                "labels": [{"name": "Cooking"}, {"name": "Favorites"}],
+                "isTrashed": False,
+            },
+        )
+
+        with patch("app.parser.settings") as mock_settings:
+            mock_settings.google_keep_path = str(tmp_path)
+            notes = parse_notes()
+
+        assert len(notes) == 1
+        assert notes[0]["labels"] == ["Cooking", "Favorites"]
+
+    def test_note_without_labels_has_no_labels_key(self, tmp_path):
+        self._write_note(
+            tmp_path,
+            "unlabeled.json",
+            {"title": "No labels here", "textContent": "Plain note.", "isTrashed": False},
+        )
+
+        with patch("app.parser.settings") as mock_settings:
+            mock_settings.google_keep_path = str(tmp_path)
+            notes = parse_notes()
+
+        assert len(notes) == 1
+        assert "labels" not in notes[0]
+
+    def test_trashed_list_note_still_skipped(self, tmp_path):
+        # A checklist note that is also trashed must still be dropped -- the new
+        # list-flattening logic must not resurrect trashed notes.
+        self._write_note(
+            tmp_path,
+            "trashed_checklist.json",
+            {
+                "title": "Old list",
+                "textContent": "",
+                "listContent": [{"text": "Stale item", "isChecked": False}],
+                "isTrashed": True,
+            },
+        )
+
+        with patch("app.parser.settings") as mock_settings:
+            mock_settings.google_keep_path = str(tmp_path)
+            notes = parse_notes()
+
+        assert notes == []
+
+    def test_malformed_json_with_list_content_still_counted_as_failure(self, tmp_path, capsys):
+        (tmp_path / "bad_list.json").write_text("{not valid json", encoding="utf-8")
+
+        with patch("app.parser.settings") as mock_settings:
+            mock_settings.google_keep_path = str(tmp_path)
+            notes = parse_notes()
+
+        assert notes == []
+        captured = capsys.readouterr()
+        assert "Failed to parse 1 notes" in captured.out

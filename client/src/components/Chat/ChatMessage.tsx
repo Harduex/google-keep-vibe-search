@@ -13,6 +13,7 @@ interface ChatMessageProps {
 export const ChatMessage = memo(({ message, onCitationClick }: ChatMessageProps) => {
   const { role, content, timestamp, citations } = message;
   const [isThinkingExpanded, setIsThinkingExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const formattedTime = timestamp
     ? new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -61,6 +62,27 @@ export const ChatMessage = memo(({ message, onCitationClick }: ChatMessageProps)
   const toggleThinking = useCallback(() => {
     setIsThinkingExpanded((prev) => !prev);
   }, []);
+
+  const handleCopy = useCallback(async () => {
+    if (!processedContent || copied) return;
+    try {
+      await navigator.clipboard.writeText(processedContent);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback for older browsers
+      const textarea = document.createElement('textarea');
+      textarea.value = processedContent;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }, [processedContent, copied]);
 
   const markdownComponents = useMemo(
     () => ({
@@ -111,7 +133,21 @@ export const ChatMessage = memo(({ message, onCitationClick }: ChatMessageProps)
       <div className="message-content">
         <div className="message-header">
           <span className="message-sender">{role === 'assistant' ? 'Assistant' : 'You'}</span>
-          {timestamp && <span className="message-time">{formattedTime}</span>}
+          <div className="message-header-actions">
+            {timestamp && <span className="message-time">{formattedTime}</span>}
+            {role === 'assistant' && processedContent && (
+              <button
+                className={`copy-message-btn${copied ? ' copied' : ''}`}
+                onClick={handleCopy}
+                title={copied ? 'Copied!' : 'Copy response'}
+                aria-label={copied ? 'Copied to clipboard' : 'Copy response to clipboard'}
+              >
+                <span className="material-icons">
+                  {copied ? 'check' : 'content_copy'}
+                </span>
+              </button>
+            )}
+          </div>
         </div>
 
         {hasThinkingSection && (

@@ -84,7 +84,7 @@ report it instead of working around it.
 | T05 | 2 B | 2 | BM25 precompute tf + normalized text | A9 | ¼ d | todo |
 | T06 | 2 C | 1 | Parser: flatten `listContent`, expose `labels` | B3a | ¼ d | done |
 | T07 | 2 C | 2 | Keep labels → tags; excluded tags at the search choke point | B3b, B10 | ½ d | todo |
-| T08 | 2 D | 1 | Close `/api/image` path traversal | B12 | ⅛ d | todo |
+| T08 | 2 D | 1 | Close `/api/image` path traversal | B12 | ⅛ d | done |
 | T09 | 2 D | 2 | Make proposal "merge" actually merge | B8 | ¼ d | todo |
 | T10 | 2 E | 1 | Redaction helper; stop leaking prompts into logs | P1, P2, P3 | ¼ d | done |
 | T11 | 3 F | 1 | Synthetic fixture corpus + stubbed model/LLM `conftest` | T1, T2 | ½ d | todo |

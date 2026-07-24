@@ -85,6 +85,14 @@ class BM25Index:
         self.tokens: List[List[str]] = []
         self.df: Dict[str, int] = {}
         self.avgdl: float = 0.0
+        # Precomputed at build() time (finding A9): per-doc term frequencies, doc
+        # lengths, normalized text for the phrase bonus, and an inverted index
+        # (term -> sorted doc indices) so search() only visits documents that share
+        # a query term, instead of rescanning every note on every query.
+        self.term_freqs: List[Counter] = []
+        self.doc_lens: List[int] = []
+        self.normalized_texts: List[str] = []
+        self.postings: Dict[str, List[int]] = {}
         if notes:
             self.build(notes)
 
@@ -96,10 +104,22 @@ class BM25Index:
             )
             for n in notes
         ]
+        self.term_freqs = [Counter(toks) for toks in self.tokens]
+        self.doc_lens = [len(toks) or 1 for toks in self.tokens]
+        self.normalized_texts = [
+            normalize(
+                n.get("cleaned_text") or clean_note(f"{n.get('title', '')} {n.get('content', '')}")
+            )
+            for n in notes
+        ]
         df_counter = Counter()
-        for t in self.tokens:
-            df_counter.update(set(t))
+        postings: Dict[str, List[int]] = {}
+        for i, tf in enumerate(self.term_freqs):
+            df_counter.update(tf.keys())
+            for term in tf:
+                postings.setdefault(term, []).append(i)
         self.df = dict(df_counter)
+        self.postings = postings
         self.avgdl = sum(len(t) for t in self.tokens) / max(1, len(self.tokens))
 
     def search(
@@ -117,19 +137,26 @@ class BM25Index:
             for t in set(qtoks)
         }
         qphrase = normalize(query)
+        # Only documents that contain at least one query term can score > 0 (the
+        # original brute-force loop skipped everyone else too, via the `score > 0`
+        # guard below) — the inverted index lets us visit just those directly.
+        # Candidates are processed in ascending doc-index order, matching the
+        # original enumerate(self.notes) order, so ties break identically and
+        # the subsequent stable sort reproduces the exact prior ranking.
+        candidates = set()
+        for t in qtoks:
+            candidates.update(self.postings.get(t, ()))
         scored = []
-        for i, note in enumerate(self.notes):
-            tf = Counter(self.tokens[i])
-            dl = len(self.tokens[i]) or 1
+        for i in sorted(candidates):
+            note = self.notes[i]
+            tf = self.term_freqs[i]
+            dl = self.doc_lens[i]
             score = 0.0
             for t in qtoks:
                 f = tf.get(t, 0)
                 if f:
                     score += idf[t] * (f * (k1 + 1)) / (f + k1 * (1 - b + b * dl / self.avgdl))
-            note_text = note.get("cleaned_text") or clean_note(
-                f"{note.get('title', '')} {note.get('content', '')}"
-            )
-            if score > 0 and len(qphrase) > 6 and qphrase in normalize(note_text):
+            if score > 0 and len(qphrase) > 6 and qphrase in self.normalized_texts[i]:
                 score *= 1.6  # exact-phrase bonus
             if score > 0:
                 note_id = str(note.get("id", i))

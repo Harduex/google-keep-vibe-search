@@ -1,9 +1,227 @@
+import json
 import math
+from pathlib import Path
 
 import pytest
 
+import app.services.categorization_service as cat_mod
 from app.models.label import Label, LabelVocabulary
 from app.services.categorization_service import CategorizationService
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+# T10 / findings P1-P3. A synthetic marker standing in for sampled note text.
+# It must never appear in stdout, stderr, any file, or any client stream frame.
+SENTINEL = "SENTINEL_NOTE_TEXT_7f3a91"
+
+
+def _leaky_exception_message() -> str:
+    """A LiteLLM/httpx-shaped message that embeds the request body.
+
+    This is the whole point of P1: provider exceptions quote the failed request,
+    so `str(e)` carries the prompt — which carries sampled note text.
+    """
+    return (
+        "litellm.APIConnectionError: POST /v1/chat/completions failed - "
+        '{"messages": [{"role": "user", "content": '
+        f'"Title: {SENTINEL}\\nSnippet: {SENTINEL} the rest of the note body"'
+        "}]}"
+    )
+
+
+class _RaisingLLM:
+    """Stub LLM client whose every call fails with a note-text-bearing message."""
+
+    def __init__(self, message: str):
+        self.message = message
+
+    async def complete_with_tools(self, **kwargs):
+        raise RuntimeError(self.message)
+
+    async def complete(self, **kwargs):
+        raise RuntimeError(self.message)
+
+
+class _EmptyLLM:
+    """Stub LLM client that returns an empty completion on every attempt."""
+
+    async def complete_with_tools(self, **kwargs):
+        return {"tool_calls": [], "content": "   "}
+
+    async def complete(self, **kwargs):
+        return "   "
+
+
+async def _instant_sleep(*_args, **_kwargs):
+    return None
+
+
+def _log_like_names(directory: Path):
+    """Names of log-ish files directly in `directory` (never their contents)."""
+    return {
+        p.name
+        for p in directory.iterdir()
+        if p.is_file() and (p.suffix == ".log" or "failure" in p.name.lower())
+    }
+
+
+def _files_containing(directory: Path, needle: str):
+    """Paths under `directory` whose bytes contain `needle`. Returns paths only."""
+    hits = []
+    for path in directory.rglob("*"):
+        if not path.is_file():
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        if needle in text:
+            hits.append(str(path.relative_to(directory)))
+    return hits
+
+
+@pytest.mark.asyncio
+async def test_llm_naming_failure_never_leaks_note_text(tmp_path, monkeypatch, capsys):
+    """P1/P3: a failing naming call must leak nothing to stdout, stderr or disk.
+
+    The service writes its failure log relative to the CWD, so the test runs in a
+    tmp CWD: that keeps the real repo root clean (an existing llm_failures.log
+    there may hold pre-fix leaked text and must never be read or truncated) while
+    still letting us scan the file the code actually writes.
+    """
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(cat_mod.asyncio, "sleep", _instant_sleep)
+
+    root_logs_before = _log_like_names(REPO_ROOT)
+
+    service = CategorizationService(
+        search_service=None,
+        note_service=None,
+        llm=_RaisingLLM(_leaky_exception_message()),
+    )
+
+    result = await service._get_llm_tag_name(
+        notes_text=f"Title: {SENTINEL}\nSnippet: {SENTINEL} note body",
+        keywords="alpha, beta",
+        neighbor_keywords="gamma",
+    )
+    assert result == ""
+
+    captured = capsys.readouterr()
+    assert SENTINEL not in captured.out, "sentinel leaked into stdout"
+    assert SENTINEL not in captured.err, "sentinel leaked into stderr"
+
+    leaked_files = _files_containing(tmp_path, SENTINEL)
+    assert leaked_files == [], f"sentinel leaked into file(s): {leaked_files}"
+
+    new_root_logs = sorted(_log_like_names(REPO_ROOT) - root_logs_before)
+    assert new_root_logs == [], f"log file(s) created in the repo root: {new_root_logs}"
+
+
+@pytest.mark.asyncio
+async def test_llm_failure_log_holds_only_redacted_metadata(tmp_path, monkeypatch, capsys):
+    """The failure log may contain exception types and counters — nothing else."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(cat_mod.asyncio, "sleep", _instant_sleep)
+
+    service = CategorizationService(
+        search_service=None,
+        note_service=None,
+        llm=_RaisingLLM(_leaky_exception_message()),
+    )
+    await service._get_llm_tag_name(
+        notes_text=f"Title: {SENTINEL}\nSnippet: {SENTINEL}",
+        keywords="alpha",
+        neighbor_keywords="beta",
+    )
+    capsys.readouterr()
+
+    log_path = tmp_path / "llm_failures.log"
+    if not log_path.exists():
+        pytest.skip("no failure log written; nothing to audit")
+
+    log_text = log_path.read_text(encoding="utf-8")
+    assert SENTINEL not in log_text, "sentinel leaked into llm_failures.log"
+    for marker in ("Title:", "Snippet:", "messages", "content"):
+        assert marker not in log_text, f"prompt marker {marker!r} leaked into llm_failures.log"
+    long_lines = [i for i, line in enumerate(log_text.splitlines(), 1) if len(line) > 160]
+    assert long_lines == [], f"suspiciously long log line(s) at {long_lines}"
+    assert "RuntimeError" in log_text, "the exception type should still be logged"
+
+
+@pytest.mark.asyncio
+async def test_empty_llm_response_never_leaks_prompt(tmp_path, monkeypatch, capsys):
+    """The empty-response branch also writes to the failure log — audit it too."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(cat_mod.asyncio, "sleep", _instant_sleep)
+
+    service = CategorizationService(
+        search_service=None,
+        note_service=None,
+        llm=_EmptyLLM(),
+    )
+    result = await service._get_llm_tag_name(
+        notes_text=f"Title: {SENTINEL}\nSnippet: {SENTINEL}",
+        keywords="alpha",
+        neighbor_keywords="beta",
+    )
+    assert result == ""
+
+    captured = capsys.readouterr()
+    assert SENTINEL not in captured.out, "sentinel leaked into stdout"
+    assert SENTINEL not in captured.err, "sentinel leaked into stderr"
+    leaked_files = _files_containing(tmp_path, SENTINEL)
+    assert leaked_files == [], f"sentinel leaked into file(s): {leaked_files}"
+
+
+@pytest.mark.asyncio
+async def test_categorize_error_frame_never_leaks_note_text(monkeypatch, capsys):
+    """P3: the client stream frame must carry a redacted exception, not `str(e)`.
+
+    This one leaves the machine, so it matters more than the log.
+    """
+
+    class _ExplodingSearchService:
+        @property
+        def embeddings(self):
+            raise RuntimeError(_leaky_exception_message())
+
+    service = CategorizationService(
+        search_service=_ExplodingSearchService(),
+        note_service=None,
+        llm=_EmptyLLM(),
+    )
+
+    frames = [json.loads(line) async for line in service.categorize()]
+    assert [f["type"] for f in frames] == ["error"]
+
+    error_text = frames[0]["error"]
+    assert SENTINEL not in error_text, "sentinel leaked into the client error frame"
+    assert "RuntimeError" in error_text, "the exception type should still reach the client"
+
+    captured = capsys.readouterr()
+    assert SENTINEL not in captured.out, "sentinel leaked into stdout"
+    assert SENTINEL not in captured.err, "sentinel leaked into stderr (traceback?)"
+
+
+def test_categorization_source_has_no_redaction_bypass():
+    """Static guard for the leak sites that are hard to reach in a tier-1 test.
+
+    `_name_labels_async` is a closure inside the full clustering pipeline, so its
+    error path cannot be driven with stubbed embeddings. Guard it at the source
+    level instead. Reports line numbers only — never file content.
+    """
+    source = (REPO_ROOT / "app" / "services" / "categorization_service.py").read_text(
+        encoding="utf-8"
+    )
+    banned = ("str(e", "traceback.print_exc", "{e}", "{e1}", "repr(raw")
+    offenders = [
+        (lineno, pattern)
+        for lineno, line in enumerate(source.splitlines(), 1)
+        for pattern in banned
+        if pattern in line
+    ]
+    assert offenders == [], f"raw exception/response text at (line, pattern): {offenders}"
 
 
 def test_sanitize_tag_name():

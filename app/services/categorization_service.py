@@ -7,6 +7,7 @@ from typing import Any, AsyncGenerator, Dict, List, Tuple
 import httpx
 import numpy as np
 
+from app.core.redact import safe_exc, safe_meta
 from app.models.label import Label, LabelVocabulary
 from app.prompts.system_prompts import TAG_NAMING_SYSTEM_PROMPT, TAG_NAMING_USER_PROMPT
 from app.services.llm_client import LLMClient
@@ -383,6 +384,18 @@ class CategorizationService:
 
         return selected
 
+    @staticmethod
+    def _log_llm_failure(detail: str) -> None:
+        """Append one already-redacted line to `llm_failures.log`.
+
+        `detail` MUST come from `app.core.redact` (`safe_exc` / `safe_meta`). Never
+        pass a raw exception string, a prompt or note text: provider exceptions
+        quote the request body, and this file is gitignored, so a leak here is
+        both silent and permanent.
+        """
+        with open("llm_failures.log", "a", encoding="utf-8") as f:
+            f.write(f"--- LLM FAILURE --- {detail}\n")
+
     async def _get_llm_tag_name(
         self, notes_text: str, keywords: str, neighbor_keywords: str
     ) -> str:
@@ -433,36 +446,33 @@ class CategorizationService:
             try:
                 raw = await make_call()
                 if not raw or not raw.strip():
-                    print(
-                        f"Empty or whitespace response on attempt {attempt + 1}, raw={repr(raw)}. Retrying..."
-                    )
+                    print(f"          └─ Empty LLM response, {safe_meta(attempt=attempt + 1)}")
                     if attempt < 2:
                         await asyncio.sleep(1)
                         continue
 
-                    # Log to file for debugging WITHOUT exposing the prompt/notes
-                    with open("llm_failures.log", "a", encoding="utf-8") as f:
-                        f.write(f"--- FAILURE (Empty Response) ---\nRAW:{repr(raw)}\n\n")
-                    raise ValueError(f"Empty response after 3 attempts. Raw: {repr(raw)}")
+                    self._log_llm_failure(safe_meta(reason="empty_response", attempt=attempt + 1))
+                    raise ValueError("Empty LLM response after 3 attempts")
 
                 break
             except Exception as e1:
                 if attempt < 2:
-                    print(f"LLM Naming failed attempt {attempt + 1}. e1={e1}. Retrying...")
+                    print(
+                        f"          └─ LLM naming failed: {safe_exc(e1)} "
+                        f"{safe_meta(attempt=attempt + 1)}. Retrying..."
+                    )
                     await asyncio.sleep(1)
                     continue
 
-                with open("llm_failures.log", "a", encoding="utf-8") as f:
-                    f.write(f"--- FAILURE (Exception) ---\nEXCEPTION:{str(e1)}\n\n")
-
-                import traceback
-
-                print(f"LLM Naming failed completely. e1={e1}")
-                traceback.print_exc()
+                # Type + status only. No traceback: its final line is the exception
+                # message, which for a provider error quotes the prompt.
+                self._log_llm_failure(f"{safe_exc(e1)} {safe_meta(attempt=attempt + 1)}")
+                print(f"          └─ LLM naming failed completely: {safe_exc(e1)}")
                 return ""
 
         sanitized = self._sanitize_tag_name(raw)
-        print(f"RAW LLM: {repr(raw)} -> SANITIZED: '{sanitized}'")
+        # `raw` is a model-generated tag, not note text — loggable, but truncated.
+        print(f"          └─ {safe_meta(raw_llm=raw, sanitized=sanitized)}")
         return sanitized
 
     async def categorize(self, granularity: str = "broad") -> AsyncGenerator[bytes, None]:
@@ -527,7 +537,9 @@ class CategorizationService:
                     try:
                         raw = await make_prefix_call(None)
                     except Exception as e:
-                        print(f"Prefix call failed: {e}")
+                        # The prefix prompt embeds harvested note titles, so the
+                        # provider's message is note-derived: type only.
+                        print(f"          └─ Prefix call failed: {safe_exc(e)}")
                         raw = ""
 
                     clean_raw = raw.strip() if raw else ""
@@ -583,7 +595,7 @@ class CategorizationService:
                             if cat == "topic":
                                 anchor_tags.append(tag_name)
                 except Exception as e:
-                    print(f"Prefix classification failed: {e}")
+                    print(f"          └─ Prefix classification failed: {safe_exc(e)}")
 
             print(
                 f"[TAGGING] Step 3/8 ── Running UMAP reduction ({umap_components} components, {umap_neighbors} neighbors)..."
@@ -1028,7 +1040,7 @@ class CategorizationService:
                                     break
 
                     except Exception as e:
-                        print(f"Consolidation failed: {e}")
+                        print(f"          └─ Consolidation failed: {safe_exc(e)}")
 
                     print(
                         f"          └─ Tag consolidation complete ({len(applied_merges)} merges applied)"
@@ -1091,17 +1103,18 @@ class CategorizationService:
                         extra_proposals.extend(gray_zone_merge_proposals(final_labels))
                         extra_proposals.extend(review_assignment_proposals(review_items))
                     except Exception as e:
-                        print(f"Dashboard proposal formatting failed: {e}")
+                        print(f"          └─ Dashboard proposal formatting failed: {safe_exc(e)}")
                         extra_proposals = []
 
                     proposals = vocab.to_proposals() + extra_proposals
                     await queue.put(self._line({"type": "label_updates", "proposals": proposals}))
                     await queue.put(self._line({"type": "done"}))
                 except Exception as e:
-                    import traceback
-
-                    traceback.print_exc()
-                    await queue.put(self._line({"type": "error", "error": str(e)}))
+                    # Redacted type only, no traceback: this frame is streamed to
+                    # the browser, so a raw provider message here would carry note
+                    # text off the machine entirely.
+                    print(f"[TAGGING] Naming task failed: {safe_exc(e)}")
+                    await queue.put(self._line({"type": "error", "error": safe_exc(e)}))
 
             asyncio.create_task(_name_labels_async())
 
@@ -1113,10 +1126,8 @@ class CategorizationService:
                     break
 
         except Exception as e:
-            import traceback
-
-            traceback.print_exc()
-            yield self._line({"type": "error", "error": str(e)})
+            print(f"[TAGGING] Categorization failed: {safe_exc(e)}")
+            yield self._line({"type": "error", "error": safe_exc(e)})
 
     def _build_prototype_vectors(
         self,

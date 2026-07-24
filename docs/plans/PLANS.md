@@ -142,7 +142,7 @@ Tasks discovered while executing the plan. Add here instead of building them
 |---|---|
 | T01 (recorded by T02) | `pre-commit` is invoked by `make setup` as `uv run pre-commit install` but is not a declared project dependency — it resolves to a global binary, so `make setup` breaks on a clean machine. `pyproject.toml` is wave 6 lane Q (T32). |
 | T02 | The CI-green portion of T02's checkpoint is unverified pending the first push to `origin`. |
-| T02 (blocker, no owning lane) | `make check`'s frontend steps use the `Makefile`'s `NVM_SOURCE` prelude, whose `[ -s "$$HOME/.nvm/nvm.sh" ] && …` chain **returns exit 1 when nvm is absent**, so the recipe line fails before `npm run lint` / `tsc -b` / `npm run test` run at all. CI runners have `actions/setup-node`'s node on `PATH` but no nvm, so `.github/workflows/ci.yml` cannot go green as written. Reproduced with `HOME=/tmp/fake-home-no-nvm`; predates T01 (introduced in `365484d`). Fix belongs in the `Makefile` (make the nvm branch a no-op when nvm is absent). **No lane owns the `Makefile` after wave 1** — wave 3 lane G owns eval targets only — so this needs an explicit assignment. |
+| ~~T02 (blocker)~~ **resolved** | `NVM_SOURCE` returned exit 1 when nvm was absent, failing the make recipe line before `npm run lint` / `tsc -b` / `npm run test` ran at all — so `ci.yml` could not go green on a runner (node from `actions/setup-node`, no nvm). Predated T01 (introduced in `365484d`). Fixed as a one-off orchestrator commit: the prelude is now an `if` that no-ops when nvm is absent while still propagating a genuine nvm failure. |
 
 ## Verification
 

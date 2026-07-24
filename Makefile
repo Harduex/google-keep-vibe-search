@@ -1,5 +1,9 @@
 SHELL := /bin/bash
-NVM_SOURCE = [ -s "$$HOME/.nvm/nvm.sh" ] && . "$$HOME/.nvm/nvm.sh" && nvm install 20 && nvm use 20
+# Pin node 20 via nvm when nvm is installed. When it is not (CI runners get node from
+# actions/setup-node, on PATH, with no nvm), this is a no-op instead of a failure: the old
+# `[ -s ... ] && ...` chain returned exit 1 when the file was missing, which failed the make
+# recipe line before npm/tsc ever ran. A real nvm error still propagates — this is not `|| true`.
+NVM_SOURCE = if [ -s "$$HOME/.nvm/nvm.sh" ]; then . "$$HOME/.nvm/nvm.sh" && nvm install 20 && nvm use 20; fi
 
 .PHONY: setup dev dev-backend dev-frontend test lint format check build eval
 

@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     llm_provider: str = "ollama"
     llm_temperature: float = 0.1
     llm_max_tokens: int = 2048
+    llm_context_window: int = 131072
     chat_context_notes: int = 10
 
     # Agent mode

@@ -86,6 +86,17 @@ type StreamMessage =
   | StreamAgentStepMessage
   | StreamGroundingMessage;
 
+export interface ChatModelInfo {
+  model: string;
+  max_input_tokens: number;
+  max_output_tokens: number;
+  chat_context_notes: number;
+  chat_max_recent_messages: number;
+  chat_summarization_threshold: number;
+  agent_max_steps: number;
+  enable_agent_mode: boolean;
+}
+
 export const useChat = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -93,6 +104,7 @@ export const useChat = () => {
   const [relevantNotes, setRelevantNotes] = useState<Note[]>([]);
   const [conflicts, setConflicts] = useState<ConflictInfo[]>([]);
   const [modelName, setModelName] = useState<string | null>(null);
+  const [modelInfo, setModelInfo] = useState<ChatModelInfo | null>(null);
   const [useNotesContext, setUseNotesContext] = useState<boolean>(true);
   const [topic, setTopic] = useState<string>('');
   const [currentPhase, setCurrentPhase] = useState<string | null>(null);
@@ -109,13 +121,23 @@ export const useChat = () => {
   const rafIdRef = useRef<number | null>(null);
   const lastSeqRef = useRef<number | null>(null);
 
-  // Fetch the model name on mount
+  // Fetch the model info on mount
   useEffect(() => {
     const fetchModelInfo = async () => {
       try {
         const response = await fetch(API_ROUTES.CHAT_MODEL);
         const data = await response.json();
         setModelName(data.model);
+        setModelInfo({
+          model: data.model || '',
+          max_input_tokens: data.max_input_tokens || 8192,
+          max_output_tokens: data.max_output_tokens || 2048,
+          chat_context_notes: data.chat_context_notes || 10,
+          chat_max_recent_messages: data.chat_max_recent_messages || 6,
+          chat_summarization_threshold: data.chat_summarization_threshold || 12,
+          agent_max_steps: data.agent_max_steps || 5,
+          enable_agent_mode: !!data.enable_agent_mode,
+        });
       } catch (err) {
         // eslint-disable-next-line no-console
         console.error('Error fetching model info:', err);
@@ -532,6 +554,7 @@ export const useChat = () => {
     relevantNotes,
     conflicts,
     modelName,
+    modelInfo,
     useNotesContext,
     topic,
     currentPhase,

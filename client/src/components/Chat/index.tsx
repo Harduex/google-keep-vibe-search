@@ -29,6 +29,7 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
     relevantNotes,
     conflicts,
     modelName,
+    modelInfo,
     useNotesContext,
     toggleNotesContext,
     topic,
@@ -45,6 +46,35 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
     deleteSession,
     renameSession,
   } = useChat();
+
+  // Estimate token count for a text string (~4 chars per token)
+  const estimateTokens = (text: string): number => {
+    if (!text) return 0;
+    return Math.ceil(text.length / 4);
+  };
+
+  const maxRecentMsgs = modelInfo?.chat_max_recent_messages || 6;
+  const recentMessages = messages.slice(-maxRecentMsgs);
+  const conversationTokens = recentMessages.reduce(
+    (acc, msg) => acc + estimateTokens(msg.content),
+    0,
+  );
+
+  const notesTokens = useNotesContext
+    ? relevantNotes.reduce(
+        (acc, note) => acc + estimateTokens(`${note.title || ''} ${note.content || ''}`),
+        0,
+      )
+    : 0;
+
+  const systemBaseTokens = 200;
+  const totalInputTokens = conversationTokens + notesTokens + systemBaseTokens;
+  const maxInputTokens = modelInfo?.max_input_tokens || 8192;
+  const maxOutputTokens = modelInfo?.max_output_tokens || 2048;
+  const remainingTokens = Math.max(0, maxInputTokens - totalInputTokens);
+  const usagePct = Math.min(100, Math.round((totalInputTokens / maxInputTokens) * 100));
+  const remainingPct = Math.max(0, 100 - usagePct);
+  const maxNotesConfig = modelInfo?.chat_context_notes || 10;
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -118,7 +148,7 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
   return (
     <div className="chat-container">
       <div className="chat-header">
-        <h2>
+        <div className="header-title-area">
           <button
             className="sidebar-toggle-btn"
             onClick={toggleSidebar}
@@ -126,11 +156,31 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
           >
             <span className="material-icons">{sidebarOpen ? 'menu_open' : 'menu'}</span>
           </button>
-          <span className="material-icons">chat</span>
-          AI Assistant
-          {modelName && <span className="model-info">Using {modelName}</span>}
-        </h2>
+          <span className="material-icons chat-title-icon">chat</span>
+          <span className="chat-title-text">AI Assistant</span>
+          {modelName && <span className="model-tag-badge">{modelName}</span>}
+        </div>
+
         <div className="chat-controls">
+          <div
+            className="context-usage-badge"
+            title={`Model Context Window: ${maxInputTokens.toLocaleString()} tokens\nMax Output Limit: ${maxOutputTokens.toLocaleString()} tokens\n\nActive Context Breakdown:\n• Notes Context: ${relevantNotes.length} / ${maxNotesConfig} notes (~${notesTokens.toLocaleString()} tokens)\n• Message Window: ${recentMessages.length} msgs (~${conversationTokens.toLocaleString()} tokens)\n• System Base Prompt: ~${systemBaseTokens} tokens\n• Total Input Used: ~${totalInputTokens.toLocaleString()} tokens\n• Remaining Input Capacity: ~${remainingTokens.toLocaleString()} tokens (${remainingPct}% left)`}
+          >
+            <span className="material-icons context-icon">memory</span>
+            <span className="context-text">
+              Context: <strong>~{totalInputTokens.toLocaleString()}</strong> /{' '}
+              {maxInputTokens.toLocaleString()} tokens
+            </span>
+            <div className="context-progress-bar">
+              <div
+                className={`context-progress-fill ${
+                  usagePct > 85 ? 'danger' : usagePct > 65 ? 'warning' : 'normal'
+                }`}
+                style={{ width: `${Math.min(100, Math.max(4, usagePct))}%` }}
+              />
+            </div>
+            <span className="context-remaining">({remainingPct}% left)</span>
+          </div>
           {isLoading && (
             <button
               className="stop-button"

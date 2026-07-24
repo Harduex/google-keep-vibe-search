@@ -10,19 +10,43 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
-.chat-header h2 {
+.header-title-area {
   display: flex;
   align-items: center;
   gap: 10px;
   margin: 0;
-  font-size: 1.5rem;
+  flex-shrink: 0;
 }
 
-.chat-header .material-icons {
-  color: var(--primary-color);
+.chat-title-text {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--text-color, #ffffff);
+  white-space: nowrap;
+}
+
+.chat-title-icon {
+  font-size: 1.4rem;
+  color: var(--primary-color, #4a90e2);
+}
+
+.model-tag-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.76rem;
+  font-weight: 500;
+  padding: 3px 9px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--text-secondary-color, #bbbbbb);
+  white-space: nowrap;
+  letter-spacing: 0.2px;
 }
 
 /* Chat controls - standardized button sizes */
@@ -33,11 +57,67 @@
   flex-wrap: wrap;
 }
 
-.model-info {
-  font-size: 0.8rem;
-  font-weight: normal;
-  margin-left: 10px;
-  opacity: 0.7;
+/* Context usage indicator badge */
+.context-usage-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface-color, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+  border-radius: 8px;
+  padding: 6px 12px;
+  height: 36px;
+  font-size: 0.82rem;
+  color: var(--text-color, #e0e0e0);
+  cursor: help;
+  user-select: none;
+  transition: all 0.2s ease;
+}
+
+.context-usage-badge:hover {
+  background: var(--surface-hover-color, rgba(255, 255, 255, 0.1));
+  border-color: var(--primary-color, #4a90e2);
+}
+
+.context-usage-badge .material-icons {
+  font-size: 1rem;
+  color: var(--primary-color, #4a90e2);
+}
+
+.context-text {
+  white-space: nowrap;
+}
+
+.context-progress-bar {
+  width: 50px;
+  height: 6px;
+  background: rgba(128, 128, 128, 0.25);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.context-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.context-progress-fill.normal {
+  background: #4caf50;
+}
+
+.context-progress-fill.warning {
+  background: #ff9800;
+}
+
+.context-progress-fill.danger {
+  background: #f44336;
+}
+
+.context-remaining {
+  font-size: 0.78rem;
+  opacity: 0.75;
+  white-space: nowrap;
 }
 
 /* Standard button styling for all chat buttons */

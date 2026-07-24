@@ -59,8 +59,49 @@ export const ChatMessage = memo(({ message, onCitationClick }: ChatMessageProps)
   }, [content, role]);
 
   const toggleThinking = useCallback(() => {
-    setIsThinkingExpanded(!isThinkingExpanded);
-  }, [isThinkingExpanded]);
+    setIsThinkingExpanded((prev) => !prev);
+  }, []);
+
+  const markdownComponents = useMemo(
+    () => ({
+      code({ className, children, ...props }: React.ComponentPropsWithoutRef<'code'>) {
+        const match = /language-(\w+)/.exec(className || '');
+        const isInline = !match && !String(children).includes('\n');
+        return isInline ? (
+          <code className="inline-code" {...props}>
+            {children}
+          </code>
+        ) : (
+          <div className="code-block-wrapper">
+            {match && <div className="code-block-header">{match[1]}</div>}
+            <pre className="code-block">
+              <code className={className} {...props}>
+                {children}
+              </code>
+            </pre>
+          </div>
+        );
+      },
+      a({ href, children }: React.ComponentPropsWithoutRef<'a'>) {
+        return (
+          <a href={href} target="_blank" rel="noopener noreferrer" className="markdown-link">
+            {children}
+          </a>
+        );
+      },
+      blockquote({ children }: React.ComponentPropsWithoutRef<'blockquote'>) {
+        return <blockquote className="markdown-blockquote">{children}</blockquote>;
+      },
+      table({ children }: React.ComponentPropsWithoutRef<'table'>) {
+        return (
+          <div className="table-container">
+            <table className="markdown-table">{children}</table>
+          </div>
+        );
+      },
+    }),
+    [],
+  );
 
   return (
     <div className={`chat-message ${role === 'assistant' ? 'assistant' : 'user'}`}>
@@ -80,15 +121,18 @@ export const ChatMessage = memo(({ message, onCitationClick }: ChatMessageProps)
               onClick={toggleThinking}
               aria-expanded={isThinkingExpanded}
             >
-              <span className="material-icons">
+              <span className="material-icons thinking-icon">psychology</span>
+              <span className="thinking-toggle-text">
+                {isThinkingExpanded ? 'Hide thinking' : 'Show thinking'}
+              </span>
+              <span className="material-icons toggle-arrow">
                 {isThinkingExpanded ? 'expand_less' : 'expand_more'}
               </span>
-              {isThinkingExpanded ? 'Hide thinking' : 'Show thinking'}
             </button>
 
             {isThinkingExpanded && (
               <div className="thinking-content">
-                <ReactMarkdown>{thinkingContent}</ReactMarkdown>
+                <ReactMarkdown components={markdownComponents}>{thinkingContent}</ReactMarkdown>
               </div>
             )}
           </div>
@@ -96,7 +140,7 @@ export const ChatMessage = memo(({ message, onCitationClick }: ChatMessageProps)
 
         {processedContent && (
           <div className="message-text">
-            <ReactMarkdown>{processedContent}</ReactMarkdown>
+            <ReactMarkdown components={markdownComponents}>{processedContent}</ReactMarkdown>
           </div>
         )}
 

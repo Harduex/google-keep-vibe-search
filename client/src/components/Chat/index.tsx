@@ -19,6 +19,7 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
   const [showTopicInput, setShowTopicInput] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatMessagesRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const {
     messages,
@@ -49,7 +50,9 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
 
   // Estimate token count for a text string (~4 chars per token)
   const estimateTokens = (text: string): number => {
-    if (!text) return 0;
+    if (!text) {
+      return 0;
+    }
     return Math.ceil(text.length / 4);
   };
 
@@ -76,10 +79,33 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
   const remainingPct = Math.max(0, 100 - usagePct);
   const maxNotesConfig = modelInfo?.chat_context_notes || 10;
 
-  // Scroll to bottom when messages change
+  const userHasScrolledUpRef = useRef(false);
+
+  const scrollToBottom = useCallback((smooth = true) => {
+    messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
+  }, []);
+
+  // Listen to scroll events: if user manually scrolls away from bottom,
+  // immediately pause auto-scroll. Resume when user scrolls back to bottom.
+  const handleScroll = useCallback(() => {
+    const container = chatMessagesRef.current;
+    if (!container) {
+      return;
+    }
+    const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 40;
+    if (isAtBottom) {
+      userHasScrolledUpRef.current = false;
+    } else {
+      userHasScrolledUpRef.current = true;
+    }
+  }, []);
+
+  // Smart auto-scroll: scroll to bottom while streaming ONLY IF user has not scrolled away
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    if (!userHasScrolledUpRef.current) {
+      scrollToBottom(!isLoading);
+    }
+  }, [messages, agentSteps, currentPhase, isLoading, scrollToBottom]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -96,10 +122,12 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
         return;
       }
 
+      userHasScrolledUpRef.current = false;
       sendMessage(inputValue.trim());
       setInputValue('');
+      setTimeout(() => scrollToBottom(true), 50);
     },
-    [inputValue, isLoading, sendMessage],
+    [inputValue, isLoading, sendMessage, scrollToBottom],
   );
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -125,11 +153,13 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
         if (!inputValue.trim() || isLoading) {
           return;
         }
+        userHasScrolledUpRef.current = false;
         sendMessage(inputValue.trim());
         setInputValue('');
+        setTimeout(() => scrollToBottom(true), 50);
       }
     },
-    [inputValue, isLoading, sendMessage],
+    [inputValue, isLoading, sendMessage, scrollToBottom],
   );
 
   const toggleSidebar = useCallback(() => {
@@ -144,6 +174,11 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
       setTimeout(() => el.classList.remove('citation-highlight'), 2000);
     }
   }, []);
+
+  const lastMessage = messages[messages.length - 1];
+  const isLastMessageAssistant = lastMessage?.role === 'assistant';
+  const previousMessages = isLastMessageAssistant ? messages.slice(0, -1) : messages;
+  const activeAssistantMessage = isLastMessageAssistant ? lastMessage : null;
 
   return (
     <div className="chat-container">
@@ -238,31 +273,44 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
         )}
 
         <div className="chat-messages-container">
-          <div className="chat-messages">
+          <div className="chat-messages" ref={chatMessagesRef} onScroll={handleScroll}>
             {messages.length === 0 ? (
               <div className="empty-chat">
                 <span className="material-icons">smart_toy</span>
                 <p>Ask me anything about your notes!</p>
               </div>
             ) : (
-              messages.map((message, index) => (
-                <ChatMessage key={index} message={message} onCitationClick={handleCitationClick} />
-              ))
+              <>
+                {previousMessages.map((message, index) => (
+                  <ChatMessage
+                    key={index}
+                    message={message}
+                    onCitationClick={handleCitationClick}
+                  />
+                ))}
+                {agentSteps.length > 0 ? (
+                  <AgentSteps steps={agentSteps} isActive={isLoading} />
+                ) : currentPhase ? (
+                  <div className="phase-indicator">
+                    <span className="material-icons phase-icon">
+                      {currentPhase === 'searching' ? 'search' : 'edit'}
+                    </span>
+                    <span className="phase-text">
+                      {currentPhase === 'searching'
+                        ? 'Searching your notes...'
+                        : 'Generating response...'}
+                    </span>
+                  </div>
+                ) : null}
+                {activeAssistantMessage && (
+                  <ChatMessage
+                    key={messages.length - 1}
+                    message={activeAssistantMessage}
+                    onCitationClick={handleCitationClick}
+                  />
+                )}
+              </>
             )}
-            {agentSteps.length > 0 ? (
-              <AgentSteps steps={agentSteps} isActive={isLoading} />
-            ) : currentPhase ? (
-              <div className="phase-indicator">
-                <span className="material-icons phase-icon">
-                  {currentPhase === 'searching' ? 'search' : 'edit'}
-                </span>
-                <span className="phase-text">
-                  {currentPhase === 'searching'
-                    ? 'Searching your notes...'
-                    : 'Generating response...'}
-                </span>
-              </div>
-            ) : null}
             {groundingResult && !isLoading && <GroundingScore result={groundingResult} />}
             {suggestions.length > 0 && !isLoading && (
               <div className="suggestion-chips">

@@ -141,68 +141,70 @@ export const NoteCard = memo(
         )}
 
         <div className="note-header">
-          {/* Badges */}
-          {note.pinned && <span className="note-badge badge-pinned">Pinned</span>}
-          {note.archived && <span className="note-badge badge-archived">Archived</span>}
-          {note.tags?.map((tagName) => (
-            <span
-              key={tagName}
-              className={`note-badge badge-tag${editingTag === tagName ? ' editing' : ''}`}
-              title={`Tagged: ${tagName}`}
-            >
-              {editingTag === tagName ? (
-                <>
-                  <input
-                    ref={editInputRef}
-                    className="tag-edit-input"
-                    value={editValue}
-                    onChange={(e) => setEditValue(e.target.value)}
-                    onKeyDown={(e) => handleEditKeyDown(e, tagName)}
-                    onBlur={() => handleEditBlur(tagName)}
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                </>
-              ) : (
-                <>
-                  <span className="material-icons">label</span>
-                  {tagName}
-                  {onRenameTag && (
-                    <button
-                      className="tag-edit-button"
-                      onClick={(e) => handleStartEditTag(e, tagName)}
-                      title="Rename tag"
-                      aria-label={`Rename tag ${tagName}`}
-                    >
-                      <span className="material-icons">edit</span>
-                    </button>
-                  )}
-                  {onRemoveTag && (
-                    <button
-                      className="tag-remove-button"
-                      onClick={(e) => handleRemoveTag(e, tagName)}
-                      title="Remove tag"
-                      aria-label={`Remove tag ${tagName}`}
-                    >
-                      <span className="material-icons">close</span>
-                    </button>
-                  )}
-                </>
-              )}
-            </span>
-          ))}
-          {scorePercentage ? (
-            <span className="note-badge badge-score">{scorePercentage}% match</span>
-          ) : null}
-          {hasMatchingImages && (
-            <span className="note-badge badge-image-match">
-              <span className="material-icons">image_search</span> Image match
-            </span>
-          )}
-
           {/* Title */}
           {note.title && (
             <div className="note-title" dangerouslySetInnerHTML={{ __html: highlightedTitle }} />
           )}
+
+          {/* Badges */}
+          <div className="note-badges">
+            {note.pinned && <span className="note-badge badge-pinned">Pinned</span>}
+            {note.archived && <span className="note-badge badge-archived">Archived</span>}
+            {note.tags?.map((tagName) => (
+              <span
+                key={tagName}
+                className={`note-badge badge-tag${editingTag === tagName ? ' editing' : ''}`}
+                title={`Tagged: ${tagName}`}
+              >
+                {editingTag === tagName ? (
+                  <>
+                    <input
+                      ref={editInputRef}
+                      className="tag-edit-input"
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      onKeyDown={(e) => handleEditKeyDown(e, tagName)}
+                      onBlur={() => handleEditBlur(tagName)}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <span className="material-icons">label</span>
+                    {tagName}
+                    {onRenameTag && (
+                      <button
+                        className="tag-edit-button"
+                        onClick={(e) => handleStartEditTag(e, tagName)}
+                        title="Rename tag"
+                        aria-label={`Rename tag ${tagName}`}
+                      >
+                        <span className="material-icons">edit</span>
+                      </button>
+                    )}
+                    {onRemoveTag && (
+                      <button
+                        className="tag-remove-button"
+                        onClick={(e) => handleRemoveTag(e, tagName)}
+                        title="Remove tag"
+                        aria-label={`Remove tag ${tagName}`}
+                      >
+                        <span className="material-icons">close</span>
+                      </button>
+                    )}
+                  </>
+                )}
+              </span>
+            ))}
+            {scorePercentage ? (
+              <span className="note-badge badge-score">{scorePercentage}% match</span>
+            ) : null}
+            {hasMatchingImages && (
+              <span className="note-badge badge-image-match">
+                <span className="material-icons">image_search</span> Image match
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Content */}

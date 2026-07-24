@@ -1,4 +1,5 @@
 import os
+
 import numpy as np
 
 from app.services.note_service import NoteService
@@ -19,13 +20,19 @@ def test_tagging_pipeline_full_and_incremental(tmp_path, monkeypatch):
                 c["name"] = f"topic {i + 1}"
         return clusters
 
-    monkeypatch.setattr("app.services.tagging.pipeline.name_clusters_sequential", stub_name_clusters)
+    monkeypatch.setattr(
+        "app.services.tagging.pipeline.name_clusters_sequential", stub_name_clusters
+    )
     monkeypatch.setattr("app.services.tagging.pipeline.adjudicate_gray_pairs", lambda gray: [])
 
     # Setup dummy note_service
     ns = NoteService()
     dummy_notes = [
-        {"id": f"note_{i}", "title": f"Note {i}", "content": f"Content for note {i} python programming"}
+        {
+            "id": f"note_{i}",
+            "title": f"Note {i}",
+            "content": f"Content for note {i} python programming",
+        }
         for i in range(25)
     ]
     ns.notes = dummy_notes
@@ -56,7 +63,11 @@ def test_tagging_pipeline_full_and_incremental(tmp_path, monkeypatch):
 
     monkeypatch.setattr("app.services.tagging.pipeline.name_clusters_sequential", spy_llm_call)
 
-    new_note = {"id": "note_new", "title": "New Python Note", "content": "Learning python programming"}
+    new_note = {
+        "id": "note_new",
+        "title": "New Python Note",
+        "content": "Learning python programming",
+    }
     ns.notes.append(new_note)
 
     res3 = run_tagging_pipeline(ns, incremental=True)

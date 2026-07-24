@@ -39,7 +39,7 @@ Rules:
 
 
 def normalize_tag(tag: str) -> str:
-    cleaned = tag.strip().lower().strip('"\'`')
+    cleaned = tag.strip().lower().strip("\"'`")
     if cleaned.endswith("."):
         cleaned = cleaned[:-1].strip()
     return re.sub(r"\s+", " ", cleaned)
@@ -183,9 +183,7 @@ def adjudicate_gray_pairs(gray_pairs: List[Dict[str, Any]]) -> List[MergeDecisio
                 else:
                     decisions.append(d)
             else:
-                decisions.append(
-                    MergeDecision(tag_a=d.tag_a, tag_b=d.tag_b, verdict="keep_both")
-                )
+                decisions.append(MergeDecision(tag_a=d.tag_a, tag_b=d.tag_b, verdict="keep_both"))
 
     except Exception as e:
         print(f"Warning: LLM gray zone adjudication error: {e}")

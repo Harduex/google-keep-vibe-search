@@ -82,7 +82,9 @@ def run_tagging_pipeline(
 ) -> Dict[str, Any]:
     """Run full or incremental tagging pipeline."""
     mode_str = "incremental" if incremental else "full"
-    print(f"[TAGGING PIPELINE] 🚀 Starting pipeline (mode: '{mode_str}', force_refresh={force_refresh})...")
+    print(
+        f"[TAGGING PIPELINE] 🚀 Starting pipeline (mode: '{mode_str}', force_refresh={force_refresh})..."
+    )
     notes = note_service.load_notes(force_refresh=force_refresh)
     if not notes:
         print("[TAGGING PIPELINE] ⚠️ No notes found to tag.")
@@ -102,12 +104,16 @@ def run_tagging_pipeline(
         embed_cache = load_tag_embeddings_cache()
         new_notes = [n for n in notes if clean_note(n["raw_text"]) not in embed_cache]
 
-        print(f"[TAGGING PIPELINE - Incremental] Step 1/4 ── Loaded {len(notes)} notes ({len(new_notes)} new/changed)")
+        print(
+            f"[TAGGING PIPELINE - Incremental] Step 1/4 ── Loaded {len(notes)} notes ({len(new_notes)} new/changed)"
+        )
         if len(new_notes) / len(notes) > 0.20:
             print("          └─ ⚠️ >20% of vault is new/changed — recommend full re-run")
 
         cleaned_texts = [n["cleaned_text"] for n in notes]
-        print(f"[TAGGING PIPELINE - Incremental] Step 2/4 ── Computing embeddings for {len(cleaned_texts)} notes...")
+        print(
+            f"[TAGGING PIPELINE - Incremental] Step 2/4 ── Computing embeddings for {len(cleaned_texts)} notes..."
+        )
         embeddings = embed_notes(cleaned_texts)
 
         # Reconstruct centroids from manifest
@@ -121,8 +127,12 @@ def run_tagging_pipeline(
         labels = np.full(len(notes), -1, dtype=int)
         probabilities = np.zeros(len(notes), dtype=float)
 
-        print(f"[TAGGING PIPELINE - Incremental] Step 3/4 ── Assigning tags via {len(centroids)} manifest centroids...")
-        assignments = assign_tags_to_notes(embeddings, labels, probabilities, centroids, cluster_tags)
+        print(
+            f"[TAGGING PIPELINE - Incremental] Step 3/4 ── Assigning tags via {len(centroids)} manifest centroids..."
+        )
+        assignments = assign_tags_to_notes(
+            embeddings, labels, probabilities, centroids, cluster_tags
+        )
 
         # Apply assignments to note_service
         bulk_assignments = {}
@@ -130,7 +140,9 @@ def run_tagging_pipeline(
             if assign["tags"] and not assign["review"]:
                 bulk_assignments[note["id"]] = assign["tags"]
         if bulk_assignments:
-            print(f"[TAGGING PIPELINE - Incremental] Step 4/4 ── Applied {len(bulk_assignments)} bulk assignments")
+            print(
+                f"[TAGGING PIPELINE - Incremental] Step 4/4 ── Applied {len(bulk_assignments)} bulk assignments"
+            )
             note_service.bulk_tag_notes(bulk_assignments)
 
         stats = compute_assignment_stats(assignments)
@@ -147,7 +159,9 @@ def run_tagging_pipeline(
     cleaned_texts = [n["cleaned_text"] for n in notes]
     print(f"[TAGGING PIPELINE - Full] Step 1/7 ── Loaded & cleaned {len(notes)} notes")
 
-    print(f"[TAGGING PIPELINE - Full] Step 2/7 ── Computing embeddings for {len(cleaned_texts)} notes...")
+    print(
+        f"[TAGGING PIPELINE - Full] Step 2/7 ── Computing embeddings for {len(cleaned_texts)} notes..."
+    )
     embeddings = embed_notes(cleaned_texts)  # Step 3: Embed
 
     print(f"[TAGGING PIPELINE - Full] Step 3/7 ── Running HDBSCAN clustering...")
@@ -160,7 +174,9 @@ def run_tagging_pipeline(
         if label != -1:
             cluster_notes_map.setdefault(label, []).append(i)
 
-    print(f"[TAGGING PIPELINE - Full] Step 4/7 ── Computed centroids for {len(unique_clusters)} clusters ({np.sum(labels == -1)} noise notes)")
+    print(
+        f"[TAGGING PIPELINE - Full] Step 4/7 ── Computed centroids for {len(unique_clusters)} clusters ({np.sum(labels == -1)} noise notes)"
+    )
 
     # Step 6 & 7: c-TF-IDF & Sampling
     cluster_payloads: List[Dict[str, Any]] = []
@@ -200,7 +216,9 @@ def run_tagging_pipeline(
         )
 
     # Step 8: Name clusters (LLM for un-reused clusters)
-    print(f"[TAGGING PIPELINE - Full] Step 5/7 ── Naming {len(cluster_payloads)} clusters sequentially...")
+    print(
+        f"[TAGGING PIPELINE - Full] Step 5/7 ── Naming {len(cluster_payloads)} clusters sequentially..."
+    )
     named_clusters = name_clusters_sequential(cluster_payloads)
     cluster_tags: Dict[int, str] = {}
     for c in named_clusters:
@@ -278,7 +296,9 @@ def run_tagging_pipeline(
     save_manifest(new_manifest)
 
     stats = compute_assignment_stats(assignments)
-    print(f"[TAGGING PIPELINE - Full] ✅ Complete ── {stats['tagged_pct']}% notes tagged, {len(proposals)} proposals generated")
+    print(
+        f"[TAGGING PIPELINE - Full] ✅ Complete ── {stats['tagged_pct']}% notes tagged, {len(proposals)} proposals generated"
+    )
     return {
         "status": "success",
         "mode": "full",

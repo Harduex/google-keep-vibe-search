@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 NVM_SOURCE = [ -s "$$HOME/.nvm/nvm.sh" ] && . "$$HOME/.nvm/nvm.sh" && nvm install 20 && nvm use 20
 
-.PHONY: setup dev dev-backend dev-frontend test lint build
+.PHONY: setup dev dev-backend dev-frontend test lint format check build eval
 
 setup:
 	@echo "=== Setting up Python backend ==="
@@ -13,6 +13,8 @@ setup:
 		cp .env.example .env; \
 		echo "IMPORTANT: Edit .env and set GOOGLE_KEEP_PATH to your Google Keep export folder."; \
 	fi
+	@echo "=== Installing git hooks ==="
+	uv run pre-commit install
 
 dev:
 	@echo "Starting backend and frontend..."
@@ -30,12 +32,30 @@ test:
 	@echo "=== Testing Node frontend ==="
 	cd client && $(NVM_SOURCE) && npm run test
 
-lint:
-	@echo "=== Linting/Formatting Python backend ==="
+# Mutating: rewrites files in place. Do not use to satisfy the `make check` gate.
+format:
+	@echo "=== Formatting Python backend ==="
 	uv run black app tests
 	uv run isort app tests
+	@echo "=== Formatting/Linting Node frontend ==="
+	cd client && $(NVM_SOURCE) && npm run fix
+
+# Non-mutating: the CI/checkpoint gate. Never writes to the tree.
+check:
+	@echo "=== Checking Python formatting ==="
+	uv run black --check app tests
+	uv run isort --check-only app tests
 	@echo "=== Linting Node frontend ==="
 	cd client && $(NVM_SOURCE) && npm run lint
+	@echo "=== Type-checking Node frontend ==="
+	cd client && $(NVM_SOURCE) && npx tsc -b
+	@echo "=== Testing Python backend ==="
+	GOOGLE_KEEP_PATH=. uv run pytest
+	@echo "=== Testing Node frontend ==="
+	cd client && $(NVM_SOURCE) && npm run test
+
+# Alias so the old habit fails loudly (non-zero exit) instead of silently rewriting files.
+lint: check
 
 build:
 	@echo "=== Building Node frontend ==="
@@ -44,3 +64,5 @@ build:
 eval:
 	@echo "=== Evaluating Categorization Pipeline ==="
 	uv run python scripts/eval_categorization.py
+
+-include bench/bench.mk

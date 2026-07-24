@@ -45,7 +45,7 @@ make setup
 .\scripts\setup.ps1
 ```
 
-This creates a Python virtual environment via `uv`, installs all dependencies, installs frontend packages, and copies `.env.example` → `.env` on first run.
+This creates a Python virtual environment via `uv`, installs all dependencies, installs frontend packages, copies `.env.example` → `.env` on first run, and installs the pre-commit git hooks.
 
 ### 3. Edit `.env`
 
@@ -202,9 +202,15 @@ cd client && npm test
 
 ### Code formatting
 
-**Unified Command (Linux / macOS):**
+**Check only, non-mutating (also what CI runs):**
 ```bash
-make lint
+make check    # black --check, isort --check-only, eslint, tsc -b, pytest, vitest run
+```
+`make lint` is an alias of `make check` — it does **not** rewrite files.
+
+**Rewrite files in place:**
+```bash
+make format   # black, isort, npm run fix (prettier --write + eslint --fix)
 ```
 
 **Python (manual):**
@@ -217,6 +223,11 @@ uv run isort app tests
 ```bash
 cd client && npm run fix
 ```
+
+### Git hooks
+
+`make setup` runs `pre-commit install` so the hooks in `.pre-commit-config.yaml` run on every commit.
+To install them manually: `uv run pre-commit install`.
 
 ---
 

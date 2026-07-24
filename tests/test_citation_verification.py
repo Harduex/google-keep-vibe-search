@@ -3,7 +3,9 @@ from app.services.context_builder import ContextBuilder
 
 
 def test_verify_citations_strips_invalid():
-    text = "Mechanical keyboards are customizable [Note #2], but quantum computing is fast [Note #99]."
+    text = (
+        "Mechanical keyboards are customizable [Note #2], but quantum computing is fast [Note #99]."
+    )
     cleaned, valid, invalid = verify_citations(text, retrieved_count=5)
 
     assert invalid == [99]

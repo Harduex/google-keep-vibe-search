@@ -3,9 +3,24 @@ from app.search import VibeSearch
 
 def test_hybrid_search_rare_verbatim_term_ranks_top_3(tmp_path, monkeypatch):
     notes = [
-        {"id": "n1", "title": "Baking", "content": "Regular recipe note for baking chocolate chip cookies.", "cleaned_text": "Baking Regular recipe note for baking chocolate chip cookies."},
-        {"id": "n2", "title": "Music Instruments", "content": "Rare term note containing the unique keyword xylophone zookeeper.", "cleaned_text": "Music Instruments Rare term note containing the unique keyword xylophone zookeeper."},
-        {"id": "n3", "title": "Software", "content": "Another general note about software engineering.", "cleaned_text": "Software Another general note about software engineering."},
+        {
+            "id": "n1",
+            "title": "Baking",
+            "content": "Regular recipe note for baking chocolate chip cookies.",
+            "cleaned_text": "Baking Regular recipe note for baking chocolate chip cookies.",
+        },
+        {
+            "id": "n2",
+            "title": "Music Instruments",
+            "content": "Rare term note containing the unique keyword xylophone zookeeper.",
+            "cleaned_text": "Music Instruments Rare term note containing the unique keyword xylophone zookeeper.",
+        },
+        {
+            "id": "n3",
+            "title": "Software",
+            "content": "Another general note about software engineering.",
+            "cleaned_text": "Software Another general note about software engineering.",
+        },
     ]
 
     engine = VibeSearch.__new__(VibeSearch)
@@ -35,11 +50,36 @@ def test_hybrid_search_rare_verbatim_term_ranks_top_3(tmp_path, monkeypatch):
 
 def test_hybrid_search_5_queries_bg_and_en():
     notes = [
-        {"id": "bg1", "title": "Баница", "content": "Традиционна българска рецепта за вкусна баница с сирене.", "cleaned_text": "Баница Традиционна българска рецепта за вкусна баница с сирене."},
-        {"id": "bg2", "title": "Почивка", "content": "Идеи и планиране на лятна почивка на море.", "cleaned_text": "Почивка Идеи и планиране на лятна почивка на море."},
-        {"id": "en1", "title": "Async Python", "content": "Guide on python async asyncio framework performance.", "cleaned_text": "Async Python Guide on python async asyncio framework performance."},
-        {"id": "en2", "title": "Keyboards", "content": "Comparison of mechanical keyboard switches for typing.", "cleaned_text": "Keyboards Comparison of mechanical keyboard switches for typing."},
-        {"id": "en3", "title": "FastAPI", "content": "Building fast REST API endpoints with fastapi routes.", "cleaned_text": "FastAPI Building fast REST API endpoints with fastapi routes."},
+        {
+            "id": "bg1",
+            "title": "Баница",
+            "content": "Традиционна българска рецепта за вкусна баница с сирене.",
+            "cleaned_text": "Баница Традиционна българска рецепта за вкусна баница с сирене.",
+        },
+        {
+            "id": "bg2",
+            "title": "Почивка",
+            "content": "Идеи и планиране на лятна почивка на море.",
+            "cleaned_text": "Почивка Идеи и планиране на лятна почивка на море.",
+        },
+        {
+            "id": "en1",
+            "title": "Async Python",
+            "content": "Guide on python async asyncio framework performance.",
+            "cleaned_text": "Async Python Guide on python async asyncio framework performance.",
+        },
+        {
+            "id": "en2",
+            "title": "Keyboards",
+            "content": "Comparison of mechanical keyboard switches for typing.",
+            "cleaned_text": "Keyboards Comparison of mechanical keyboard switches for typing.",
+        },
+        {
+            "id": "en3",
+            "title": "FastAPI",
+            "content": "Building fast REST API endpoints with fastapi routes.",
+            "cleaned_text": "FastAPI Building fast REST API endpoints with fastapi routes.",
+        },
     ]
 
     engine = VibeSearch.__new__(VibeSearch)

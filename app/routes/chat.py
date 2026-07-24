@@ -1,10 +1,10 @@
 import json
-from typing import Optional
 import urllib.request
+from typing import Optional
 
+import litellm
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
-import litellm
 
 from app.core.config import settings
 from app.core.dependencies import get_chat_service, get_session_service

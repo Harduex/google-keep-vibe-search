@@ -19,7 +19,8 @@ def test_deduplicate_tags_synthetic():
     assert mapping["cooking"] == "cooking"
 
     # 'mechanical keyboards' and 'keyboard' in gray_pairs
-    gray_tag_pairs = [
-        set([g["tag1"], g["tag2"]]) for g in gray_pairs
-    ]
-    assert {"keyboard", "mechanical keyboards"} in gray_tag_pairs or {"keyboards", "mechanical keyboards"} in gray_tag_pairs
+    gray_tag_pairs = [set([g["tag1"], g["tag2"]]) for g in gray_pairs]
+    assert {"keyboard", "mechanical keyboards"} in gray_tag_pairs or {
+        "keyboards",
+        "mechanical keyboards",
+    } in gray_tag_pairs

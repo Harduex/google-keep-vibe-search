@@ -91,6 +91,7 @@ class ChatService:
     ) -> AsyncGenerator[bytes, None]:
         """Agentic retrieval: PydanticAI agent iteratively searches, then generates response."""
         import json
+
         from app.services.agent.pydantic_agent import gather_context_pydantic_agent
 
         query = ""

@@ -1,4 +1,5 @@
 import os
+
 import numpy as np
 
 from app.services.tagging import embed
@@ -9,7 +10,9 @@ def test_embed_notes_caching_and_identity(tmp_path, monkeypatch, capsys):
     test_cache_file = os.path.join(str(tmp_path), "tag_embeddings.json")
     monkeypatch.setattr(embed, "TAG_EMBED_CACHE", test_cache_file)
 
-    sample_notes = [f"Cleaned note content number {i} for testing embedding cache." for i in range(20)]
+    sample_notes = [
+        f"Cleaned note content number {i} for testing embedding cache." for i in range(20)
+    ]
 
     # First run: missing texts, computes and saves cache
     embeds_run1 = embed_notes(sample_notes)

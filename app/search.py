@@ -15,8 +15,6 @@ from app.core.config import settings
 from app.services.search.bm25 import BM25Index
 from app.services.tagging.preprocess import clean_note
 
-
-
 DEFAULT_NUM_CLUSTERS = 20
 
 if settings.enable_image_search:
@@ -454,7 +452,13 @@ class VibeSearch:
     ) -> List[str]:
         """Extract representative keywords for a cluster of notes."""
         # Combine all text from notes in cluster using cleaned_text
-        all_text = " ".join([note.get("cleaned_text") or clean_note(f"{note.get('title', '')} {note.get('content', '')}") for note in notes])
+        all_text = " ".join(
+            [
+                note.get("cleaned_text")
+                or clean_note(f"{note.get('title', '')} {note.get('content', '')}")
+                for note in notes
+            ]
+        )
 
         # Get standard stopwords (English + Bulgarian)
         try:

@@ -6,8 +6,8 @@ HDBSCAN_MIN_SAMPLES = 5
 SAMPLE_CENTRAL_DOCS = 4
 SAMPLE_DIVERSE_DOCS = 4
 SAMPLE_DOC_SNIPPET_CHARS = 300
-TAG_MERGE_AUTO = 0.85        # >= : merge silently
-TAG_MERGE_GRAY_LOW = 0.60    # [0.60, 0.85) : LLM adjudicates -> dashboard approval
+TAG_MERGE_AUTO = 0.85  # >= : merge silently
+TAG_MERGE_GRAY_LOW = 0.60  # [0.60, 0.85) : LLM adjudicates -> dashboard approval
 MULTILABEL_SIMILARITY = 0.60
 NOISE_RESCUE_SIMILARITY = 0.50
 CONFIDENCE_AUTO_APPLY = 0.70

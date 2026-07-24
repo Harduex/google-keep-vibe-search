@@ -8,9 +8,21 @@ from app.services.tagging.dedupe import (
 
 def test_adjudicate_gray_pairs_synthetic(monkeypatch):
     gray_pairs = [
-        {"tag1": "recipes", "tag2": "cooking recipes", "similarity": 0.78, "count1": 10, "count2": 5},
+        {
+            "tag1": "recipes",
+            "tag2": "cooking recipes",
+            "similarity": 0.78,
+            "count1": 10,
+            "count2": 5,
+        },
         {"tag1": "guitar", "tag2": "music gear", "similarity": 0.65, "count1": 8, "count2": 15},
-        {"tag1": "keyboard", "tag2": "mechanical keyboards", "similarity": 0.72, "count1": 12, "count2": 6},
+        {
+            "tag1": "keyboard",
+            "tag2": "mechanical keyboards",
+            "similarity": 0.72,
+            "count1": 12,
+            "count2": 6,
+        },
     ]
 
     def stub_run_sync(prompt):
@@ -18,11 +30,21 @@ def test_adjudicate_gray_pairs_synthetic(monkeypatch):
             data = DedupeReview(
                 decisions=[
                     # True duplicate pair -> merge with valid canonical 'recipes'
-                    MergeDecision(tag_a="recipes", tag_b="cooking recipes", verdict="merge", canonical="recipes"),
+                    MergeDecision(
+                        tag_a="recipes",
+                        tag_b="cooking recipes",
+                        verdict="merge",
+                        canonical="recipes",
+                    ),
                     # Parent/child pair -> keep_both
                     MergeDecision(tag_a="guitar", tag_b="music gear", verdict="keep_both"),
                     # Hand-crafted invalid response -> hallucinated canonical 'piano' not in {'keyboard', 'mechanical keyboards'}
-                    MergeDecision(tag_a="keyboard", tag_b="mechanical keyboards", verdict="merge", canonical="piano"),
+                    MergeDecision(
+                        tag_a="keyboard",
+                        tag_b="mechanical keyboards",
+                        verdict="merge",
+                        canonical="piano",
+                    ),
                 ]
             )
 
@@ -63,7 +85,9 @@ def test_adjudicate_empty_gray_pairs_skips_llm():
 def test_format_dashboard_proposals():
     canonical_mapping = {"keyboards": "keyboard"}
     merge_decisions = [
-        MergeDecision(tag_a="recipes", tag_b="cooking recipes", verdict="merge", canonical="recipes")
+        MergeDecision(
+            tag_a="recipes", tag_b="cooking recipes", verdict="merge", canonical="recipes"
+        )
     ]
     tag_counts = {"recipes": 10, "cooking recipes": 5, "keyboard": 12, "keyboards": 4}
 

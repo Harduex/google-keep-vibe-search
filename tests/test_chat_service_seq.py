@@ -1,4 +1,5 @@
 import json
+
 import pytest
 
 from app.services.chat_service import ChatService
@@ -22,6 +23,7 @@ class DummyRetrieval:
         class Model:
             def encode(self, texts):
                 import numpy as np
+
                 return [np.array([1.0, 0.0], dtype=np.float32) for _ in texts]
 
         model = Model()
@@ -49,6 +51,7 @@ async def test_stream_agentic_seq_numbers(monkeypatch):
     # Stub gather_context_pydantic_agent
     async def stub_agent(query, search_service):
         from app.services.agent.models import AgentResult, AgentStep
+
         yield AgentStep(
             step_number=1,
             action="search_notes",
@@ -59,7 +62,9 @@ async def test_stream_agentic_seq_numbers(monkeypatch):
         )
         yield AgentResult(notes=[{"id": "n1", "title": "Test Note"}], steps=[])
 
-    monkeypatch.setattr("app.services.agent.pydantic_agent.gather_context_pydantic_agent", stub_agent)
+    monkeypatch.setattr(
+        "app.services.agent.pydantic_agent.gather_context_pydantic_agent", stub_agent
+    )
 
     retrieval = DummyRetrieval()
     cb = DummyContextBuilder()

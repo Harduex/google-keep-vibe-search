@@ -11,7 +11,6 @@ from app.core.config import settings
 from app.services.tagging.preprocess import clean_note
 
 
-
 class NoteChunk:
     __slots__ = ("note_id", "chunk_index", "text", "title", "created", "edited", "tag")
 

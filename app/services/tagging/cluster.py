@@ -76,7 +76,9 @@ def cluster_notes(embeddings: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         cluster_count = len(unique_clusters)
 
     sizes = {cid: int(np.sum(labels == cid)) for cid in unique_clusters}
-    print(f"[Clustering] Clusters: {cluster_count}, Sizes: {sizes}, Noise: {noise_pct * 100:.1f}% ({noise_count}/{n_samples})")
+    print(
+        f"[Clustering] Clusters: {cluster_count}, Sizes: {sizes}, Noise: {noise_pct * 100:.1f}% ({noise_count}/{n_samples})"
+    )
 
     return labels, probabilities
 

@@ -64,7 +64,9 @@ export const ChatMessage = memo(({ message, onCitationClick }: ChatMessageProps)
   }, []);
 
   const handleCopy = useCallback(async () => {
-    if (!processedContent || copied) return;
+    if (!processedContent || copied) {
+      return;
+    }
     try {
       await navigator.clipboard.writeText(processedContent);
       setCopied(true);
@@ -142,9 +144,7 @@ export const ChatMessage = memo(({ message, onCitationClick }: ChatMessageProps)
                 title={copied ? 'Copied!' : 'Copy response'}
                 aria-label={copied ? 'Copied to clipboard' : 'Copy response to clipboard'}
               >
-                <span className="material-icons">
-                  {copied ? 'check' : 'content_copy'}
-                </span>
+                <span className="material-icons">{copied ? 'check' : 'content_copy'}</span>
               </button>
             )}
           </div>

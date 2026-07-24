@@ -471,7 +471,9 @@ class CategorizationService:
             note_indices = self.search_service.note_indices
             notes = self.search_service.notes
             n = len(note_indices)
-            print(f"[TAGGING] Step 1/8 ── Initializing categorization for {n} notes (granularity: '{granularity}')")
+            print(
+                f"[TAGGING] Step 1/8 ── Initializing categorization for {n} notes (granularity: '{granularity}')"
+            )
 
             (
                 umap_components,
@@ -583,7 +585,9 @@ class CategorizationService:
                 except Exception as e:
                     print(f"Prefix classification failed: {e}")
 
-            print(f"[TAGGING] Step 3/8 ── Running UMAP reduction ({umap_components} components, {umap_neighbors} neighbors)...")
+            print(
+                f"[TAGGING] Step 3/8 ── Running UMAP reduction ({umap_components} components, {umap_neighbors} neighbors)..."
+            )
             yield self._line(
                 {
                     "type": "progress",
@@ -614,7 +618,9 @@ class CategorizationService:
                 }
             )
 
-            print(f"[TAGGING] Step 4/8 ── Clustering note embeddings with HDBSCAN (min_cluster_size={min_cluster_size}, min_samples={min_samples})...")
+            print(
+                f"[TAGGING] Step 4/8 ── Clustering note embeddings with HDBSCAN (min_cluster_size={min_cluster_size}, min_samples={min_samples})..."
+            )
             yield self._line(
                 {
                     "type": "progress",
@@ -644,7 +650,9 @@ class CategorizationService:
                     clusters.setdefault(label, []).append(i)
 
             total_clusters = len(clusters)
-            print(f"          └─ Found {total_clusters} clusters ({len(noise_indices)} noise notes)")
+            print(
+                f"          └─ Found {total_clusters} clusters ({len(noise_indices)} noise notes)"
+            )
             if total_clusters == 0:
                 all_ids = [notes[note_indices[idx]]["id"] for idx in range(len(note_indices))]
                 sample = [
@@ -668,7 +676,9 @@ class CategorizationService:
             cluster_centroids = []
             all_cluster_notes = []
 
-            print(f"[TAGGING] Step 5/8 ── Extracting c-TF-IDF keywords & representative samples ({total_clusters} clusters)...")
+            print(
+                f"[TAGGING] Step 5/8 ── Extracting c-TF-IDF keywords & representative samples ({total_clusters} clusters)..."
+            )
             for _, member_indices in cluster_items:
                 cluster_centroids.append(reduced[member_indices].mean(axis=0))
                 all_cluster_notes.append([notes[note_indices[mi]] for mi in member_indices])
@@ -774,7 +784,9 @@ class CategorizationService:
                 review_items: List[Dict[str, Any]] = []
                 try:
                     total_llm = len(llm_tasks)
-                    print(f"[TAGGING] Step 6/8 ── Generating cluster names via LLM ({total_llm} clusters)...")
+                    print(
+                        f"[TAGGING] Step 6/8 ── Generating cluster names via LLM ({total_llm} clusters)..."
+                    )
                     for i, (lbl, n_text, kw_str, neighbor_kw) in enumerate(llm_tasks):
                         progress = 0.66 + (i / total_llm) * 0.25 if total_llm > 0 else 0.90
                         await queue.put(
@@ -788,7 +800,9 @@ class CategorizationService:
                             )
                         )
                         real_name = await self._get_llm_tag_name(n_text, kw_str, neighbor_kw)
-                        print(f"          └─ [{i+1}/{total_llm}] Cluster '{lbl.name}' ──► '{real_name}'")
+                        print(
+                            f"          └─ [{i+1}/{total_llm}] Cluster '{lbl.name}' ──► '{real_name}'"
+                        )
 
                         denylist = {
                             "misc",
@@ -814,7 +828,9 @@ class CategorizationService:
                     # Remove dropped labels
                     vocab.labels = [lbl for lbl in vocab.labels if lbl.name != "DROP_ME"]
 
-                    print("[TAGGING] Step 7/8 ── Consolidating tags & evaluating borderline pairs...")
+                    print(
+                        "[TAGGING] Step 7/8 ── Consolidating tags & evaluating borderline pairs..."
+                    )
                     await queue.put(
                         self._line(
                             {
@@ -1014,7 +1030,9 @@ class CategorizationService:
                     except Exception as e:
                         print(f"Consolidation failed: {e}")
 
-                    print(f"          └─ Tag consolidation complete ({len(applied_merges)} merges applied)")
+                    print(
+                        f"          └─ Tag consolidation complete ({len(applied_merges)} merges applied)"
+                    )
                     seen_names = {}
                     for lbl in vocab.labels:
                         lbl.name = self._deduplicate_name(lbl.name, seen_names)
@@ -1026,7 +1044,9 @@ class CategorizationService:
                     uncat_pct = round((uncat_count / n) * 100, 1) if n > 0 else 0
                     final_tags = len(vocab.labels) - (1 if uncat_label else 0)
 
-                    print(f"[TAGGING] Step 8/8 ── Building prototype vectors & assigning final tags to {n} notes...")
+                    print(
+                        f"[TAGGING] Step 8/8 ── Building prototype vectors & assigning final tags to {n} notes..."
+                    )
                     await queue.put(
                         self._line(
                             {
@@ -1043,7 +1063,9 @@ class CategorizationService:
                         vocab, embeddings, notes, note_indices
                     )
 
-                    print(f"[TAGGING] ✅ Complete ── Created {final_tags} tags ({uncat_pct}% uncategorized)")
+                    print(
+                        f"[TAGGING] ✅ Complete ── Created {final_tags} tags ({uncat_pct}% uncategorized)"
+                    )
                     await queue.put(
                         self._line(
                             {

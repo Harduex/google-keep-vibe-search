@@ -77,7 +77,7 @@ report it instead of working around it.
 
 | # | Wave/Lane | Round | Task | Fixes | Est | State |
 |---|---|---|---|---|---|---|
-| T01 | 1 | 1 | Formatting baseline + `make check`/`make format` split | H2, lint errors | ¼ d | todo |
+| T01 | 1 | 1 | Formatting baseline + `make check`/`make format` split | H2, lint errors | ¼ d | done |
 | T02 | 1 | 2 | CI workflow + fix 3 red tests | H1, B9 | ¼ d | todo |
 | T03 | 2 A | 1 | Chat pipeline correctness | B1, B5, B6, B7, B11 | ½ d | todo |
 | T04 | 2 B | 1 | Reranker no longer caps search at 20 | B2 | ¼ d | todo |

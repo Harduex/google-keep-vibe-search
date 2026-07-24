@@ -34,7 +34,7 @@ class TagName(BaseModel):
 
 
 def validate_tag(tag: str) -> bool:
-    cleaned = tag.strip().lower().strip('"\'`')
+    cleaned = tag.strip().lower().strip("\"'`")
     if cleaned.endswith("."):
         cleaned = cleaned[:-1].strip()
     if not cleaned:
@@ -49,15 +49,13 @@ def validate_tag(tag: str) -> bool:
 
 
 def clean_and_normalize_tag(tag: str) -> str:
-    cleaned = tag.strip().lower().strip('"\'`')
+    cleaned = tag.strip().lower().strip("\"'`")
     if cleaned.endswith("."):
         cleaned = cleaned[:-1].strip()
     return cleaned
 
 
-def name_single_cluster(
-    keywords: List[str], samples_text: str, existing_tags: List[str]
-) -> str:
+def name_single_cluster(keywords: List[str], samples_text: str, existing_tags: List[str]) -> str:
     prompt = VERBATIM_NAMING_PROMPT.format(
         keywords=", ".join(keywords),
         samples=samples_text,
@@ -97,7 +95,9 @@ def name_single_cluster(
 
 def name_clusters_sequential(clusters: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Order clusters by size DESC, name sequentially appending accepted tags to existing_tags."""
-    sorted_clusters = sorted(clusters, key=lambda c: c.get("size", len(c.get("notes", []))), reverse=True)
+    sorted_clusters = sorted(
+        clusters, key=lambda c: c.get("size", len(c.get("notes", []))), reverse=True
+    )
     existing_tags: List[str] = []
 
     for idx, cluster in enumerate(sorted_clusters):

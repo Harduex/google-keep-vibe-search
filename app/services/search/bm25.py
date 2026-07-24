@@ -11,17 +11,17 @@ from app.services.tagging.preprocess import clean_note
 _TOKEN = re.compile(r"[^\W_]+")  # letters/digits in any script
 
 _CJK_RANGES = (
-    (0x0E00, 0x0E7F),    # Thai
-    (0x0E80, 0x0EFF),    # Lao
-    (0x1000, 0x109F),    # Myanmar
-    (0x1780, 0x17FF),    # Khmer
-    (0x2E80, 0x2FDF),    # CJK Radicals Supplement + Kangxi Radicals
-    (0x3040, 0x309F),    # Hiragana
-    (0x30A0, 0x30FF),    # Katakana
-    (0x3400, 0x4DBF),    # CJK Unified Ideographs Extension A
-    (0x4E00, 0x9FFF),    # CJK Unified Ideographs
-    (0xAC00, 0xD7AF),    # Hangul Syllables
-    (0xF900, 0xFAFF),    # CJK Compatibility Ideographs
+    (0x0E00, 0x0E7F),  # Thai
+    (0x0E80, 0x0EFF),  # Lao
+    (0x1000, 0x109F),  # Myanmar
+    (0x1780, 0x17FF),  # Khmer
+    (0x2E80, 0x2FDF),  # CJK Radicals Supplement + Kangxi Radicals
+    (0x3040, 0x309F),  # Hiragana
+    (0x30A0, 0x30FF),  # Katakana
+    (0x3400, 0x4DBF),  # CJK Unified Ideographs Extension A
+    (0x4E00, 0x9FFF),  # CJK Unified Ideographs
+    (0xAC00, 0xD7AF),  # Hangul Syllables
+    (0xF900, 0xFAFF),  # CJK Compatibility Ideographs
     (0x20000, 0x2FA1F),  # CJK Unified Ideographs Extensions B-F
 )
 
@@ -73,7 +73,7 @@ def tokenize(text: str) -> List[str]:
                 if len(seg) == 1:
                     out.append(seg)
                 else:
-                    out.extend(seg[k:k + 2] for k in range(len(seg) - 1))
+                    out.extend(seg[k : k + 2] for k in range(len(seg) - 1))
             elif len(seg) > 1:
                 out.append(_stem(seg))
     return out
@@ -91,7 +91,9 @@ class BM25Index:
     def build(self, notes: List[Dict[str, Any]]):
         self.notes = notes
         self.tokens = [
-            tokenize(n.get("cleaned_text") or clean_note(f"{n.get('title', '')} {n.get('content', '')}"))
+            tokenize(
+                n.get("cleaned_text") or clean_note(f"{n.get('title', '')} {n.get('content', '')}")
+            )
             for n in notes
         ]
         df_counter = Counter()

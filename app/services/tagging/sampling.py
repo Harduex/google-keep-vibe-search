@@ -55,8 +55,7 @@ def select_representatives(
         for cand in remaining:
             sim_c = sim_to_centroid[cand]
             max_sim_sel = max(
-                _cosine_sim(cluster_embeds[cand], cluster_embeds[sel])
-                for sel in selected_local
+                _cosine_sim(cluster_embeds[cand], cluster_embeds[sel]) for sel in selected_local
             )
             mmr_score = 0.5 * sim_c - 0.5 * max_sim_sel
             if mmr_score > best_mmr:

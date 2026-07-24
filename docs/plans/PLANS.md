@@ -78,7 +78,7 @@ report it instead of working around it.
 | # | Wave/Lane | Round | Task | Fixes | Est | State |
 |---|---|---|---|---|---|---|
 | T01 | 1 | 1 | Formatting baseline + `make check`/`make format` split | H2, lint errors | ¼ d | done |
-| T02 | 1 | 2 | CI workflow + fix 3 red tests | H1, B9 | ¼ d | todo |
+| T02 | 1 | 2 | CI workflow + fix 3 red tests | H1, B9 | ¼ d | done |
 | T03 | 2 A | 1 | Chat pipeline correctness | B1, B5, B6, B7, B11 | ½ d | todo |
 | T04 | 2 B | 1 | Reranker no longer caps search at 20 | B2 | ¼ d | todo |
 | T05 | 2 B | 2 | BM25 precompute tf + normalized text | A9 | ¼ d | todo |
@@ -140,7 +140,8 @@ Tasks discovered while executing the plan. Add here instead of building them
 
 | From | Proposal |
 |---|---|
-| — | _(none yet)_ |
+| T01 (recorded by T02) | `pre-commit` is invoked by `make setup` as `uv run pre-commit install` but is not a declared project dependency — it resolves to a global binary, so `make setup` breaks on a clean machine. `pyproject.toml` is wave 6 lane Q (T32). |
+| T02 | The CI-green portion of T02's checkpoint is unverified pending the first push to `origin`. |
 
 ## Verification
 

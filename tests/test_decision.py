@@ -1,6 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
+from app.services.agent.constants import MAX_QUERIES_PER_STEP, QUERY_MAX_CHARS
 from app.services.agent.decision import SearchDecision
 
 
@@ -33,7 +34,7 @@ def test_search_decision_rejects_empty_and_blank_strings():
 
 
 def test_search_decision_rejects_over_long_query():
-    long_q = "a" * 201
+    long_q = "a" * (QUERY_MAX_CHARS + 1)
     with pytest.raises(ValidationError):
         SearchDecision(
             tool="search_notes",
@@ -42,10 +43,11 @@ def test_search_decision_rejects_over_long_query():
         )
 
 
-def test_search_decision_rejects_more_than_3_distinct_queries():
+def test_search_decision_rejects_more_than_max_queries_per_step():
+    queries = [f"q{i}" for i in range(MAX_QUERIES_PER_STEP + 1)]
     with pytest.raises(ValidationError):
         SearchDecision(
             tool="search_notes",
-            queries=["q1", "q2", "q3", "q4"],
-            reasoning="Testing > 3 queries",
+            queries=queries,
+            reasoning="Testing > MAX_QUERIES_PER_STEP queries",
         )

@@ -1,5 +1,6 @@
 import numpy as np
 
+from app.services.agent.constants import MAX_COLLECTED_NOTES
 from app.services.agent.coverage import coverage_is_sufficient
 
 
@@ -15,7 +16,7 @@ def test_coverage_max_steps_stop():
 
 def test_coverage_note_limit_stop():
     query_emb = np.array([1.0, 0.0], dtype=np.float32)
-    collected = [np.array([0.1, 0.9], dtype=np.float32)] * 40
+    collected = [np.array([0.1, 0.9], dtype=np.float32)] * MAX_COLLECTED_NOTES
     is_done, reason = coverage_is_sufficient(
         query_emb, collected, last_batch_size=5, last_batch_new=5, steps_taken=2, max_steps=5
     )

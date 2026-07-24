@@ -108,3 +108,72 @@ async def test_pydantic_agent_loop_multi_query_and_novelty_stop():
     final_result = items[-1]
     assert isinstance(final_result, AgentResult)
     assert len(final_result.notes) == 2
+
+
+class TagDecisionAgent:
+    """Always decides to filter by one tag, so the filter_by_tag branch is exercised."""
+
+    def __init__(self, tag: str):
+        self.tag = tag
+
+    async def run(self, prompt):
+        class Result:
+            output = SearchDecision(
+                tool="filter_by_tag",
+                queries=[self.tag],
+                reasoning="tag filter",
+            )
+
+        return Result()
+
+
+@pytest.mark.asyncio
+async def test_filter_by_tag_uses_injected_tag_lookup():
+    """B5: raw search_service.notes are never tag-enriched, so the tool always found 0.
+
+    The tag map has to arrive as an explicit parameter; a tag query must then return the
+    tagged note even though the note dict itself carries no `tags` key.
+    """
+    notes = [
+        {"id": "n1", "title": "Pasta", "content": "Boil water"},
+        {"id": "n2", "title": "Trip", "content": "Book flights"},
+    ]
+    search_service = StubSearchService(notes)
+
+    items = []
+    async for item in gather_context_pydantic_agent(
+        "what recipes do I have",
+        search_service,
+        max_steps=2,
+        custom_agent=TagDecisionAgent("recipes"),
+        tag_lookup={"n1": ["Recipes", "cooking"]},
+    ):
+        items.append(item)
+
+    first_step = items[0]
+    assert isinstance(first_step, AgentStep)
+    assert first_step.action == "filter_by_tag"
+    assert first_step.notes_found == 1
+
+    result = items[-1]
+    assert isinstance(result, AgentResult)
+    assert [n["id"] for n in result.notes] == ["n1"]
+
+
+@pytest.mark.asyncio
+async def test_filter_by_tag_without_tag_lookup_returns_nothing():
+    """Degradation guard: no tag map wired means no matches, never a crash."""
+    notes = [{"id": "n1", "title": "Pasta", "content": "Boil water"}]
+    search_service = StubSearchService(notes)
+
+    items = []
+    async for item in gather_context_pydantic_agent(
+        "what recipes do I have",
+        search_service,
+        max_steps=1,
+        custom_agent=TagDecisionAgent("recipes"),
+    ):
+        items.append(item)
+
+    assert isinstance(items[-1], AgentResult)
+    assert items[-1].notes == []

@@ -1,12 +1,27 @@
-from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
+import asyncio
+from typing import Any, AsyncGenerator, Dict, List, Mapping, Optional, Tuple, Type
 
+from litellm.exceptions import LITELLM_EXCEPTION_TYPES
+
+from app.core.config import settings
+from app.prompts.system_prompts import FOLLOW_UP_PROMPT
+from app.services.agent.constants import AGENT_RERANK_CANDIDATE_WINDOW
 from app.services.agent.models import AgentResult, AgentStep
-from app.services.citation_service import extract_citations
+from app.services.citation_service import extract_citations, verify_citations
 from app.services.context_builder import ContextBuilder
 from app.services.conversation_manager import ConversationManager
 from app.services.llm_client import LLMClient
 from app.services.retrieval_orchestrator import RetrievalOrchestrator
 from app.services.streaming_protocol import StreamingProtocol
+
+# The errors we actually expect from an LLM call: everything LiteLLM raises, plus the
+# transport-level failures it does not wrap. Anything else — a NameError, an AttributeError —
+# must propagate. A missing import once sat behind a bare `except Exception` here, which
+# disabled follow-up suggestions silently for months.
+LLM_CALL_ERRORS: Tuple[Type[BaseException], ...] = tuple(LITELLM_EXCEPTION_TYPES) + (
+    asyncio.TimeoutError,
+    OSError,
+)
 
 
 class ChatService:
@@ -22,6 +37,7 @@ class ChatService:
         grounding_service=None,
         llm: LLMClient = None,
         agent: Any = None,
+        note_service: Any = None,
     ):
         self.retrieval = retrieval
         self.context_builder = context_builder
@@ -31,6 +47,53 @@ class ChatService:
         self.grounding_service = grounding_service
         self.llm = llm
         self.agent = agent
+        self.note_service = note_service
+
+    def _tag_lookup(self) -> Optional[Mapping[str, List[str]]]:
+        """Return the note-id -> tags map the agent's `filter_by_tag` tool needs.
+
+        `search_service.notes` is never tag-enriched, so the tag map has to be handed to
+        the agent explicitly. Resolved from an injected note service, falling back to one
+        hanging off the search service. Returns None when neither is wired, in which case
+        the tool degrades to the note dict's own `tags` key instead of failing.
+        """
+        note_service = self.note_service or getattr(
+            self.retrieval.search_service, "note_service", None
+        )
+        return getattr(note_service, "note_tags", None)
+
+    def _cap_context_notes(self, query: str, notes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Rerank and cap agent-collected notes to the prompt budget.
+
+        The agent loop may collect up to MAX_COLLECTED_NOTES (250); the prompt budget is
+        `chat_context_notes`. Cross-encoder rerank a bounded candidate window, then cap —
+        so the prompt and the UI's token meter agree on how many notes are in play.
+        """
+        cap = getattr(self.retrieval, "max_context_notes", None) or len(notes)
+        if len(notes) <= cap:
+            return notes
+
+        reranker = getattr(self.retrieval, "reranker", None)
+        if reranker is not None and query.strip():
+            return reranker.rerank(query, notes[:AGENT_RERANK_CANDIDATE_WINDOW], top_k=cap)
+        return notes[:cap]
+
+    def _verify_and_extract_citations(
+        self, full_response: str, notes: List[Dict[str, Any]]
+    ) -> Tuple[str, List[Dict[str, Any]], Optional[int]]:
+        """Strip citations pointing outside the retrieved set, then extract the rest.
+
+        Shared by both stream paths: the legacy path never verified, so the default config
+        emitted unverified `[Note #N]` markers (B11). Returns the cleaned response, the
+        citations, and the number of stripped citations (None when there were none, which is
+        what `StreamingProtocol.done` wants in order to omit the field).
+        """
+        full_response, _valid, invalid = verify_citations(full_response, len(notes))
+        if invalid:
+            # Count only — never the response text or the note text it cites.
+            print(f"[citations] stripped {len(invalid)} invalid citation(s)")
+        citations = extract_citations(full_response, notes)
+        return full_response, citations, len(invalid) or None
 
     def _detect_conflicts(self, notes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Run conflict detection if verification service is available."""
@@ -113,7 +176,12 @@ class ChatService:
         relevant_notes = []
         gap_status = "sufficient"
 
-        async for item in gather_context_pydantic_agent(query, self.retrieval.search_service):
+        async for item in gather_context_pydantic_agent(
+            query,
+            self.retrieval.search_service,
+            max_steps=settings.agent_max_steps,
+            tag_lookup=self._tag_lookup(),
+        ):
             if isinstance(item, AgentStep):
                 yield emit(
                     self.protocol.agent_step(
@@ -128,6 +196,8 @@ class ChatService:
             elif isinstance(item, AgentResult):
                 relevant_notes = item.notes
                 gap_status = item.gap_status
+
+        relevant_notes = self._cap_context_notes(query, relevant_notes)
 
         conflicts = self._detect_conflicts(relevant_notes)
         yield emit(self.protocol.context(relevant_notes, conflicts, session_id or ""))
@@ -144,21 +214,10 @@ class ChatService:
                 full_response += delta
                 yield emit(self.protocol.delta(delta))
 
-            from app.services.citation_service import verify_citations
-
-            full_response, valid_cites, invalid_cites = verify_citations(
-                full_response, len(relevant_notes)
+            full_response, citations, warnings = self._verify_and_extract_citations(
+                full_response, relevant_notes
             )
-            citations = extract_citations(full_response, relevant_notes)
-            if invalid_cites:
-                print(f"Warning: stripped invalid citations: {invalid_cites}")
-                yield emit(
-                    self.protocol.done(
-                        full_response, citations, citation_warnings=len(invalid_cites)
-                    )
-                )
-            else:
-                yield emit(self.protocol.done(full_response, citations))
+            yield emit(self.protocol.done(full_response, citations, citation_warnings=warnings))
 
             suggestions = await self._generate_suggestions(full_response, relevant_notes)
             if suggestions:
@@ -215,8 +274,10 @@ class ChatService:
                 full_response += delta
                 yield self.protocol.delta(delta)
 
-            citations = extract_citations(full_response, relevant_notes)
-            yield self.protocol.done(full_response, citations)
+            full_response, citations, warnings = self._verify_and_extract_citations(
+                full_response, relevant_notes
+            )
+            yield self.protocol.done(full_response, citations, citation_warnings=warnings)
 
             suggestions = await self._generate_suggestions(full_response, relevant_notes)
             if suggestions:
@@ -248,8 +309,9 @@ class ChatService:
         """Generate follow-up question suggestions via LLM."""
         if not notes:
             return []
+
+        context = f"Response: {response[:500]}\nNotes used: {len(notes)}"
         try:
-            context = f"Response: {response[:500]}\nNotes used: {len(notes)}"
             text = await self.llm.complete(
                 [
                     {"role": "system", "content": FOLLOW_UP_PROMPT},
@@ -257,7 +319,12 @@ class ChatService:
                 ],
                 max_tokens=200,
             )
-            lines = [line.strip().lstrip("0123456789.-) ") for line in text.strip().split("\n")]
-            return [q for q in lines if q and len(q) < 80][:3]
-        except Exception:
+        except LLM_CALL_ERRORS as e:
+            # Suggestions are optional garnish, so a provider/transport failure degrades
+            # quietly. Programming errors are deliberately not caught here (see B1).
+            # Type name only: LiteLLM exception strings embed the request body.
+            print(f"[suggestions] LLM call failed: {type(e).__name__}")
             return []
+
+        lines = [line.strip().lstrip("0123456789.-) ") for line in text.strip().split("\n")]
+        return [q for q in lines if q and len(q) < 80][:3]

@@ -1,43 +1,77 @@
+import asyncio
 import json
 
+import numpy as np
 import pytest
 
+from app.core.config import settings
+from app.services.agent.constants import AGENT_RERANK_CANDIDATE_WINDOW
+from app.services.agent.models import AgentResult, AgentStep
 from app.services.chat_service import ChatService
 from app.services.streaming_protocol import StreamingProtocol
 
 
 class DummyLLM:
+    """Stub LLM. `completion` feeds _generate_suggestions; `error` makes complete() raise."""
+
+    def __init__(
+        self,
+        deltas=("Hello ", "world!"),
+        completion="Suggestion 1\nSuggestion 2",
+        error=None,
+    ):
+        self.deltas = list(deltas)
+        self.completion = completion
+        self.error = error
+
     async def stream(self, messages):
-        yield "Hello "
-        yield "world!"
+        for delta in self.deltas:
+            yield delta
 
     async def complete(self, messages, max_tokens=200):
-        return "Suggestion 1\nSuggestion 2"
+        if self.error is not None:
+            raise self.error
+        return self.completion
 
 
 class DummyRetrieval:
-    def __init__(self):
-        self.search_service = self
+    """Stands in for RetrievalOrchestrator and the SearchService it holds."""
 
     class Engine:
         class Model:
             def encode(self, texts):
-                import numpy as np
-
                 return [np.array([1.0, 0.0], dtype=np.float32) for _ in texts]
 
         model = Model()
 
-    engine = Engine()
-    notes = [{"id": "n1", "title": "Test Note", "content": "Content"}]
-    embeddings = [None]
+    def __init__(self, notes=None, max_context_notes=None, reranker=None, note_service=None):
+        self.search_service = self
+        self.engine = self.Engine()
+        self.notes = (
+            notes
+            if notes is not None
+            else [{"id": "n1", "title": "Test Note", "content": "Content"}]
+        )
+        self.embeddings = [None] * len(self.notes)
+        self.max_context_notes = max_context_notes
+        self.reranker = reranker
+        self.note_service = note_service
 
-    def search(self, query):
+    def search(self, query, max_results=None):
         return self.notes
 
+    async def get_context(self, messages, topic=None):
+        return list(self.notes), "sufficient"
 
-class DummyContextBuilder:
+
+class RecordingContextBuilder:
+    """Captures exactly which notes were handed to the prompt builder."""
+
+    def __init__(self):
+        self.notes_seen = None
+
     def build_messages(self, windowed, notes, conflicts, gap_status):
+        self.notes_seen = list(notes)
         return [{"role": "user", "content": "test"}]
 
 
@@ -46,47 +80,67 @@ class DummyConversationMgr:
         return messages
 
 
+class StubReranker:
+    """Records the candidate window it was given and reverses order so the effect is visible."""
+
+    def __init__(self):
+        self.calls = []
+
+    def rerank(self, query, notes, top_k=10):
+        self.calls.append({"candidates": len(notes), "top_k": top_k})
+        return list(reversed(notes))[:top_k]
+
+
+def _stub_gather(notes, calls, steps=1):
+    """Build a stand-in for gather_context_pydantic_agent that records its kwargs."""
+
+    async def stub_agent(query, search_service, max_steps=None, custom_agent=None, tag_lookup=None):
+        calls.append({"query": query, "max_steps": max_steps, "tag_lookup": tag_lookup})
+        for i in range(steps):
+            yield AgentStep(
+                step_number=i + 1,
+                action="search_notes",
+                params={"queries": ["test"]},
+                result_summary=f"found {len(notes)}",
+                notes_found=len(notes),
+                reasoning="testing",
+            )
+        yield AgentResult(notes=list(notes), steps=[])
+
+    return stub_agent
+
+
+def _make_chat(retrieval, llm, context_builder=None, agent=None):
+    return ChatService(
+        retrieval=retrieval,
+        context_builder=context_builder or RecordingContextBuilder(),
+        conversation_mgr=DummyConversationMgr(),
+        protocol=StreamingProtocol(),
+        llm=llm,
+        agent=agent,
+    )
+
+
+async def _collect(chat, messages=None, use_notes_context=True):
+    messages = messages or [{"role": "user", "content": "test query"}]
+    chunks = []
+    async for chunk in chat.stream_chat_with_protocol(
+        messages, use_notes_context=use_notes_context
+    ):
+        chunks.append(chunk)
+    return [json.loads(c.decode()) for c in chunks if c.strip()]
+
+
 @pytest.mark.asyncio
 async def test_stream_agentic_seq_numbers(monkeypatch):
-    # Stub gather_context_pydantic_agent
-    async def stub_agent(query, search_service):
-        from app.services.agent.models import AgentResult, AgentStep
-
-        yield AgentStep(
-            step_number=1,
-            action="search_notes",
-            params={"queries": ["test"]},
-            result_summary="found 1",
-            notes_found=1,
-            reasoning="testing",
-        )
-        yield AgentResult(notes=[{"id": "n1", "title": "Test Note"}], steps=[])
-
+    calls = []
     monkeypatch.setattr(
-        "app.services.agent.pydantic_agent.gather_context_pydantic_agent", stub_agent
+        "app.services.agent.pydantic_agent.gather_context_pydantic_agent",
+        _stub_gather([{"id": "n1", "title": "Test Note"}], calls),
     )
 
-    retrieval = DummyRetrieval()
-    cb = DummyContextBuilder()
-    cm = DummyConversationMgr()
-    protocol = StreamingProtocol()
-    llm = DummyLLM()
-
-    chat = ChatService(
-        retrieval=retrieval,
-        context_builder=cb,
-        conversation_mgr=cm,
-        protocol=protocol,
-        llm=llm,
-        agent=True,  # truthy to trigger agentic path
-    )
-
-    messages = [{"role": "user", "content": "test query"}]
-    chunks = []
-    async for chunk in chat.stream_chat_with_protocol(messages, use_notes_context=True):
-        chunks.append(chunk)
-
-    lines = [json.loads(c.decode()) for c in chunks if c.strip()]
+    chat = _make_chat(DummyRetrieval(), DummyLLM(), agent=True)
+    lines = await _collect(chat)
     assert len(lines) > 0
 
     # Verify gapless seq numbers 0..N-1
@@ -96,3 +150,116 @@ async def test_stream_agentic_seq_numbers(monkeypatch):
     # Verify done event has citations
     done_event = next(line for line in lines if line["type"] == "done")
     assert "citations" in done_event
+
+
+@pytest.mark.asyncio
+async def test_agentic_passes_configured_max_steps(monkeypatch):
+    """B7: AGENT_MAX_STEPS was ignored — the function default always won."""
+    monkeypatch.setattr(settings, "agent_max_steps", 3)
+    calls = []
+    monkeypatch.setattr(
+        "app.services.agent.pydantic_agent.gather_context_pydantic_agent",
+        _stub_gather([{"id": "n1", "title": "Test Note"}], calls),
+    )
+
+    chat = _make_chat(DummyRetrieval(), DummyLLM(), agent=True)
+    await _collect(chat)
+
+    assert len(calls) == 1
+    assert calls[0]["max_steps"] == 3
+
+
+@pytest.mark.asyncio
+async def test_agentic_passes_tag_lookup_from_note_service(monkeypatch):
+    """B5: the agent needs an explicit note-id -> tags map; notes are never tag-enriched."""
+
+    class StubNoteService:
+        note_tags = {"n1": ["recipes"]}
+
+    calls = []
+    monkeypatch.setattr(
+        "app.services.agent.pydantic_agent.gather_context_pydantic_agent",
+        _stub_gather([{"id": "n1", "title": "Test Note"}], calls),
+    )
+
+    retrieval = DummyRetrieval(note_service=StubNoteService())
+    chat = _make_chat(retrieval, DummyLLM(), agent=True)
+    await _collect(chat)
+
+    assert calls[0]["tag_lookup"] == {"n1": ["recipes"]}
+
+
+@pytest.mark.asyncio
+async def test_agentic_caps_prompt_notes_to_context_budget(monkeypatch):
+    """B6: agent mode injected every collected note (up to 250) into the prompt."""
+    collected = [{"id": f"n{i}", "title": f"Note {i}", "content": "Content"} for i in range(100)]
+    calls = []
+    monkeypatch.setattr(
+        "app.services.agent.pydantic_agent.gather_context_pydantic_agent",
+        _stub_gather(collected, calls),
+    )
+
+    # `lifespan` wires RetrievalOrchestrator.max_context_notes from settings.chat_context_notes;
+    # pin it here so the assertion does not depend on the developer's .env.
+    cap = 10
+    reranker = StubReranker()
+    retrieval = DummyRetrieval(max_context_notes=cap, reranker=reranker)
+    context_builder = RecordingContextBuilder()
+    chat = _make_chat(retrieval, DummyLLM(), context_builder=context_builder, agent=True)
+
+    lines = await _collect(chat)
+
+    prompt_notes = context_builder.notes_seen
+    assert len(prompt_notes) <= cap
+
+    # The cross-encoder saw a bounded candidate window, and its ordering was kept.
+    assert reranker.calls == [{"candidates": AGENT_RERANK_CANDIDATE_WINDOW, "top_k": cap}]
+    expected = list(reversed(collected[:AGENT_RERANK_CANDIDATE_WINDOW]))[:cap]
+    assert [n["id"] for n in prompt_notes] == [n["id"] for n in expected]
+
+    # The context event the UI's token meter reads must show the same capped set.
+    context_event = next(line for line in lines if line["type"] == "context")
+    assert len(context_event["notes"]) == len(prompt_notes)
+
+
+@pytest.mark.asyncio
+async def test_legacy_path_verifies_citations():
+    """B11: the legacy (default) path emitted unverified [Note #N] markers."""
+    llm = DummyLLM(deltas=("See [Note #7] ", "and [Note #1]."))
+    context_builder = RecordingContextBuilder()
+    chat = _make_chat(DummyRetrieval(), llm, context_builder=context_builder, agent=None)
+
+    lines = await _collect(chat)
+
+    done_event = next(line for line in lines if line["type"] == "done")
+    assert "[Note #7]" not in done_event["full_response"]
+    assert "[Note #1]" in done_event["full_response"]
+    assert done_event["citation_warnings"] == 1
+    assert [c["note_number"] for c in done_event["citations"]] == [1]
+
+
+@pytest.mark.asyncio
+async def test_generate_suggestions_returns_questions():
+    """B1: FOLLOW_UP_PROMPT was never imported, so this always returned []."""
+    chat = _make_chat(DummyRetrieval(), DummyLLM(completion="What next?\nWhy that?"))
+
+    suggestions = await chat._generate_suggestions("answer", [{"id": "n1"}])
+
+    assert suggestions == ["What next?", "Why that?"]
+
+
+@pytest.mark.asyncio
+async def test_generate_suggestions_does_not_swallow_programming_errors():
+    """Guard for B1: a bare `except Exception` hid the NameError for months."""
+    chat = _make_chat(DummyRetrieval(), DummyLLM(error=NameError("boom")))
+
+    with pytest.raises(NameError):
+        await chat._generate_suggestions("answer", [{"id": "n1"}])
+
+
+@pytest.mark.asyncio
+async def test_generate_suggestions_degrades_on_transport_error():
+    """Expected LLM/transport failures still degrade quietly to no suggestions."""
+    chat = _make_chat(DummyRetrieval(), DummyLLM(error=asyncio.TimeoutError()))
+
+    assert await chat._generate_suggestions("answer", [{"id": "n1"}]) == []

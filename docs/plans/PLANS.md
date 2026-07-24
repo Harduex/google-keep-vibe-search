@@ -79,7 +79,7 @@ report it instead of working around it.
 |---|---|---|---|---|---|---|
 | T01 | 1 | 1 | Formatting baseline + `make check`/`make format` split | H2, lint errors | ¼ d | done |
 | T02 | 1 | 2 | CI workflow + fix 3 red tests | H1, B9 | ¼ d | done |
-| T03 | 2 A | 1 | Chat pipeline correctness | B1, B5, B6, B7, B11 | ½ d | todo |
+| T03 | 2 A | 1 | Chat pipeline correctness | B1, B5, B6, B7, B11 | ½ d | done |
 | T04 | 2 B | 1 | Reranker no longer caps search at 20 | B2 | ¼ d | done |
 | T05 | 2 B | 2 | BM25 precompute tf + normalized text | A9 | ¼ d | todo |
 | T06 | 2 C | 1 | Parser: flatten `listContent`, expose `labels` | B3a | ¼ d | done |
@@ -147,6 +147,7 @@ Tasks discovered while executing the plan. Add here instead of building them
 | T10 | Route the remaining LLM-adjacent `str(e)`/`{e}` sites through `app/core/redact.py` (`safe_exc`) as **one dedicated task** — ~11 sites across `chat_service.py`, `query_service.py`, `tagging/dedupe.py`, `agent/pydantic_agent.py`, `routes/chat.py`, `routes/embeddings.py`, `routes/search.py`; several stream raw provider exceptions to the browser, the same P1 class as the `:1104` site T10 fixed. Spans multiple lanes and waves, so it needs its own task rather than piecemeal cross-lane edits. |
 | T10 | `pydantic_agent._log_agent_step` is **kept** (it prints the user's own question and generated probes — user text, not note text, and it is the debugging surface agent mode needs). Decision recorded as a one-line comment referencing T10 in Lane A's file, authorised separately by the orchestrator; not open work. |
 | T10 | Migrate the tagging pipeline's ad-hoc `print` + `llm_failures.log` writes to a named stdlib `logging` logger, so redaction is enforced by one handler instead of per-call discipline. §5 freezes config, so the level would be a constant, not an env var. |
+| T03 | B6's cross-encoder candidate window (`AGENT_RERANK_CANDIDATE_WINDOW = 20`) takes the agent's collected notes in **insertion order**, so notes discovered only in later agent steps can be dropped before the cross-encoder scores them. Scores from different agent probes are not comparable and `filter_by_tag` hits carry no score at all, so a pre-window score sort would systematically discard exactly the notes B5 made reachable. Deciding whether a comparable pre-window ranking signal is worth adding needs tier-2 measurement via `bench/run_retrieval.py` (T36). |
 
 ## Verification
 

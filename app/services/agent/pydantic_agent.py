@@ -1,7 +1,7 @@
 """PydanticAI agent loop with deterministic coverage stopping."""
 
 import asyncio
-from typing import Any, AsyncGenerator, Dict, List, Union
+from typing import Any, AsyncGenerator, Callable, Dict, List, Mapping, Optional, Union
 
 import numpy as np
 from pydantic_ai import Agent
@@ -37,7 +37,27 @@ def _get_query_str(past_query_entry: str) -> str:
     return past_query_entry.strip().lower()
 
 
+TagLookup = Union[Callable[[str], List[str]], Mapping[str, List[str]]]
+
+
+def _resolve_tag_lookup(tag_lookup: Optional[TagLookup]) -> Callable[[str], List[str]]:
+    """Normalise a note-id -> tags lookup into a callable.
+
+    Accepts either a mapping (the shape of ``NoteService.note_tags``) or a callable.
+    When nothing is supplied the lookup is empty, so the agent falls back to whatever
+    the note dict itself carries rather than raising.
+    """
+    if tag_lookup is None:
+        return lambda note_id: []
+    if callable(tag_lookup):
+        return tag_lookup
+    return lambda note_id: list(tag_lookup.get(note_id, []))
+
+
 def _log_agent_step(step: AgentStep) -> None:
+    # This logs the user's question and the agent's generated probes on purpose.
+    # That is user text, not note text, and it is the debugging surface agent step-selection
+    # needs — a deliberate keep, not an oversight.
     queries = step.params.get("queries", [])
     queries_str = ", ".join(f'"{q}"' for q in queries) if queries else "None"
     print(
@@ -55,10 +75,15 @@ async def gather_context_pydantic_agent(
     search_service: SearchService,
     max_steps: int = 5,
     custom_agent: Any = None,
+    tag_lookup: Optional[TagLookup] = None,
 ) -> AsyncGenerator[Union[AgentStep, AgentResult], None]:
     """Execute PydanticAI agent loop for context gathering.
 
     Yields AgentStep objects during execution, terminating with AgentResult.
+
+    ``tag_lookup`` maps a note id to its tags. It must be supplied by the caller because
+    ``search_service.notes`` is never tag-enriched — enrichment mutates route-level copies
+    only — so without it the ``filter_by_tag`` tool can never match anything.
     """
     if not query.strip():
         yield AgentResult(notes=[], steps=[], gap_status="sufficient")
@@ -73,6 +98,7 @@ async def gather_context_pydantic_agent(
         query_embedding = np.zeros(384, dtype=np.float32)
 
     id_to_idx = {note.get("id", ""): i for i, note in enumerate(search_service.notes)}
+    tags_for = _resolve_tag_lookup(tag_lookup)
 
     state = AgentRunState(query=query)
     steps_history: List[AgentStep] = []
@@ -190,10 +216,12 @@ async def gather_context_pydantic_agent(
             state.past_queries.append(f"{decision.tool}: {q}")
 
             if decision.tool == "filter_by_tag":
+                q_lower = q.lower()
                 matches = [
                     n
                     for n in search_service.notes
-                    if q.lower() in [t.lower() for t in n.get("tags", [])]
+                    if q_lower
+                    in [t.lower() for t in (tags_for(n.get("id", "")) or n.get("tags", []) or [])]
                 ]
             else:
                 matches = search_service.search(q)

@@ -7,7 +7,6 @@ import { ErrorDisplay } from '@/components/ErrorDisplay';
 import { GalleryProvider, GalleryOverlay } from '@/components/ImageGallery';
 import { ImageSearchUpload } from '@/components/ImageSearchUpload';
 import { LoadingScreen } from '@/components/LoadingScreen';
-import { NotesClusters } from '@/components/NotesClusters';
 import { Organize } from '@/components/Organize';
 import { Results } from '@/components/Results';
 import { SearchBar } from '@/components/SearchBar';
@@ -193,12 +192,6 @@ const App = () => {
         {activeTab === 'all-notes' && (
           <ErrorBoundary fallbackLabel="All Notes">
             <AllNotes onShowRelated={handleSearch} />
-          </ErrorBoundary>
-        )}
-
-        {activeTab === 'clusters' && (
-          <ErrorBoundary fallbackLabel="Clusters">
-            <NotesClusters query={query} onShowRelated={handleSearch} />
           </ErrorBoundary>
         )}
 

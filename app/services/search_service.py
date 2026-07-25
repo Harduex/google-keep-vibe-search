@@ -48,6 +48,3 @@ class SearchService:
 
     def search_by_image(self, image_path: str) -> List[Dict[str, Any]]:
         return self.engine.search_by_image(image_path)
-
-    def get_clusters(self, num_clusters: Optional[int] = None) -> List[Dict[str, Any]]:
-        return self.engine.get_clusters(num_clusters)

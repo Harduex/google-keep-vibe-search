@@ -11,7 +11,6 @@ export const API_ROUTES = {
   SEARCH_BY_IMAGE: '/api/search/image',
   IMAGE: '/api/image',
   EMBEDDINGS: '/api/embeddings',
-  CLUSTERS: '/api/clusters',
   ALL_NOTES: '/api/all-notes',
   CHAT: '/api/chat',
   CHAT_MODEL: '/api/chat/model',

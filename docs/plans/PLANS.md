@@ -95,7 +95,7 @@ report it instead of working around it.
 | T12 | 3 F | 2 | End-to-end API integration test | T2 | ½ d | done |
 | T13 | 3 G | 2 | Retrieval eval harness (`make eval-retrieval`) | T4 | ½ d | done |
 | T14 | 3 G | 3 | Categorization eval script (closes the `make eval` stub) | H3, T4 | ¼ d | done |
-| T15 | 4 H | 1 | Remove Clusters tab + KMeans; recolour 3D map by tag | Q1, A2, A10 | ½ d | todo |
+| T15 | 4 H | 1 | Remove Clusters tab + KMeans; recolour 3D map by tag | Q1, A2, A10 | ½ d | done |
 | T16 | 4 I | 1 | Remove Topic input; add tag/date scoping | Q3, B13 | ½ d | todo |
 | T17 | 4 J | 1 | Delete `agent/tools.py`, `ClustersButton`, `newChat` dup | A14, A16 | ⅛ d | todo |
 | T18 | 4 J | 2 | Fix dangling doc refs; dedupe agent instruction files | H3, H4 | ¼ d | todo |

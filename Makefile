@@ -67,6 +67,6 @@ build:
 
 eval:
 	@echo "=== Evaluating Categorization Pipeline ==="
-	uv run python scripts/eval_categorization.py
+	PYTHONPATH=. GOOGLE_KEEP_PATH=. uv run python scripts/eval_categorization.py
 
 -include bench/bench.mk

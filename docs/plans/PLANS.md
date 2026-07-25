@@ -94,7 +94,7 @@ report it instead of working around it.
 | T11 | 3 F | 1 | Synthetic fixture corpus + stubbed model/LLM `conftest` | T1, T2 | ½ d | done |
 | T12 | 3 F | 2 | End-to-end API integration test | T2 | ½ d | done |
 | T13 | 3 G | 2 | Retrieval eval harness (`make eval-retrieval`) | T4 | ½ d | done |
-| T14 | 3 G | 3 | Categorization eval script (closes the `make eval` stub) | H3, T4 | ¼ d | todo |
+| T14 | 3 G | 3 | Categorization eval script (closes the `make eval` stub) | H3, T4 | ¼ d | done |
 | T15 | 4 H | 1 | Remove Clusters tab + KMeans; recolour 3D map by tag | Q1, A2, A10 | ½ d | todo |
 | T16 | 4 I | 1 | Remove Topic input; add tag/date scoping | Q3, B13 | ½ d | todo |
 | T17 | 4 J | 1 | Delete `agent/tools.py`, `ClustersButton`, `newChat` dup | A14, A16 | ⅛ d | todo |
@@ -134,7 +134,7 @@ task of that wave lands.
 |---|---|---|---|
 | 1 | — | T01 → T02 | done |
 | 2 | A B C D E | 5 lanes, 2 rounds | done |
-| 3 | F G R T | T11·T33·T35 → T12·T13·T36 → T14 | todo |
+| 3 | F G R T | T11·T33·T35 → T12·T13·T36 → T14 | done |
 | 4 | H I J K | 4 lanes → T18 → T20 | todo |
 | 5 | L1–L6 | T21 → T22·T23 → T24·T25 → T26 | todo |
 | 6 | M N O P Q S | 6 lanes → T28 | todo |

@@ -7,6 +7,7 @@ from unittest import mock
 import pytest
 from fastapi.testclient import TestClient
 
+from app.core.config import settings
 from app.main import app
 from tests.fixtures.notes import generate_synthetic_notes
 from tests.fixtures.stubs import StubCrossEncoder, StubEmbedder, StubLLM, stub_spacy_load
@@ -161,9 +162,6 @@ def fixture_export_dir(tmp_path):
     return export_dir
 
 
-from app.core.config import settings
-
-
 @pytest.fixture
 def _wired_setup(fixture_export_dir, monkeypatch):
     """Core setup for wired_app and client."""
@@ -173,13 +171,21 @@ def _wired_setup(fixture_export_dir, monkeypatch):
     monkeypatch.setattr(settings, "cache_dir", str(fixture_export_dir / ".cache"))
 
     patcher_st = mock.patch("app.search.SentenceTransformer", StubEmbedder)
+    # Two CrossEncoder patch targets, and both are required. `reranker_service` imports it
+    # lazily inside __init__, so only patching the source module reaches it (patching
+    # `app.services.reranker_service.CrossEncoder` raises AttributeError — that name never
+    # exists at module level). `verification_service` imports it at module top level, so its
+    # already-bound name must be patched directly; patching only the source module leaves it
+    # holding the real class, and the fixture then silently loads real NLI weights.
     patcher_ce = mock.patch("sentence_transformers.CrossEncoder", StubCrossEncoder)
+    patcher_ce_nli = mock.patch("app.services.verification_service.CrossEncoder", StubCrossEncoder)
     patcher_llm = mock.patch("app.core.lifespan.LLMClient", StubLLM)
     patcher_spacy_load = mock.patch("spacy.load", side_effect=stub_spacy_load)
     patcher_spacy_dl = mock.patch("spacy.cli.download")
 
     patcher_st.start()
     patcher_ce.start()
+    patcher_ce_nli.start()
     patcher_llm.start()
     patcher_spacy_load.start()
     patcher_spacy_dl.start()
@@ -190,6 +196,7 @@ def _wired_setup(fixture_export_dir, monkeypatch):
     finally:
         patcher_st.stop()
         patcher_ce.stop()
+        patcher_ce_nli.stop()
         patcher_llm.stop()
         patcher_spacy_load.stop()
         patcher_spacy_dl.stop()

@@ -3,6 +3,27 @@ import json
 import pytest
 
 
+def test_wired_app_loads_no_real_models(wired_app):
+    """The wired fixture must be hermetic — no real model weights, ever (T1/T2).
+
+    A patch target that misses one import site does not fail loudly: the app just
+    downloads and runs the real model, so the suite stays green while depending on
+    network and a warm HF cache. This asserts every model handle in the wired app is a
+    stub, by class name only — never touching note text.
+    """
+    from tests.fixtures.stubs import StubCrossEncoder, StubEmbedder
+
+    chat_service = wired_app.state.chat_service
+    verification_service = chat_service.verification_service
+    grounding_service = chat_service.grounding_service
+    reranker = chat_service.retrieval.reranker
+
+    assert isinstance(chat_service.retrieval.search_service.engine.model, StubEmbedder)
+    assert isinstance(verification_service.nli_model, StubCrossEncoder)
+    assert isinstance(grounding_service.nli_model, StubCrossEncoder)
+    assert isinstance(reranker.model, StubCrossEncoder)
+
+
 def test_ready_and_stats(client):
     """
     Pins B4: ensure /api/ready flips true properly when everything is loaded.

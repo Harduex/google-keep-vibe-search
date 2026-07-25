@@ -115,7 +115,7 @@ report it instead of working around it.
 | T32 | 6 Q | 1 | Docker/torch/packaging hygiene | H5, H6, H7 | ½ d | todo |
 | T33 | 3 R | 1 | Tests for the two NDJSON stream parsers | T3 | ½ d | done |
 | T34 | 6 S | 1 | Session service hygiene | B14, B16 | ¼ d | todo |
-| T35 | 3 T | 1 | Benchmark corpora, scale generator, shared metrics | T4 | 1 d | todo |
+| T35 | 3 T | 1 | Benchmark corpora, scale generator, shared metrics | T4 | 1 d | done |
 | T36 | 3 T | 2 | Signal ablation, tagging correctness, baseline gate | T4 | 1 d | todo |
 | T37 | 7 — | 1 | Production-readiness comment sweep + pre-push safety audit | — | ½ d | todo |
 

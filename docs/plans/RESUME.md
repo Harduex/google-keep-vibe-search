@@ -3,7 +3,7 @@
 **Paste this file's contents to a fresh agent to resume the plan.** It is written for someone with
 none of the originating conversation's context.
 
-**Last updated:** 2026-07-25, after the post-wave-4 review · **resume at wave 5**.
+**Last updated:** 2026-07-25, mid-wave-5 — T21, T22, T23 all committed; wave-5 Round 2 closed green. **Resume at wave-5 Round 3** (dispatch T24 ∥ T25) — see Next steps.
 
 > Keep this current: refresh it at every wave barrier, in the barrier commit, alongside the
 > `PLANS.md` § Status update. A stale resume file is worse than none — it will confidently point the
@@ -21,23 +21,52 @@ Precedence: `AGENTS.md` > EXECUTION-PROTOCOL > wave file > PLANS.md.
 
 ## State
 
-Waves 1–4 complete, then reviewed and repaired. Tree clean, branch `master`, nothing ever pushed
-(`origin/master` is still at `6dab505`).
+Waves 1–4 complete, then reviewed and repaired. Branch `master`, nothing ever pushed
+(`origin/master` is still at `6dab505`). **The working tree is NOT clean** — see below.
 
-**Read `PLANS.md` § Post-wave-4 review before starting wave 5.** A review of all 31 wave-1–4
+**Read `PLANS.md` § Post-wave-4 review before continuing wave 5.** A review of all 31 wave-1–4
 commits found five tasks marked `done` whose deliverable did not work, plus two protocol
 deviations — including a barrier declared on a red gate and a benchmark tier that reported
 hardcoded numbers. All are fixed; the § Task index rows say which tasks were completed in review.
 The lesson is recorded there and applies directly to how waves 5–7 should be gated.
 
+### Wave 5 in progress — Round 2 closed; Round 3 next
+
+- **Round 1 — T21 (Lane L1, domain model): DONE.** Committed as `e2f66ee`
+  (`feat(domain): content-addressed document model with stable ids`). Verified by the driver:
+  4 paths only, no trailers, T21 row flipped to `done`. `app/domain` exposes `SourceDoc`,
+  `Document`, `ChangeSet`, `Attachment`, `stable_id(source_key, external_id)`, `content_hash(title, body)`.
+  **Note for downstream:** `ChangeSet.unchanged` is `list[str]` (ids only), not `list[Document]` —
+  T24's `ingest` / T25's `apply` must treat unchanged as a count, not iterate full objects.
+- **Round 2 — T22 (Lane L2) ∥ T23 (Lane L3): DONE, both committed after a green combined gate.**
+  The driver ran `GOOGLE_KEEP_PATH=. make check` over the combined tree → **exit 0** (337 pytest
+  passed, 1 skipped, 90.4 s; 67 vitest; eslint 0 errors; tsc/black/isort clean). 270→337 = +32
+  (T22) +35 (T23), plus the 1 documented skip.
+  - **T22 — `90966b9`** `feat(store): sqlite document store and mmapped vector store`.
+    `app/store/` (`__init__.py`, `sqlite.py`, `vectors.py`, `constants.py`) + `tests/test_store.py`
+    (32 passed). A4 idempotence proven as a *measured* zero (re-upsert 5k → `written=0`); vectors
+    keyed by `content_hash` not position (asserted).
+  - **T23 — `2a8e10f`** `feat(importers): pluggable importers for keep takeout and markdown folders`.
+    `app/importers/` (`__init__.py`, `base.py`, `keep.py`, `markdown.py`) + `tests/test_importers.py`
+    (35 passed, 1 skipped). SourceDoc counts: synthetic keep 27+3, synthetic markdown 27+3. Ports
+    `parser.py` (T06/T07 fixes retained); `app/parser.py` left for T26. Stdlib only.
+  - **T23 blocker (not a T23 failure):** `bench/corpora.py::load_markdown_vault()` is a stub that
+    returns `None` — Lane R / T35 never shipped a real CC-licensed markdown vault. The real-corpus
+    acceptance test **skips cleanly** with a documented reason; **no count was fabricated** (the T36
+    failure mode, avoided). Recorded as a Round-2 finding; T35 should ship the vault so the skip
+    becomes a real assertion. It did not gate T23.
+
 ## Next steps, in order
 
-1. Read `wave-5-store.md` (lanes L1–L6) and `EXECUTION-PROTOCOL.md` §1.3 for rounds.
-   **Round 1 = T21 SERIAL (Lane L1 — Domain model)**.
-   **Round 2 = T22 (Lane L2 — SQLite store + mmapped vector store) · T23 (Lane L3 — Importer protocol)**.
-   **Round 3 = T24 (Lane L4 — Ingest API) · T25 (Lane L5 — Index apply)**.
-   **Round 4 = T26 SERIAL (Lane L6 — Cutover)**.
-2. Dispatch Round 1 using the concurrency protocol below.
+**The paused Round-2 gate is resolved** — T22 (`90966b9`) and T23 (`2a8e10f`) are committed after a
+green combined `make check`. Do not re-dispatch them.
+
+1. **Round 3 = T24 (Lane L4 — Ingest API) ∥ T25 (Lane L5 — Index apply)** — dispatch concurrently.
+   Both consume the store (T22); T25 routes vector I/O through `store/vectors.py`. Brief each lane
+   with the concurrency protocol below. Remember `ChangeSet.unchanged` is `list[str]` (ids), not
+   `list[Document]` — treat it as a count. Wait for both to report `READY FOR GATE`, then run
+   `GOOGLE_KEEP_PATH=. make check` yourself and **paste its output** before issuing commit tokens.
+2. **Round 4 = T26 SERIAL (Lane L6 — Cutover)** — depends on T22, T23, T24, T25.
 3. At the wave-5 barrier (after T26): run `make check` yourself **and paste its output**, flip
    § Status, re-run both § Verification scripts, refresh this file, **delete `wave-5-store.md` in
    the barrier commit**, then **stop and report**. The owner wants a barrier stop before each new
@@ -58,16 +87,23 @@ The lesson is recorded there and applies directly to how waves 5–7 should be g
 
 ## Verified gate, as of this checkpoint
 
-`GOOGLE_KEEP_PATH=. make check` → **exit 0**: 243 pytest passed in 107 s, 12 vitest files /
-64 tests, eslint 0 errors (2 pre-existing warnings in `GalleryContext.tsx`,
-`ImageGallery/index.tsx`), tsc clean, black/isort clean. PLANS.md invariants: `overlaps: 0`,
-`unowned: none` (the coverage script now handles findings the plan split into lettered parts,
-e.g. B3 → B3a/B3b; it previously printed `['B3']` while the barrier notes claimed "none").
+**Last green `make check` the driver actually ran and pasted: the combined wave-5 Round-2 tree,
+after T22/T23 were coded and before they were committed** → **exit 0**: 337 pytest passed, 1
+skipped, 90.4 s; 12 vitest files / 67 tests; eslint 0 errors (2 pre-existing warnings in
+`GalleryContext.tsx`, `ImageGallery/index.tsx`); tsc clean; black/isort clean. 270→337 over the
+round = +32 (T22 store) +35 (T23 importers); the +1 skip is the documented T23 markdown-vault
+stub (T35), not a fabricated count. That combined run greenlit both `90966b9` and `2a8e10f`.
 
-The suite went from 220 tests / 170 s to 243 / 107 s: the extra tests are the review's regression
-tests, and the speed-up is real models and a live LLM call leaving the unit suite (the wired
-fixture was loading real NLI weights, and one chat test drove the real agent loop into its step
-timeout).
+PLANS.md invariants: `overlaps: 0`, `unowned: none` (the coverage script handles findings the
+plan split into lettered parts, e.g. B3 → B3a/B3b).
+
+**The tree is clean of in-flight lane work** — T22/T23 are committed; only this docs refresh is
+uncommitted. Round 3 (T24 ∥ T25) has not started.
+
+The suite went from 220 tests / 170 s to 243 / 107 s over the review: the extra tests are the
+review's regression tests, and the speed-up is real models and a live LLM call leaving the unit
+suite (the wired fixture was loading real NLI weights, and one chat test drove the real agent loop
+into its step timeout).
 
 Tier-1 eval: `make eval-retrieval` (fixture corpus, ~6 s). Tier-2 benchmarks: `make bench-fetch`
 once, then `make bench` / `make bench-compare` — real models over SciFact and 20 Newsgroups, minutes

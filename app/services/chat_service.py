@@ -110,14 +110,18 @@ class ChatService:
         self,
         messages: List[Dict[str, str]],
         use_notes_context: bool = True,
-        topic: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        date_range: Optional[Dict[str, str]] = None,
+        **kwargs,
     ) -> Tuple[str, List[Dict[str, Any]]]:
         """Non-streaming chat completion."""
         relevant_notes = []
         gap_status = "sufficient"
 
         if use_notes_context:
-            relevant_notes, gap_status = await self.retrieval.get_context(messages, topic)
+            relevant_notes, gap_status = await self.retrieval.get_context(
+                messages, tags=tags, date_range=date_range
+            )
 
         conflicts = self._detect_conflicts(relevant_notes)
         windowed = await self.conversation_mgr.maybe_summarize(messages)
@@ -135,22 +139,34 @@ class ChatService:
         self,
         messages: List[Dict[str, str]],
         use_notes_context: bool = True,
-        topic: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        date_range: Optional[Dict[str, str]] = None,
         session_id: Optional[str] = None,
+        **kwargs,
     ) -> AsyncGenerator[bytes, None]:
         """Streaming chat with NDJSON protocol including phases and suggestions."""
         if self.agent and use_notes_context:
-            async for chunk in self._stream_agentic(messages, topic, session_id):
+            async for chunk in self._stream_agentic(
+                messages, tags=tags, date_range=date_range, session_id=session_id
+            ):
                 yield chunk
         else:
-            async for chunk in self._stream_legacy(messages, use_notes_context, topic, session_id):
+            async for chunk in self._stream_legacy(
+                messages,
+                use_notes_context,
+                tags=tags,
+                date_range=date_range,
+                session_id=session_id,
+            ):
                 yield chunk
 
     async def _stream_agentic(
         self,
         messages: List[Dict[str, str]],
-        topic: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        date_range: Optional[Dict[str, str]] = None,
         session_id: Optional[str] = None,
+        **kwargs,
     ) -> AsyncGenerator[bytes, None]:
         """Agentic retrieval: PydanticAI agent iteratively searches, then generates response."""
         import json
@@ -178,7 +194,7 @@ class ChatService:
 
         async for item in gather_context_pydantic_agent(
             query,
-            self.retrieval.search_service,
+            self.retrieval,
             max_steps=settings.agent_max_steps,
             tag_lookup=self._tag_lookup(),
         ):
@@ -248,8 +264,10 @@ class ChatService:
         self,
         messages: List[Dict[str, str]],
         use_notes_context: bool = True,
-        topic: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        date_range: Optional[Dict[str, str]] = None,
         session_id: Optional[str] = None,
+        **kwargs,
     ) -> AsyncGenerator[bytes, None]:
         """Legacy single-shot retrieval path."""
         relevant_notes = []
@@ -257,7 +275,9 @@ class ChatService:
 
         if use_notes_context:
             yield self.protocol.phase("searching", "Searching your notes...")
-            relevant_notes, gap_status = await self.retrieval.get_context(messages, topic)
+            relevant_notes, gap_status = await self.retrieval.get_context(
+                messages, tags=tags, date_range=date_range
+            )
 
         conflicts = self._detect_conflicts(relevant_notes)
         yield self.protocol.context(relevant_notes, conflicts, session_id or "")

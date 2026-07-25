@@ -1,6 +1,7 @@
 """PydanticAI agent loop with deterministic coverage stopping."""
 
 import asyncio
+import inspect
 from typing import Any, AsyncGenerator, Callable, Dict, List, Mapping, Optional, Union
 
 import numpy as np
@@ -72,7 +73,7 @@ def _log_agent_step(step: AgentStep) -> None:
 
 async def gather_context_pydantic_agent(
     query: str,
-    search_service: SearchService,
+    orchestrator: Any,
     max_steps: int = 5,
     custom_agent: Any = None,
     tag_lookup: Optional[TagLookup] = None,
@@ -85,6 +86,7 @@ async def gather_context_pydantic_agent(
     ``search_service.notes`` is never tag-enriched — enrichment mutates route-level copies
     only — so without it the ``filter_by_tag`` tool can never match anything.
     """
+    search_service = getattr(orchestrator, "search_service", orchestrator)
     if not query.strip():
         yield AgentResult(notes=[], steps=[], gap_status="sufficient")
         return
@@ -102,6 +104,7 @@ async def gather_context_pydantic_agent(
 
     state = AgentRunState(query=query)
     steps_history: List[AgentStep] = []
+    final_gap_status = "sufficient"
 
     last_batch_size = 0
     last_batch_new = 0
@@ -224,7 +227,17 @@ async def gather_context_pydantic_agent(
                     in [t.lower() for t in (tags_for(n.get("id", "")) or n.get("tags", []) or [])]
                 ]
             else:
-                matches = search_service.search(q)
+                if hasattr(orchestrator, "get_context"):
+                    res = orchestrator.get_context([{"role": "user", "content": q}])
+                    if inspect.isawaitable(res):
+                        res = await res
+                    matches, step_gap_status = res
+                else:
+                    matches = search_service.search(q)
+                    step_gap_status = "sufficient"
+
+                if step_gap_status != "sufficient":
+                    final_gap_status = step_gap_status
 
             for note in matches:
                 nid = note.get("id")
@@ -264,5 +277,5 @@ async def gather_context_pydantic_agent(
     yield AgentResult(
         notes=list(state.collected.values()),
         steps=steps_history,
-        gap_status="sufficient",
+        gap_status=final_gap_status,
     )

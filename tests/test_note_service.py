@@ -270,3 +270,60 @@ class TestB5LiveWiring:
 
         assert tag_lookup is not None
         assert tag_lookup["n1"] == ["Recipes"]
+
+
+class TestSearchServiceScope:
+    """B13/Q3: tag + date scoping, enforced at the same choke point as B10's exclusions."""
+
+    NOTES = [
+        {"id": "n1", "created": "2024-03-01 10:00:00"},
+        {"id": "n2", "created": "2024-06-15 10:00:00"},
+        {"id": "n3", "created": "2025-01-20 10:00:00"},
+        {"id": "n4"},  # no created field at all
+    ]
+
+    @staticmethod
+    def _service(note_tags=None):
+        ns = NoteService()
+        ns.note_tags = note_tags or {}
+        ns.excluded_tags = set()
+        engine = _TruncatingStubEngine([dict(n) for n in TestSearchServiceScope.NOTES])
+        engine.notes = [dict(n) for n in TestSearchServiceScope.NOTES]
+        return SearchService(engine, note_service=ns)
+
+    def test_tags_are_or_ed_and_read_from_the_tag_map(self):
+        # The engine's note dicts carry no "tags" key — the map is the only source.
+        service = self._service({"n1": ["Recipes"], "n2": ["Travel"], "n3": ["Work"]})
+
+        results = service.search("q", tags=["Recipes", "Travel"])
+
+        assert [r["id"] for r in results] == ["n1", "n2"]
+
+    def test_date_range_bounds_are_inclusive(self):
+        service = self._service()
+
+        results = service.search("q", date_range={"start": "2024-03-01", "end": "2024-06-15"})
+
+        assert [r["id"] for r in results] == ["n1", "n2"]
+
+    def test_open_ended_ranges_and_missing_dates(self):
+        service = self._service()
+
+        assert [r["id"] for r in service.search("q", date_range={"start": "2025-01-01"})] == ["n3"]
+        assert [r["id"] for r in service.search("q", date_range={"end": "2024-03-31"})] == ["n1"]
+        # A note with no creation date cannot be shown to satisfy a bound, so it is excluded.
+        assert "n4" not in [
+            r["id"] for r in service.search("q", date_range={"start": "2000-01-01"})
+        ]
+
+    def test_tag_and_date_scopes_intersect(self):
+        service = self._service({"n1": ["Recipes"], "n2": ["Recipes"]})
+
+        results = service.search("q", tags=["Recipes"], date_range={"start": "2024-06-01"})
+
+        assert [r["id"] for r in results] == ["n2"]
+
+    def test_no_scope_leaves_the_result_set_alone(self):
+        service = self._service({"n1": ["Recipes"]})
+
+        assert [r["id"] for r in service.search("q")] == ["n1", "n2", "n3", "n4"]

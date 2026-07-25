@@ -10,6 +10,7 @@ from app.services.agent.decision import SearchDecision
 from app.services.agent.model_factory import build_agent_model
 from app.services.agent.models import AgentResult, AgentStep
 from app.services.agent.pydantic_agent import gather_context_pydantic_agent
+from app.services.search_service import SearchService
 
 
 def test_pydantic_ai_api_compatibility():
@@ -45,8 +46,13 @@ class StubSearchService:
         self.notes = notes
         self.engine = StubSearchEngine(notes)
         self.embeddings = self.engine.embeddings
+        self.note_service = None
 
-    def search(self, query: str):
+    # Borrowed from the real service so the scope rule under test has one implementation.
+    _note_tags = SearchService._note_tags
+    in_scope = SearchService.in_scope
+
+    def search(self, query: str, **kwargs):
         # Return notes matching query string substring
         return [
             n
@@ -177,3 +183,84 @@ async def test_filter_by_tag_without_tag_lookup_returns_nothing():
 
     assert isinstance(items[-1], AgentResult)
     assert items[-1].notes == []
+
+
+class ScopeRecordingOrchestrator:
+    """Orchestrator double that records the scope each probe was issued with."""
+
+    def __init__(self, notes):
+        self.search_service = StubSearchService(notes)
+        self.calls = []
+
+    async def get_context(self, messages, tags=None, date_range=None, **kwargs):
+        self.calls.append({"tags": tags, "date_range": date_range})
+        query = messages[-1]["content"]
+        return self.search_service.search(query), "sufficient"
+
+
+class SearchDecisionAgent:
+    def __init__(self, queries):
+        self.queries = queries
+
+    async def run(self, prompt):
+        class Result:
+            output = SearchDecision(
+                tool="search_notes", queries=list(self.queries), reasoning="probe"
+            )
+
+        return Result()
+
+
+@pytest.mark.asyncio
+async def test_search_probes_carry_the_user_scope():
+    """B13/Q3: every probe the agent makes is bound by the user's scope, not just the first."""
+    notes = [{"id": "n1", "title": "Pasta", "content": "Boil water"}]
+    orchestrator = ScopeRecordingOrchestrator(notes)
+
+    items = []
+    async for item in gather_context_pydantic_agent(
+        "pasta",
+        orchestrator,
+        max_steps=1,
+        custom_agent=SearchDecisionAgent(["Pasta"]),
+        tags=["Recipes"],
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+    ):
+        items.append(item)
+
+    assert orchestrator.calls
+    assert all(call["tags"] == ["Recipes"] for call in orchestrator.calls)
+    assert all(
+        call["date_range"] == {"start": "2024-01-01", "end": "2024-12-31"}
+        for call in orchestrator.calls
+    )
+
+
+@pytest.mark.asyncio
+async def test_filter_by_tag_intersects_the_user_scope():
+    """A tag the agent picks itself cannot escape the user's scope.
+
+    filter_by_tag walks the corpus directly instead of going through SearchService.search,
+    so without an explicit intersection it would return notes the user had scoped out.
+    """
+    notes = [
+        {"id": "n1", "title": "Pasta", "content": "Boil water", "created": "2024-03-01 10:00:00"},
+        {"id": "n2", "title": "Risotto", "content": "Stir rice", "created": "2021-03-01 10:00:00"},
+    ]
+    search_service = StubSearchService(notes)
+
+    items = []
+    async for item in gather_context_pydantic_agent(
+        "what recipes do I have",
+        search_service,
+        max_steps=1,
+        custom_agent=TagDecisionAgent("recipes"),
+        tag_lookup={"n1": ["Recipes"], "n2": ["Recipes"]},
+        date_range={"start": "2024-01-01"},
+    ):
+        items.append(item)
+
+    result = items[-1]
+    assert isinstance(result, AgentResult)
+    # Both notes carry the agent's tag; only n1 is inside the user's date scope.
+    assert [n["id"] for n in result.notes] == ["n1"]

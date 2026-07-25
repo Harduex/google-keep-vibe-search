@@ -3,6 +3,7 @@ import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { AgentSteps } from '@/components/Chat/AgentSteps';
 import { ChatMessage } from '@/components/Chat/ChatMessage';
 import { ChatNotes } from '@/components/Chat/ChatNotes';
+import { ChatScope } from '@/components/Chat/ChatScope';
 import { GroundingScore } from '@/components/Chat/GroundingScore';
 import { SessionList } from '@/components/Chat/SessionList';
 import { useChat } from '@/hooks/useChat';
@@ -32,6 +33,11 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
     modelInfo,
     useNotesContext,
     toggleNotesContext,
+    availableTags,
+    selectedTags,
+    setSelectedTags,
+    dateRange,
+    setDateRange,
     currentPhase,
     suggestions,
     agentSteps,
@@ -317,6 +323,16 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
           </div>
 
           <form className="chat-input" onSubmit={handleSubmit}>
+            {useNotesContext && (
+              <ChatScope
+                availableTags={availableTags}
+                selectedTags={selectedTags}
+                onSelectedTagsChange={setSelectedTags}
+                dateRange={dateRange}
+                onDateRangeChange={setDateRange}
+                disabled={isLoading}
+              />
+            )}
             <div className="input-wrapper">
               <textarea
                 id="chat-message-input"

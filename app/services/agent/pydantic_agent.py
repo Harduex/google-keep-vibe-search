@@ -77,6 +77,8 @@ async def gather_context_pydantic_agent(
     max_steps: int = 5,
     custom_agent: Any = None,
     tag_lookup: Optional[TagLookup] = None,
+    tags: Optional[List[str]] = None,
+    date_range: Optional[Dict[str, str]] = None,
 ) -> AsyncGenerator[Union[AgentStep, AgentResult], None]:
     """Execute PydanticAI agent loop for context gathering.
 
@@ -85,6 +87,10 @@ async def gather_context_pydantic_agent(
     ``tag_lookup`` maps a note id to its tags. It must be supplied by the caller because
     ``search_service.notes`` is never tag-enriched — enrichment mutates route-level copies
     only — so without it the ``filter_by_tag`` tool can never match anything.
+
+    ``tags`` and ``date_range`` are the *user's* scope and bound every probe the
+    agent makes, including its own ``filter_by_tag`` picks — they are not the agent's to
+    widen. Distinct from ``tag_lookup``, which is only the id -> tags map.
     """
     search_service = getattr(orchestrator, "search_service", orchestrator)
     if not query.strip():
@@ -229,14 +235,21 @@ async def gather_context_pydantic_agent(
                     if q_lower
                     in [t.lower() for t in (tags_for(n.get("id", "")) or n.get("tags", []) or [])]
                 ]
+                # The user's scope still binds a tag the agent picked itself:
+                # `filter_by_tag` walks the corpus directly instead of going through
+                # SearchService.search, so it has to intersect the scope here.
+                if (tags or date_range) and hasattr(search_service, "in_scope"):
+                    matches = [n for n in matches if search_service.in_scope(n, tags, date_range)]
             else:
                 if hasattr(orchestrator, "get_context"):
-                    res = orchestrator.get_context([{"role": "user", "content": q}])
+                    res = orchestrator.get_context(
+                        [{"role": "user", "content": q}], tags=tags, date_range=date_range
+                    )
                     if inspect.isawaitable(res):
                         res = await res
                     matches, step_gap_status = res
                 else:
-                    matches = search_service.search(q)
+                    matches = search_service.search(q, tags=tags, date_range=date_range)
                     step_gap_status = "sufficient"
 
                 if step_gap_status != "sufficient":

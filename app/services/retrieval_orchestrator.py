@@ -31,16 +31,13 @@ class RetrievalOrchestrator:
         date_range: Optional[Dict[str, str]] = None,
     ) -> List[Dict[str, Any]]:
         max_notes = max_notes or self.max_context_notes
-        import inspect
-
-        kwargs = {}
-        sig = inspect.signature(self.search_service.search)
-        if "tags" in sig.parameters or any(
-            p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
-        ):
-            kwargs["tags"] = tags
-            kwargs["date_range"] = date_range
-        return self.search_service.search(query, max_results=max_notes, **kwargs)
+        # SearchService.search enforces the scope (B13/Q3) — passed unconditionally. This
+        # used to be guarded by a signature sniff that never fired, because
+        # SearchService.search took no tags/date_range at all, so scoping was silently
+        # dropped on every path.
+        return self.search_service.search(
+            query, max_results=max_notes, tags=tags, date_range=date_range
+        )
 
     async def get_context(
         self,
@@ -111,6 +108,11 @@ class RetrievalOrchestrator:
             query=latest_message,
         )
 
+        # The scope has to be re-applied after fusion, not only pushed into the note-level
+        # searches: the chunk signal and the entity signal reach the corpus directly, so an
+        # out-of-scope note can enter the fused list through either of them (B13/Q3).
+        merged = self._apply_scope(merged, tags, date_range)
+
         # Coverage saturation
         merged = self._cap_if_saturated(merged)
         result = merged[: self.max_context_notes]
@@ -118,11 +120,36 @@ class RetrievalOrchestrator:
         # Gap analysis
         gap_status = "sufficient"
         if self.query_service and latest_message and result:
+            # Bind the scope to the fetch callback, so gap-filling probes cannot widen it.
+            def scoped_fetch(query: str, max_notes: Optional[int] = None) -> List[Dict[str, Any]]:
+                return self.get_relevant_notes(
+                    query, max_notes=max_notes, tags=tags, date_range=date_range
+                )
+
             result, gap_status = await self.query_service.retrieve_with_gap_analysis(
-                latest_message, result, self.get_relevant_notes
+                latest_message, result, scoped_fetch
             )
+            result = self._apply_scope(result, tags, date_range)
 
         return result, gap_status
+
+    def _apply_scope(
+        self,
+        notes: List[Dict[str, Any]],
+        tags: Optional[List[str]],
+        date_range: Optional[Dict[str, str]],
+    ) -> List[Dict[str, Any]]:
+        """Drop notes outside the caller's tag/date scope.
+
+        Delegates to `SearchService.in_scope` so the rule has exactly one implementation;
+        a search service without it (a bare test double) leaves the list untouched.
+        """
+        if not (tags or date_range):
+            return notes
+        in_scope = getattr(self.search_service, "in_scope", None)
+        if in_scope is None:
+            return notes
+        return [note for note in notes if in_scope(note, tags, date_range)]
 
     def _merge_and_rerank(
         self,

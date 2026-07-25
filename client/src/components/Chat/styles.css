@@ -1547,3 +1547,126 @@
     height: 38px;
   }
 }
+
+/* Chat retrieval scope (tag chips + created-date range) */
+.chat-scope {
+  margin-bottom: 6px;
+}
+
+.chat-scope-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chat-scope-toggle,
+.chat-scope-clear,
+.chat-scope-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: color var(--transition-fast);
+}
+
+.chat-scope-toggle:hover,
+.chat-scope-clear:hover,
+.chat-scope-more:hover {
+  color: var(--primary-color);
+}
+
+.chat-scope-toggle .material-icons {
+  font-size: 1rem;
+}
+
+.chat-scope-badge {
+  min-width: 16px;
+  padding: 0 5px;
+  font-size: 0.68rem;
+  line-height: 16px;
+  text-align: center;
+  color: #fff;
+  background: var(--primary-color);
+  border-radius: 8px;
+}
+
+.chat-scope-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 10px;
+  margin-top: 4px;
+  background: rgba(var(--primary-color-rgb), 0.04);
+  border: 1px dashed rgba(var(--primary-color-rgb), 0.25);
+  border-radius: var(--radius-md);
+}
+
+.chat-scope-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chat-scope-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  font-size: 0.78rem;
+  color: var(--text-color);
+  background: rgba(var(--primary-color-rgb), 0.08);
+  border: 1px solid rgba(var(--primary-color-rgb), 0.25);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.chat-scope-chip:hover:not(:disabled) {
+  background: rgba(var(--primary-color-rgb), 0.18);
+}
+
+.chat-scope-chip.selected {
+  color: #fff;
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+.chat-scope-chip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.chat-scope-chip-count {
+  font-size: 0.68rem;
+  opacity: 0.7;
+}
+
+.chat-scope-dates {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.chat-scope-dates input {
+  padding: 3px 6px;
+  font-size: 0.78rem;
+  color: var(--text-color);
+  background: var(--input-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+}
+
+.chat-scope-empty {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}

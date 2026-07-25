@@ -122,6 +122,61 @@ describe('useChat NDJSON stream parser', () => {
     });
   };
 
+  it('sends the staged tag and date scope with the chat request', async () => {
+    // B13/Q3: the scope existed as hook state and was never put on the wire, so the
+    // backend's tags/date_range parameters could not do anything.
+    const { result } = renderHook(() => useChat());
+
+    await act(async () => {
+      await vi.runAllTimersAsync();
+    });
+
+    let sentBody: any = null;
+    mockChatFetch((options: any) => {
+      sentBody = JSON.parse(options.body as string);
+      return createStreamResponse([
+        encodeChunk(JSON.stringify({ type: 'done', full_response: 'ok' }) + '\n'),
+      ]);
+    });
+
+    act(() => {
+      result.current.setSelectedTags(['Recipes', 'Travel']);
+      result.current.setDateRange({ start: '2024-01-01', end: '2024-06-30' });
+    });
+
+    await act(async () => {
+      await result.current.sendMessage('Hello');
+      await vi.runAllTimersAsync();
+    });
+
+    expect(sentBody.tags).toEqual(['Recipes', 'Travel']);
+    expect(sentBody.date_range).toEqual({ start: '2024-01-01', end: '2024-06-30' });
+  });
+
+  it('omits both scope keys when nothing is staged', async () => {
+    const { result } = renderHook(() => useChat());
+
+    await act(async () => {
+      await vi.runAllTimersAsync();
+    });
+
+    let sentBody: any = null;
+    mockChatFetch((options: any) => {
+      sentBody = JSON.parse(options.body as string);
+      return createStreamResponse([
+        encodeChunk(JSON.stringify({ type: 'done', full_response: 'ok' }) + '\n'),
+      ]);
+    });
+
+    await act(async () => {
+      await result.current.sendMessage('Hello');
+      await vi.runAllTimersAsync();
+    });
+
+    expect('tags' in sentBody).toBe(false);
+    expect('date_range' in sentBody).toBe(false);
+  });
+
   it('handles chunk-boundary safety with split JSON objects', async () => {
     const { result } = renderHook(() => useChat());
 

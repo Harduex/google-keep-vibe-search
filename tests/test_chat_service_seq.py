@@ -61,7 +61,7 @@ class DummyRetrieval:
         self.reranker = reranker
         self.note_service = note_service
 
-    def search(self, query, max_results=None):
+    def search(self, query, max_results=None, **kwargs):
         return self.notes
 
     async def get_context(self, messages, *args, **kwargs):
@@ -98,8 +98,24 @@ class StubReranker:
 def _stub_gather(notes, calls, steps=1):
     """Build a stand-in for gather_context_pydantic_agent that records its kwargs."""
 
-    async def stub_agent(query, search_service, max_steps=None, custom_agent=None, tag_lookup=None):
-        calls.append({"query": query, "max_steps": max_steps, "tag_lookup": tag_lookup})
+    async def stub_agent(
+        query,
+        search_service,
+        max_steps=None,
+        custom_agent=None,
+        tag_lookup=None,
+        tags=None,
+        date_range=None,
+    ):
+        calls.append(
+            {
+                "query": query,
+                "max_steps": max_steps,
+                "tag_lookup": tag_lookup,
+                "tags": tags,
+                "date_range": date_range,
+            }
+        )
         for i in range(steps):
             yield AgentStep(
                 step_number=i + 1,
@@ -190,6 +206,32 @@ async def test_agentic_passes_tag_lookup_from_note_service(monkeypatch):
     await _collect(chat)
 
     assert calls[0]["tag_lookup"] == {"n1": ["recipes"]}
+
+
+@pytest.mark.asyncio
+async def test_stream_forwards_the_user_scope_to_the_agent(monkeypatch):
+    """B13/Q3: the route accepts tags/date_range and the stream path used to drop both.
+
+    T20 removed the only branch that forwarded them, so a scoped chat request searched the
+    whole corpus.
+    """
+    calls = []
+    monkeypatch.setattr(
+        "app.services.agent.pydantic_agent.gather_context_pydantic_agent",
+        _stub_gather([{"id": "n1", "title": "Test Note"}], calls),
+    )
+
+    chat = _make_chat(DummyRetrieval(), DummyLLM())
+    chunks = []
+    async for chunk in chat.stream_chat_with_protocol(
+        [{"role": "user", "content": "test query"}],
+        tags=["Recipes"],
+        date_range={"start": "2024-01-01"},
+    ):
+        chunks.append(chunk)
+
+    assert calls[0]["tags"] == ["Recipes"]
+    assert calls[0]["date_range"] == {"start": "2024-01-01"}
 
 
 @pytest.mark.asyncio

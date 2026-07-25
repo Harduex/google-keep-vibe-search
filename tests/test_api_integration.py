@@ -78,6 +78,96 @@ def test_exclude_tags(client):
     client.post("/api/tags/excluded", json={"excluded_tags": []})
 
 
+def _stub_agent_decision(monkeypatch, queries):
+    """Make the agent's decision step deterministic and offline.
+
+    Only the LLM decision is stubbed — the real agent loop, RetrievalOrchestrator and
+    SearchService still run, which is what makes a scoping assertion meaningful. Without
+    this the loop tries to reach the configured LLM, fails, and yields zero notes, so
+    "every returned note is in scope" would pass vacuously.
+    """
+    from app.services.agent.decision import SearchDecision
+
+    class StubDecisionAgent:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def run(self, prompt):
+            class Result:
+                output = SearchDecision(
+                    tool="search_notes", queries=list(queries), reasoning="probe"
+                )
+
+            return Result()
+
+    monkeypatch.setattr("app.services.agent.pydantic_agent.Agent", StubDecisionAgent)
+
+
+def _chat_context_notes(client, payload):
+    resp = client.post("/api/chat", json=payload)
+    assert resp.status_code == 200
+    for line in resp.iter_lines():
+        if line and line.strip():
+            event = json.loads(line)
+            if event["type"] == "context":
+                return event["notes"]
+    raise AssertionError("no context event in the stream")
+
+
+def test_chat_scopes_retrieval_to_the_requested_tags(client, monkeypatch):
+    """Pins B13/Q3: the tag scope must bound what chat retrieves.
+
+    T16 added `tags`/`date_range` to ChatRequest and the orchestrator, but nothing applied
+    them: SearchService.search took no such parameters, the orchestrator's signature sniff
+    therefore never fired, and T20 dropped them from the streaming path entirely.
+    """
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "agent_max_steps", 1)
+    monkeypatch.setattr(client.app.state.chat_service.retrieval, "max_context_notes", 20)
+    _stub_agent_decision(monkeypatch, ["Content with label"])
+
+    base_payload = {
+        "messages": [{"role": "user", "content": "what did I write about labels"}],
+        "stream": True,
+        "useNotesContext": True,
+    }
+
+    unscoped = _chat_context_notes(client, base_payload)
+    scoped = _chat_context_notes(client, {**base_payload, "tags": ["Label6"]})
+
+    # Non-vacuous: the unscoped probe reaches more than the one labelled note.
+    assert len(unscoped) > 1
+    assert {n["title"] for n in unscoped} & {"Labeled 6", "Labeled 7", "Labeled 8"}
+
+    assert len(scoped) >= 1
+    assert {n["title"] for n in scoped} == {"Labeled 6"}
+
+
+def test_chat_scopes_retrieval_to_the_requested_date_range(client, monkeypatch):
+    """Pins B13/Q3 for the date half: a range that excludes every note yields no context."""
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "agent_max_steps", 1)
+    _stub_agent_decision(monkeypatch, ["Content with label"])
+
+    base_payload = {
+        "messages": [{"role": "user", "content": "what did I write about labels"}],
+        "stream": True,
+        "useNotesContext": True,
+    }
+
+    in_range = _chat_context_notes(
+        client, {**base_payload, "date_range": {"start": "2000-01-01", "end": "2100-01-01"}}
+    )
+    out_of_range = _chat_context_notes(
+        client, {**base_payload, "date_range": {"start": "2100-01-01"}}
+    )
+
+    assert len(in_range) >= 1
+    assert out_of_range == []
+
+
 def test_chat_streaming(client, monkeypatch):
     """
     Pins B1, B6, B11, B5, B7.

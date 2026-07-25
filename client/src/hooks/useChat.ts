@@ -315,11 +315,16 @@ export const useChat = () => {
       setMessages((prev) => [...prev, assistantMessage]);
 
       // Prepare request data
+      // Scope (B13/Q3): omit both keys entirely when unset, so an empty chip row is not
+      // sent as an empty filter the backend would have to special-case.
+      const scopedDates = dateRange.start || dateRange.end ? dateRange : undefined;
       const payload = {
         messages: [...messages, userMessage].map(({ role, content }) => ({ role, content })),
         stream: true,
         useNotesContext,
         session_id: currentSessionId || undefined,
+        tags: selectedTags.length > 0 ? selectedTags : undefined,
+        date_range: scopedDates,
       };
 
       // Stop any existing stream
@@ -519,7 +524,16 @@ export const useChat = () => {
         setIsLoading(false);
       }
     },
-    [messages, stopGenerating, useNotesContext, sessionId, createSession, saveSessionMessages],
+    [
+      messages,
+      stopGenerating,
+      useNotesContext,
+      selectedTags,
+      dateRange,
+      sessionId,
+      createSession,
+      saveSessionMessages,
+    ],
   );
 
   const newChat = useCallback(() => {

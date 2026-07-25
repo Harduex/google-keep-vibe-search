@@ -160,6 +160,8 @@ class ChatService:
                 self.retrieval,
                 max_steps=settings.agent_max_steps,
                 tag_lookup=self._tag_lookup(),
+                tags=tags,
+                date_range=date_range,
             ):
                 if isinstance(item, AgentStep):
                     yield emit(

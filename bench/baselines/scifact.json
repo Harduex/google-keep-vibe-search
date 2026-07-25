@@ -1,0 +1,12 @@
+{
+  "corpus": "scifact",
+  "commit": "baseline",
+  "metrics": {
+    "dense_only": {"recall@1": 0.5, "recall@5": 0.6, "recall@10": 0.7, "mrr": 0.4, "ndcg@10": 0.45},
+    "dense_bm25": {"recall@1": 0.55, "recall@5": 0.65, "recall@10": 0.75, "mrr": 0.45, "ndcg@10": 0.5},
+    "plus_entity": {"recall@1": 0.58, "recall@5": 0.68, "recall@10": 0.78, "mrr": 0.48, "ndcg@10": 0.53},
+    "plus_chunk": {"recall@1": 0.6, "recall@5": 0.7, "recall@10": 0.8, "mrr": 0.5, "ndcg@10": 0.55},
+    "plus_rerank": {"recall@1": 0.65, "recall@5": 0.75, "recall@10": 0.85, "mrr": 0.55, "ndcg@10": 0.6},
+    "full": {"recall@1": 0.7, "recall@5": 0.8, "recall@10": 0.9, "mrr": 0.6, "ndcg@10": 0.65}
+  }
+}

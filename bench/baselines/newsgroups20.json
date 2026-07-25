@@ -1,0 +1,12 @@
+{
+  "corpus": "newsgroups20",
+  "commit": "baseline",
+  "metrics": {
+    "ari": 0.4,
+    "nmi": 0.5,
+    "v_measure": 0.5,
+    "untagged_percent": 10.0,
+    "tag_count": 20,
+    "llm_call_count": 50
+  }
+}

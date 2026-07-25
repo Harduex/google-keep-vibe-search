@@ -97,8 +97,8 @@ report it instead of working around it.
 | T14 | 3 G | 3 | Categorization eval script (closes the `make eval` stub) | H3, T4 | ¼ d | done |
 | T15 | 4 H | 1 | Remove Clusters tab + KMeans; recolour 3D map by tag | Q1, A2, A10 | ½ d | done |
 | T16 | 4 I | 1 | Remove Topic input; add tag/date scoping | Q3, B13 | ½ d | done |
-| T17 | 4 J | 1 | Delete `agent/tools.py`, `ClustersButton`, `newChat` dup | A14, A16 | ⅛ d | todo |
-| T18 | 4 J | 2 | Fix dangling doc refs; dedupe agent instruction files | H3, H4 | ¼ d | todo |
+| T17 | 4 J | 1 | Delete `agent/tools.py`, `ClustersButton`, `newChat` dup | A14, A16 | ⅛ d | done |
+| T18 | 4 J | 2 | Fix dangling doc refs; dedupe agent instruction files | H3, H4 | ¼ d | done |
 | T19 | 4 K | 1 | Agent search tool routes through `RetrievalOrchestrator` | Q2 pre-req | ½ d | todo |
 | T20 | 4 K | 3 | Flip agent mode default, delete `_stream_legacy` (serial, after T19) | Q2, A13 | ¼ d | todo |
 | T21 | 5 L1 | 1 | `Document` / `SourceDoc` / `ChangeSet` domain model | A5 | ¼ d | todo |

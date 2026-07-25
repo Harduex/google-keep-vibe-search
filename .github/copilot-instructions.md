@@ -1,6 +1,6 @@
 # Copilot Instructions
 
-See `AGENTS.md` for full project context. See `docs/memories/` for project memory.
+See `AGENTS.md` for full project context. See `docs/audit/` and `docs/plans/PLANS.md` for project memory.
 
 ## Conventions
 - Python: black + isort formatting (line-length=100). TypeScript: prettier + eslint.

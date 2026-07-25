@@ -31,4 +31,5 @@ Google Keep Vibe Search is a full-stack note search and chat application for Goo
 - **PyTorch/CUDA Setup:** App runs on GPU with `torch==2.1.2` (cu121) and `numpy<2`. Use `SentenceTransformer(...).to("cuda")` instead of `device="cuda"` (fails in 2.2.2).
 - **Local LLM Tool Calling:** Instruct models on LM Studio hallucinate tags. Use LiteLLM `complete_with_tools` with explicit schema and `tool_choice="required"`.
 - **LLM Output Validation:** Strict regex word bounds fail on LLM tags containing numbers/symbols (e.g. "3D Printing", "&"). Use full-string character set validation (`^[A-Za-z0-9\s&/-]*$`).
-- **Chat System Debt:** `ChatService` needs splitting. Frontend has a per-chunk re-render problem (500+ setState calls). Citation click handler is broken.
+- **Chat System Debt:** `ChatService` is a 262 LOC orchestrator now. Frontend uses RAF batching in `useChat` to solve re-render issues. Citation click handler uses `context-note-{n}` in `ChatNotes.tsx`.
+- **Privacy Logging Rule (T10):** NEVER read, open, print, summarize, query, embed, or log raw note contents. If you add debug logging, log only structural metadata: counts, shapes, ids, hashes, timings, exception types. NEVER note/prompt text.

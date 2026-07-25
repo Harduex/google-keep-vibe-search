@@ -19,12 +19,16 @@ class DummyLLM:
         deltas=("Hello ", "world!"),
         completion="Suggestion 1\nSuggestion 2",
         error=None,
+        stream_error=None,
     ):
         self.deltas = list(deltas)
         self.completion = completion
         self.error = error
+        self.stream_error = stream_error
 
     async def stream(self, messages):
+        if self.stream_error is not None:
+            raise self.stream_error
         for delta in self.deltas:
             yield delta
 
@@ -110,14 +114,13 @@ def _stub_gather(notes, calls, steps=1):
     return stub_agent
 
 
-def _make_chat(retrieval, llm, context_builder=None, agent=None):
+def _make_chat(retrieval, llm, context_builder=None):
     return ChatService(
         retrieval=retrieval,
         context_builder=context_builder or RecordingContextBuilder(),
         conversation_mgr=DummyConversationMgr(),
         protocol=StreamingProtocol(),
         llm=llm,
-        agent=agent,
     )
 
 
@@ -139,7 +142,7 @@ async def test_stream_agentic_seq_numbers(monkeypatch):
         _stub_gather([{"id": "n1", "title": "Test Note"}], calls),
     )
 
-    chat = _make_chat(DummyRetrieval(), DummyLLM(), agent=True)
+    chat = _make_chat(DummyRetrieval(), DummyLLM())
     lines = await _collect(chat)
     assert len(lines) > 0
 
@@ -162,7 +165,7 @@ async def test_agentic_passes_configured_max_steps(monkeypatch):
         _stub_gather([{"id": "n1", "title": "Test Note"}], calls),
     )
 
-    chat = _make_chat(DummyRetrieval(), DummyLLM(), agent=True)
+    chat = _make_chat(DummyRetrieval(), DummyLLM())
     await _collect(chat)
 
     assert len(calls) == 1
@@ -183,7 +186,7 @@ async def test_agentic_passes_tag_lookup_from_note_service(monkeypatch):
     )
 
     retrieval = DummyRetrieval(note_service=StubNoteService())
-    chat = _make_chat(retrieval, DummyLLM(), agent=True)
+    chat = _make_chat(retrieval, DummyLLM())
     await _collect(chat)
 
     assert calls[0]["tag_lookup"] == {"n1": ["recipes"]}
@@ -205,7 +208,7 @@ async def test_agentic_caps_prompt_notes_to_context_budget(monkeypatch):
     reranker = StubReranker()
     retrieval = DummyRetrieval(max_context_notes=cap, reranker=reranker)
     context_builder = RecordingContextBuilder()
-    chat = _make_chat(retrieval, DummyLLM(), context_builder=context_builder, agent=True)
+    chat = _make_chat(retrieval, DummyLLM(), context_builder=context_builder)
 
     lines = await _collect(chat)
 
@@ -223,11 +226,21 @@ async def test_agentic_caps_prompt_notes_to_context_budget(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_legacy_path_verifies_citations():
-    """B11: the legacy (default) path emitted unverified [Note #N] markers."""
+async def test_citations_outside_the_retrieved_set_are_stripped(monkeypatch):
+    """B11: `[Note #N]` markers pointing past the retrieved set used to reach the client.
+
+    The path that skipped verification was deleted in T20, so this now guards the single
+    remaining stream path against the same regression. The agent loop is stubbed: since
+    T20 there is no non-agentic branch to fall back on, so a test that leaves it real
+    drives a live LLM call and blocks on the step timeout.
+    """
+    monkeypatch.setattr(
+        "app.services.agent.pydantic_agent.gather_context_pydantic_agent",
+        _stub_gather([{"id": "n1", "title": "Test Note"}], []),
+    )
     llm = DummyLLM(deltas=("See [Note #7] ", "and [Note #1]."))
     context_builder = RecordingContextBuilder()
-    chat = _make_chat(DummyRetrieval(), llm, context_builder=context_builder, agent=None)
+    chat = _make_chat(DummyRetrieval(), llm, context_builder=context_builder)
 
     lines = await _collect(chat)
 
@@ -236,6 +249,31 @@ async def test_legacy_path_verifies_citations():
     assert "[Note #1]" in done_event["full_response"]
     assert done_event["citation_warnings"] == 1
     assert [c["note_number"] for c in done_event["citations"]] == [1]
+
+
+@pytest.mark.asyncio
+async def test_stream_error_frame_carries_only_the_exception_type(capsys):
+    """P1: the generation prompt embeds note text, and LiteLLM quotes the failed request
+    body in its exception message — so `str(e)` on this path can carry notes into the
+    error frame and into anything capturing stdout. Only the type may cross.
+
+    Asserts on a synthetic marker and a boolean, so a failure cannot itself print note
+    text (T10's methodology).
+    """
+    marker = "SYNTHETIC-REQUEST-BODY-MARKER"
+    llm = DummyLLM(stream_error=RuntimeError(f"provider rejected: {{'messages': ['{marker}']}}"))
+    chat = _make_chat(DummyRetrieval(), llm)
+
+    # No retrieval needed: the failure under test is in generation. Skipping it also keeps
+    # the real agent loop (and its live LLM call) out of this test.
+    lines = await _collect(chat, use_notes_context=False)
+    captured = capsys.readouterr()
+
+    error_event = next(line for line in lines if line["type"] == "error")
+    assert error_event["error"] == "RuntimeError"
+    assert marker not in json.dumps(lines)
+    assert marker not in captured.out
+    assert marker not in captured.err
 
 
 @pytest.mark.asyncio

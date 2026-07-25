@@ -22,7 +22,7 @@ Google Keep Vibe Search is a full-stack note search and chat application for Goo
 
 ## Architecture & Workflows
 - **LLM Integration:** All calls go through `app/services/llm_client.py` (LiteLLM). Model string is `settings.resolved_litellm_model`. For Ollama, `api_base` must be the raw URL without `/v1/`.
-- **Chat Pipeline:** Agentic (`ENABLE_AGENT_MODE=true`) yields `AgentStep` for live UI streaming. Streaming Protocol uses NDJSON (types: `phase`, `context`, `delta`, `done`, `suggestions`, `verification`, `agent_step`, `grounding`, `error`).
+- **Chat Pipeline:** One agentic path, always on — the `ENABLE_AGENT_MODE` flag and the legacy single-shot path were removed in T20. It yields `AgentStep` for live UI streaming. Streaming Protocol uses NDJSON (types: `phase`, `context`, `delta`, `done`, `suggestions`, `verification`, `agent_step`, `grounding`, `error`).
 - **Categorization Pipeline:** Math-heavy, LLM-light. Embeds notes -> groups via HDBSCAN (logarithmic sizing) -> extracts cluster keywords via c-TF-IDF -> samples 5-10 notes per cluster -> asks LLM to generate 1 tag via `complete_with_tools` -> applies tag to entire cluster. The LLM NEVER reads the whole corpus.
 - **Setup/Validation:** Use `make setup`, `make dev`, `make test`, `make lint`, `make build`.
 - **Plan Tracking:** Implementation plans live in `docs/plans/PLANS.md`.

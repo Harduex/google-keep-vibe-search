@@ -120,10 +120,6 @@ async def lifespan(app: FastAPI):
         max_context_notes=settings.chat_context_notes,
     )
 
-    # Agentic retrieval
-    agent = True
-    t = _step("Agent mode active", t)
-
     chat_service = ChatService(
         retrieval=retrieval,
         context_builder=context_builder,
@@ -132,7 +128,6 @@ async def lifespan(app: FastAPI):
         verification_service=verification_service,
         grounding_service=grounding_service,
         llm=llm,
-        agent=agent,
     )
     _step(f"Chat service ready (model: {settings.resolved_litellm_model})", t)
 

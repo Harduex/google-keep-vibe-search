@@ -4,6 +4,7 @@ from typing import Any, AsyncGenerator, Dict, List, Mapping, Optional, Tuple, Ty
 from litellm.exceptions import LITELLM_EXCEPTION_TYPES
 
 from app.core.config import settings
+from app.core.redact import safe_exc
 from app.prompts.system_prompts import FOLLOW_UP_PROMPT
 from app.services.agent.constants import AGENT_RERANK_CANDIDATE_WINDOW
 from app.services.agent.models import AgentResult, AgentStep
@@ -36,7 +37,6 @@ class ChatService:
         verification_service=None,
         grounding_service=None,
         llm: LLMClient = None,
-        agent: Any = None,
         note_service: Any = None,
     ):
         self.retrieval = retrieval
@@ -46,7 +46,6 @@ class ChatService:
         self.verification_service = verification_service
         self.grounding_service = grounding_service
         self.llm = llm
-        self.agent = agent
         self.note_service = note_service
 
     def _tag_lookup(self) -> Optional[Mapping[str, List[str]]]:
@@ -86,7 +85,8 @@ class ChatService:
             model = self.retrieval.search_service.engine.model
             return self.verification_service.detect_conflicts(notes, model)
         except Exception as e:
-            print(f"[conflict] Detection error: {e}")
+            # Type only: this runs over note text, so an exception message can quote it.
+            print(f"[conflict] Detection error: {safe_exc(e)}")
             return []
 
     async def generate_chat_completion(
@@ -116,7 +116,9 @@ class ChatService:
             text = await self.llm.complete(prepared)
             return text, relevant_notes
         except Exception as e:
-            return f"Error calling LLM API: {str(e)}", relevant_notes
+            # `prepared` embeds note text, and provider exceptions quote the request
+            # body — so only the exception type may cross this boundary.
+            return f"Error calling LLM API: {safe_exc(e)}", relevant_notes
 
     async def stream_chat_with_protocol(
         self,
@@ -210,7 +212,7 @@ class ChatService:
                     )
                     yield emit(self.protocol.verification(verification_results))
                 except Exception as e:
-                    print(f"[verification] Error: {e}")
+                    print(f"[verification] Error: {safe_exc(e)}")
 
             if self.grounding_service and relevant_notes:
                 try:
@@ -219,10 +221,13 @@ class ChatService:
                     )
                     yield emit(self.protocol.grounding(grounding_result))
                 except Exception as e:
-                    print(f"[grounding] Error: {e}")
+                    print(f"[grounding] Error: {safe_exc(e)}")
 
         except Exception as e:
-            yield emit(self.protocol.error(str(e)))
+            # The prompt this wraps embeds note text and LiteLLM quotes the failed request
+            # body in its exception message, so the raw string can carry notes into the
+            # browser and into whatever captures stdout. Type only.
+            yield emit(self.protocol.error(safe_exc(e)))
 
     async def _generate_suggestions(self, response: str, notes: List[Dict[str, Any]]) -> List[str]:
         """Generate follow-up question suggestions via LLM."""
@@ -242,7 +247,7 @@ class ChatService:
             # Suggestions are optional garnish, so a provider/transport failure degrades
             # quietly. Programming errors are deliberately not caught here (see B1).
             # Type name only: LiteLLM exception strings embed the request body.
-            print(f"[suggestions] LLM call failed: {type(e).__name__}")
+            print(f"[suggestions] LLM call failed: {safe_exc(e)}")
             return []
 
         lines = [line.strip().lstrip("0123456789.-) ") for line in text.strip().split("\n")]

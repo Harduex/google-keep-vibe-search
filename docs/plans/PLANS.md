@@ -105,7 +105,7 @@ report it instead of working around it.
 | T20 | 4 K | 3 | Flip agent mode default, delete `_stream_legacy` (serial, after T19) | Q2, A13 | ¼ d | done |
 | T21 | 5 L1 | 1 | `Document` / `SourceDoc` / `ChangeSet` domain model | A5 | ¼ d | done |
 | T22 | 5 L2 | 2 | SQLite store + mmapped vector store | A3, A4, A15 | 1 d | done |
-| T23 | 5 L3 | 2 | `Importer` protocol + keep-takeout + markdown-dir | Q4 | ½ d | todo |
+| T23 | 5 L3 | 2 | `Importer` protocol + keep-takeout + markdown-dir | Q4 | ½ d | done |
 | T24 | 5 L4 | 3 | Ingestion diff/upsert + `/api/imports` (+ `dry_run`) | Q4, A4 | 1 d | todo |
 | T25 | 5 L5 | 3 | Indexes gain `build(all)` / `apply(ChangeSet)` | A4 | 1 d | todo |
 | T26 | 5 L6 | 4 | Cutover: lifespan on store, migration, drop `cache_service` (serial) | A3, A7 | 1 d | todo |

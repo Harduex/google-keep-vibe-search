@@ -17,7 +17,7 @@ import time
 from typing import Any, Dict, List, Optional
 
 from app.core.config import settings
-from app.services.cache_service import _write_json_atomically
+from app.services.note_service import _write_json_atomically
 
 
 def _pending_path() -> str:

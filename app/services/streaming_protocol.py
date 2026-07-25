@@ -86,4 +86,4 @@ class StreamingProtocol:
     def _encode(data: Dict[str, Any], seq: Optional[int] = None) -> bytes:
         if seq is not None:
             data["seq"] = seq
-        return json.dumps(data).encode() + b"\n"
+        return json.dumps(data, default=str).encode() + b"\n"

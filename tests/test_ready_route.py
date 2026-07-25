@@ -9,25 +9,21 @@ def test_ready_endpoint_returns_true(monkeypatch):
     # pieces that are not relevant so the server can start instantly.
 
     class DummyNoteService:
-        def __init__(self):
+        def __init__(self, store=None):
             self.notes = []
             self.note_tags = {}
 
-        def load_notes(self, force_refresh=False):
+        def load_notes(self, force_refresh=False, vector_store=None, embedder=None):
             return self.notes
 
         def load_tags(self):
             pass
 
         def seed_tags_from_labels(self):
-            # no-op: this double carries no notes/labels, so there is nothing to
-            # seed. Lifespan calls this unconditionally after load_tags() (T07);
-            # the seeding behavior itself is covered in tests/test_note_service.py.
             return 0
 
     class DummySearchEngine:
         def __init__(self, notes, force_refresh=False, type_prefixes=None):
-            # attributes accessed by SearchService
             self.notes = notes
             self.type_prefixes = type_prefixes or []
             self.embeddings = []
@@ -36,7 +32,12 @@ def test_ready_endpoint_returns_true(monkeypatch):
             self.image_note_map = {}
             self.model = None
 
-        # minimal methods used by services, not actually invoked here
+        @classmethod
+        def from_model(cls, model, vector_store=None, sqlite_store=None, type_prefixes=None):
+            return cls([], type_prefixes=type_prefixes)
+
+        def build(self, documents):
+            pass
 
     class DummyChunkingService:
         def __init__(self, model):

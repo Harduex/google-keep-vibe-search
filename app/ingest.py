@@ -322,7 +322,7 @@ class IngestService:
         for d in [*change_set.added, *change_set.updated]:
             hash_to_doc.setdefault(d.content_hash, d)
 
-        if not hash_to_doc:
+        if self._vectors is None or self._embedder is None or not hash_to_doc:
             return
 
         missing = [h for h in hash_to_doc if h not in self._vectors]
@@ -331,7 +331,8 @@ class IngestService:
 
         to_embed = [hash_to_doc[h] for h in missing]
         texts = [_embed_text(d) for d in to_embed]
-        matrix = self._embedder.embed(texts)
+        fn = getattr(self._embedder, "embed", None) or getattr(self._embedder, "encode")
+        matrix = fn(texts)
         if matrix.shape[0] != len(to_embed):
             raise ValueError(f"embedder returned {matrix.shape[0]} rows for {len(to_embed)} inputs")
         id_to_vec = {

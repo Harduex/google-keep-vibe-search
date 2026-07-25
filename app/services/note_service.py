@@ -1,43 +1,164 @@
-from typing import Any, Dict, List, Set
+import json
+import os
+import shutil
+import tempfile
+from typing import Any, Dict, List, Optional, Set
 
 from app.core.config import settings
-from app.parser import compute_notes_hash, get_latest_modification_time, parse_notes
-from app.services.cache_service import (
-    load_excluded_tags_from_cache,
-    load_notes_from_cache,
-    load_tags_from_cache,
-    save_excluded_tags_to_cache,
-    save_notes_to_cache,
-    save_tags_to_cache,
-)
+from app.domain import Document
+from app.ingest import IngestService
+from app.services.tagging.preprocess import clean_note
+from app.store import SQLiteStore, VectorStore
+
+
+def ensure_cache_dir():
+    os.makedirs(settings.resolved_cache_dir, exist_ok=True)
+
+
+def _write_json_atomically(path: str, payload: Any, keep_backup: bool = False) -> None:
+    ensure_cache_dir()
+    directory = os.path.dirname(path) or "."
+
+    if keep_backup and os.path.exists(path):
+        try:
+            shutil.copy2(path, f"{path}.bak")
+        except OSError:
+            pass
+
+    handle, tmp_path = tempfile.mkstemp(dir=directory, prefix=".tmp_", suffix=".json")
+    try:
+        with os.fdopen(handle, "w", encoding="utf-8") as f:
+            json.dump(payload, f)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, path)
+    except BaseException:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+
+
+def load_tags_from_cache() -> Dict[str, List[str]]:
+    if os.path.exists(settings.tags_cache_file):
+        try:
+            with open(settings.tags_cache_file, "r", encoding="utf-8") as f:
+                raw = json.load(f)
+            if not raw:
+                return {}
+            sample_value = next(iter(raw.values()))
+            if isinstance(sample_value, str):
+                migrated = {nid: [tag] for nid, tag in raw.items()}
+                save_tags_to_cache(migrated)
+                return migrated
+            return raw
+        except (json.JSONDecodeError, IOError):
+            pass
+    return {}
+
+
+def save_tags_to_cache(tags_data: Dict[str, List[str]]) -> None:
+    previous_count = 0
+    if os.path.exists(settings.tags_cache_file):
+        try:
+            with open(settings.tags_cache_file, "r", encoding="utf-8") as f:
+                previous_count = len(json.load(f))
+        except (json.JSONDecodeError, IOError):
+            previous_count = 0
+    if previous_count and not tags_data:
+        print(
+            f"[tags] WARNING: writing 0 tagged notes over {previous_count} existing; "
+            f"previous version kept at {os.path.basename(settings.tags_cache_file)}.bak"
+        )
+
+    try:
+        _write_json_atomically(settings.tags_cache_file, tags_data, keep_backup=True)
+    except OSError:
+        pass
+
+
+def load_excluded_tags_from_cache() -> Set[str]:
+    if os.path.exists(settings.excluded_tags_cache_file):
+        try:
+            with open(settings.excluded_tags_cache_file, "r", encoding="utf-8") as f:
+                return set(json.load(f))
+        except (json.JSONDecodeError, IOError):
+            pass
+    return set()
+
+
+def save_excluded_tags_to_cache(excluded: Set[str]) -> None:
+    try:
+        _write_json_atomically(
+            settings.excluded_tags_cache_file, sorted(excluded), keep_backup=True
+        )
+    except OSError:
+        pass
 
 
 class NoteService:
-    def __init__(self):
+    def __init__(self, store: Optional[SQLiteStore] = None):
+        self.store = store
         self.notes: List[Dict[str, Any]] = []
         self.note_tags: Dict[str, List[str]] = {}
         self.excluded_tags: Set[str] = set()
 
-    def load_notes(self, force_refresh: bool = False) -> List[Dict[str, Any]]:
-        """Load notes, using cache when possible.
+    def _ensure_store(self) -> SQLiteStore:
+        if self.store is None:
+            self.store = SQLiteStore(settings.resolved_store_db_path)
+        return self.store
 
-        Args:
-            force_refresh: bypass the cache and re‑parse regardless of timestamps.
-        """
-        latest_mod_time = get_latest_modification_time(settings.google_keep_path)
-        notes_hash = compute_notes_hash(settings.google_keep_path)
+    def load_notes(
+        self,
+        force_refresh: bool = False,
+        vector_store: Optional[VectorStore] = None,
+        embedder=None,
+    ) -> List[Dict[str, Any]]:
+        """Load notes into self.notes from SQLiteStore, running IngestPipeline if force_refresh or store is empty."""
+        store = self._ensure_store()
+        source_key = getattr(settings, "default_source_key", "keep")
+        ids = store.list_ids(source_key)
 
-        cached = None if force_refresh else load_notes_from_cache(latest_mod_time, notes_hash)
+        if force_refresh or not ids:
+            pipeline = IngestService(store, vector_store, embedder)
+            pipeline.ingest(
+                source_key=source_key,
+                importer_key="keep-takeout",
+                path=settings.google_keep_path,
+            )
+            ids = store.list_ids(source_key)
 
-        if cached:
-            self.notes = cached
-            print(f"Loaded {len(self.notes)} notes from cache")
-        else:
-            self.notes = parse_notes()
-            print(f"Parsed {len(self.notes)} notes from Google Keep export")
-            save_notes_to_cache(self.notes, notes_hash)
-
+        docs = store.get_many(ids)
+        self.notes = [self._doc_to_dict(doc) for doc in docs]
         return self.notes
+
+    @staticmethod
+    def _doc_to_dict(doc: Document) -> Dict[str, Any]:
+        title = doc.title or ""
+        body = doc.body or ""
+        cleaned = clean_note(f"{title} {body}".strip())
+        out = {
+            "id": doc.id,
+            "external_id": doc.external_id,
+            "title": title,
+            "content": body,
+            "cleaned_text": cleaned,
+            "created": doc.created_at.isoformat() if doc.created_at else "",
+            "edited": doc.edited_at.isoformat() if doc.edited_at else "",
+            "labels": list(doc.labels),
+            "attachments": list(doc.attachments) if hasattr(doc, "attachments") else [],
+        }
+        if doc.extra:
+            for k, v in doc.extra.items():
+                if k not in out:
+                    out[k] = v
+            out["archived"] = doc.extra.get("archived", doc.extra.get("isArchived", False))
+            out["pinned"] = doc.extra.get("pinned", doc.extra.get("isPinned", False))
+        else:
+            out["archived"] = False
+            out["pinned"] = False
+        return out
 
     def load_tags(self):
         self.note_tags = load_tags_from_cache()
@@ -45,17 +166,6 @@ class NoteService:
         print(f"Loaded {len(self.note_tags)} note tags and {len(self.excluded_tags)} excluded tags")
 
     def seed_tags_from_labels(self) -> int:
-        """Seed ``note_tags`` from each note's parsed Keep ``labels`` (B3b/T07).
-
-        Additive and idempotent: a label is appended only when that exact tag name is
-        not already present for the note, so a user's existing tag of the same name is
-        never duplicated or clobbered, and no user tag is ever removed. Calling this
-        repeatedly (e.g. on every startup) after labels have already been applied once
-        makes no further changes and does not touch ``tags.json`` — required so startup
-        is safe to re-run without perturbing the persisted tag file.
-
-        Returns the number of notes that gained at least one tag from this call.
-        """
         changed = False
         notes_seeded = 0
         for note in self.notes:
@@ -81,12 +191,6 @@ class NoteService:
         return notes_seeded
 
     def excluded_note_count(self) -> int:
-        """How many notes carry at least one excluded tag.
-
-        This is the exact upper bound on how many results ``filter_by_excluded_tags``
-        can remove, so a caller that must return ``n`` results can over-fetch by this
-        much and still honour ``n`` (see ``SearchService.search``).
-        """
         if not self.excluded_tags:
             return 0
         return sum(
@@ -102,28 +206,34 @@ class NoteService:
             if not any(t in self.excluded_tags for t in self.note_tags.get(note.get("id"), []))
         ]
 
+    def _resolve_note_id(self, nid: str) -> Optional[str]:
+        for n in self.notes:
+            if n.get("id") == nid or n.get("external_id") == nid:
+                return n.get("id")
+        return None
+
     def tag_notes(self, note_ids: List[str], tag_name: str) -> int:
-        valid_ids = {note["id"] for note in self.notes}
-        invalid_ids = [nid for nid in note_ids if nid not in valid_ids]
+        resolved = [self._resolve_note_id(nid) for nid in note_ids]
+        invalid_ids = [nid for nid, r in zip(note_ids, resolved) if r is None]
         if invalid_ids:
             raise ValueError(f"Invalid note IDs: {invalid_ids}")
 
-        for note_id in note_ids:
-            tags = self.note_tags.setdefault(note_id, [])
-            if tag_name not in tags:
-                tags.append(tag_name)
+        for r_id in resolved:
+            if r_id is not None:
+                tags = self.note_tags.setdefault(r_id, [])
+                if tag_name not in tags:
+                    tags.append(tag_name)
 
         save_tags_to_cache(self.note_tags)
         return len(note_ids)
 
     def bulk_tag_notes(self, assignments: Dict[str, List[str]]) -> int:
-        """Assign multiple tags to multiple notes in one operation."""
-        valid_ids = {note["id"] for note in self.notes}
         count = 0
         for note_id, tag_names in assignments.items():
-            if note_id not in valid_ids:
+            r_id = self._resolve_note_id(note_id)
+            if r_id is None:
                 continue
-            tags = self.note_tags.setdefault(note_id, [])
+            tags = self.note_tags.setdefault(r_id, [])
             for tag_name in tag_names:
                 if tag_name not in tags:
                     tags.append(tag_name)

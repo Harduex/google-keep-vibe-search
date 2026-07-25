@@ -2,9 +2,10 @@ import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from sentence_transformers import SentenceTransformer
 
 from app.core.config import settings
-from app.search import VibeSearch
+from app.search import VibeSearch, _model_dim
 from app.services.categorization_service import CategorizationService
 from app.services.chat_service import ChatService
 from app.services.chunking_service import ChunkingService
@@ -21,6 +22,7 @@ from app.services.search_service import SearchService
 from app.services.session_service import SessionService
 from app.services.streaming_protocol import StreamingProtocol
 from app.services.verification_service import VerificationService
+from app.store import SQLiteStore, VectorStore
 
 
 def _step(label: str, start: float) -> float:
@@ -36,12 +38,24 @@ async def lifespan(app: FastAPI):
     # ensure ready flag exists and is false until startup finishes
     app.state.ready = False
 
-    note_service = NoteService()
-    note_service.load_notes(force_refresh=settings.force_cache_refresh)
+    store = SQLiteStore(settings.resolved_store_db_path)
+    embedder = SentenceTransformer(settings.embedding_model)
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            embedder = embedder.to("cuda")
+    except Exception:
+        pass
+    vectors = VectorStore(settings.resolved_vector_store_dir, dim=_model_dim(embedder))
+
+    note_service = NoteService(store=store)
+    note_service.load_notes(
+        force_refresh=settings.force_cache_refresh,
+        vector_store=vectors,
+        embedder=embedder,
+    )
     note_service.load_tags()
-    # B3b/T07: seed note_tags from Keep's own labels (additive + idempotent — see
-    # NoteService.seed_tags_from_labels docstring). Runs after load_tags so it only
-    # adds labels the user doesn't already have as a tag of that name.
     note_service.seed_tags_from_labels()
     t = _step(f"Notes loaded ({len(note_service.notes)} notes)", t0)
 
@@ -54,14 +68,13 @@ async def lifespan(app: FastAPI):
                 if prefix not in type_prefixes:
                     type_prefixes.append(prefix)
 
-    search_engine = VibeSearch(
-        note_service.notes, force_refresh=settings.force_cache_refresh, type_prefixes=type_prefixes
+    search_engine = VibeSearch.from_model(
+        embedder, vector_store=vectors, sqlite_store=store, type_prefixes=type_prefixes
     )
-    # B10/B5: give SearchService the note service so it can enforce excluded-tag
-    # filtering at this one choke point (every retrieval caller goes through
-    # SearchService.search), and — under this exact `note_service` attribute name —
-    # so ChatService._tag_lookup() can resolve a tag map for the agent's
-    # `filter_by_tag` tool (B5), which was fixed in T03 but not wired to anything live.
+    source_key = getattr(settings, "default_source_key", "keep")
+    documents = store.get_many(store.list_ids(source_key))
+    search_engine.build(documents)
+
     search_service = SearchService(search_engine, note_service=note_service)
     t = _step("Search engine ready", t)
 
@@ -135,6 +148,9 @@ async def lifespan(app: FastAPI):
     categorization_service = CategorizationService(search_service, note_service, llm)
 
     # mark app as ready once all heavy initialization is complete
+    app.state.store = store
+    app.state.vectors = vectors
+    app.state.embedder = embedder
     app.state.note_service = note_service
     app.state.search_service = search_service
     app.state.chat_service = chat_service
@@ -147,5 +163,6 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # Cleanup (LLMClient is stateless — no cleanup needed)
+    # Cleanup
     await categorization_service.close()
+    store.close()

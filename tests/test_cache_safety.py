@@ -17,8 +17,7 @@ from pathlib import Path
 import pytest
 
 from app.core.config import settings
-from app.services.cache_service import save_excluded_tags_to_cache, save_tags_to_cache
-from app.services.note_service import NoteService
+from app.services.note_service import NoteService, save_excluded_tags_to_cache, save_tags_to_cache
 
 
 class TestCacheIsolation:

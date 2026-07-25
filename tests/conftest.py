@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 from app.core.config import settings
 from app.main import app
-from app.services import cache_service
+from app.services import note_service
 from tests.fixtures.notes import generate_synthetic_notes
 from tests.fixtures.stubs import StubCrossEncoder, StubEmbedder, StubLLM, stub_spacy_load
 
@@ -33,26 +33,12 @@ def _refuse_real_cache(path: str, what: str) -> None:
 
 @pytest.fixture(autouse=True)
 def isolate_cache_dir(tmp_path_factory, monkeypatch):
-    """Point every test at a throwaway cache directory, and block writes to the real one.
-
-    Isolation is the default because opting in was tried and failed: `test_pipeline.py`
-    redirected the tag manifest and the embedding cache but not `settings.cache_dir`, so a
-    real `NoteService` in that test wrote `save_tags_to_cache` straight into the developer's
-    live `cache/tags.json` and emptied it — and clobbered `notes_hash.json`, which made the
-    running app recompute 45 MB of embeddings.
-
-    Prevention rather than detection, deliberately: an earlier version of this guard
-    fingerprinted the real cache before and after the session, but a dev server running
-    alongside the suite writes there legitimately, so it could not tell a test's write from
-    the app's and would have failed honest runs. Blocking at the write itself names the
-    offending test instead.
-    """
     isolated = tmp_path_factory.mktemp("isolated_cache")
     monkeypatch.setattr(settings, "cache_dir", str(isolated))
     monkeypatch.setenv("CACHE_DIR", str(isolated))
 
-    real_write_json = cache_service._write_json_atomically
-    real_makedirs = cache_service.os.makedirs
+    real_write_json = note_service._write_json_atomically
+    real_makedirs = note_service.os.makedirs
 
     def guarded_write_json(path, payload, keep_backup=False):
         _refuse_real_cache(path, "write a cache file")
@@ -62,8 +48,8 @@ def isolate_cache_dir(tmp_path_factory, monkeypatch):
         _refuse_real_cache(name, "create a cache directory")
         return real_makedirs(name, *args, **kwargs)
 
-    monkeypatch.setattr(cache_service, "_write_json_atomically", guarded_write_json)
-    monkeypatch.setattr(cache_service.os, "makedirs", guarded_makedirs)
+    monkeypatch.setattr(note_service, "_write_json_atomically", guarded_write_json)
+    monkeypatch.setattr(note_service.os, "makedirs", guarded_makedirs)
 
     return isolated
 
@@ -225,7 +211,8 @@ def _wired_setup(fixture_export_dir, monkeypatch):
     monkeypatch.setattr(settings, "google_keep_path", str(fixture_export_dir))
     monkeypatch.setattr(settings, "cache_dir", str(fixture_export_dir / ".cache"))
 
-    patcher_st = mock.patch("app.search.SentenceTransformer", StubEmbedder)
+    patcher_st = mock.patch("sentence_transformers.SentenceTransformer", StubEmbedder)
+    patcher_st_lifespan = mock.patch("app.core.lifespan.SentenceTransformer", StubEmbedder)
     # Two CrossEncoder patch targets, and both are required. `reranker_service` imports it
     # lazily inside __init__, so only patching the source module reaches it (patching
     # `app.services.reranker_service.CrossEncoder` raises AttributeError — that name never
@@ -239,6 +226,7 @@ def _wired_setup(fixture_export_dir, monkeypatch):
     patcher_spacy_dl = mock.patch("spacy.cli.download")
 
     patcher_st.start()
+    patcher_st_lifespan.start()
     patcher_ce.start()
     patcher_ce_nli.start()
     patcher_llm.start()
@@ -250,6 +238,7 @@ def _wired_setup(fixture_export_dir, monkeypatch):
             yield test_client, app
     finally:
         patcher_st.stop()
+        patcher_st_lifespan.stop()
         patcher_ce.stop()
         patcher_ce_nli.stop()
         patcher_llm.stop()

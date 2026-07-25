@@ -2,12 +2,19 @@ import os
 
 import numpy as np
 
+from app.core.config import settings
 from app.services.note_service import NoteService
 from app.services.tagging import pipeline
 from app.services.tagging.pipeline import run_tagging_pipeline
 
 
 def test_tagging_pipeline_full_and_incremental(tmp_path, monkeypatch):
+    # This test builds a *real* NoteService, whose tag writes go to
+    # settings.tags_cache_file. It used to redirect only the tag manifest and the embedding
+    # cache, so `save_tags_to_cache` emptied the developer's live cache/tags.json. The
+    # autouse `isolate_cache_dir` fixture now covers this, but pin it here too: the hazard
+    # belongs next to the code that caused it.
+    monkeypatch.setattr(settings, "cache_dir", str(tmp_path))
     test_manifest_path = os.path.join(str(tmp_path), "tag_manifest.json")
     test_embed_cache = os.path.join(str(tmp_path), "tag_embeddings.json")
     monkeypatch.setattr(pipeline, "TAG_MANIFEST_PATH", test_manifest_path)

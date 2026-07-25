@@ -1,6 +1,7 @@
 import json
 import os
 import tempfile
+from pathlib import Path
 from typing import Any, Dict, List
 from unittest import mock
 
@@ -9,8 +10,62 @@ from fastapi.testclient import TestClient
 
 from app.core.config import settings
 from app.main import app
+from app.services import cache_service
 from tests.fixtures.notes import generate_synthetic_notes
 from tests.fixtures.stubs import StubCrossEncoder, StubEmbedder, StubLLM, stub_spacy_load
+
+# The user's real cache, resolved once at collection time — before any fixture can redirect
+# it. Everything below exists to keep the suite out of this directory.
+REAL_CACHE_DIR = Path(settings.resolved_cache_dir).resolve()
+
+
+def _refuse_real_cache(path: str, what: str) -> None:
+    """Raise if a write is aimed at the real cache directory."""
+    target = Path(path).resolve()
+    if target == REAL_CACHE_DIR or REAL_CACHE_DIR in target.parents:
+        raise AssertionError(
+            f"A test tried to {what} inside the real cache directory ({target}). "
+            "Tests get an isolated cache from the autouse `isolate_cache_dir` fixture; "
+            "something is resolving or hardcoding the real path instead. This is blocked "
+            "because it has destroyed real user data before."
+        )
+
+
+@pytest.fixture(autouse=True)
+def isolate_cache_dir(tmp_path_factory, monkeypatch):
+    """Point every test at a throwaway cache directory, and block writes to the real one.
+
+    Isolation is the default because opting in was tried and failed: `test_pipeline.py`
+    redirected the tag manifest and the embedding cache but not `settings.cache_dir`, so a
+    real `NoteService` in that test wrote `save_tags_to_cache` straight into the developer's
+    live `cache/tags.json` and emptied it — and clobbered `notes_hash.json`, which made the
+    running app recompute 45 MB of embeddings.
+
+    Prevention rather than detection, deliberately: an earlier version of this guard
+    fingerprinted the real cache before and after the session, but a dev server running
+    alongside the suite writes there legitimately, so it could not tell a test's write from
+    the app's and would have failed honest runs. Blocking at the write itself names the
+    offending test instead.
+    """
+    isolated = tmp_path_factory.mktemp("isolated_cache")
+    monkeypatch.setattr(settings, "cache_dir", str(isolated))
+    monkeypatch.setenv("CACHE_DIR", str(isolated))
+
+    real_write_json = cache_service._write_json_atomically
+    real_makedirs = cache_service.os.makedirs
+
+    def guarded_write_json(path, payload, keep_backup=False):
+        _refuse_real_cache(path, "write a cache file")
+        return real_write_json(path, payload, keep_backup=keep_backup)
+
+    def guarded_makedirs(name, *args, **kwargs):
+        _refuse_real_cache(name, "create a cache directory")
+        return real_makedirs(name, *args, **kwargs)
+
+    monkeypatch.setattr(cache_service, "_write_json_atomically", guarded_write_json)
+    monkeypatch.setattr(cache_service.os, "makedirs", guarded_makedirs)
+
+    return isolated
 
 
 @pytest.fixture

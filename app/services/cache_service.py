@@ -1,5 +1,7 @@
 import json
 import os
+import shutil
+import tempfile
 import time
 from typing import Any, Dict, List, Optional, Set
 
@@ -77,12 +79,58 @@ def load_tags_from_cache() -> Dict[str, List[str]]:
     return {}
 
 
-def save_tags_to_cache(tags_data: Dict[str, List[str]]) -> None:
+def _write_json_atomically(path: str, payload: Any, keep_backup: bool = False) -> None:
+    """Write JSON so an interrupted or wrong write cannot destroy the previous version.
+
+    `open(path, "w")` truncates before it writes: a crash mid-write leaves an empty file, and
+    a caller holding an empty in-memory map silently erases everything on disk. So write to a
+    temporary file in the same directory, fsync, then `os.replace` (atomic on POSIX), and
+    keep the previous version as `<name>.bak` for the files that hold user-authored data.
+    """
     ensure_cache_dir()
+    directory = os.path.dirname(path) or "."
+
+    if keep_backup and os.path.exists(path):
+        try:
+            shutil.copy2(path, f"{path}.bak")
+        except OSError:
+            pass  # A missing backup must not stop the write itself.
+
+    handle, tmp_path = tempfile.mkstemp(dir=directory, prefix=".tmp_", suffix=".json")
     try:
-        with open(settings.tags_cache_file, "w", encoding="utf-8") as f:
-            json.dump(tags_data, f)
-    except IOError:
+        with os.fdopen(handle, "w", encoding="utf-8") as f:
+            json.dump(payload, f)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, path)
+    except BaseException:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+
+
+def save_tags_to_cache(tags_data: Dict[str, List[str]]) -> None:
+    # Emptying the tag file is loud and reversible. A caller whose in-memory map is empty for
+    # the wrong reason — a failed load, a test running against the real cache dir — used to
+    # erase months of tagging with no trace. Counts only, never tag names or note text.
+    previous_count = 0
+    if os.path.exists(settings.tags_cache_file):
+        try:
+            with open(settings.tags_cache_file, "r", encoding="utf-8") as f:
+                previous_count = len(json.load(f))
+        except (json.JSONDecodeError, IOError):
+            previous_count = 0
+    if previous_count and not tags_data:
+        print(
+            f"[tags] WARNING: writing 0 tagged notes over {previous_count} existing; "
+            f"previous version kept at {os.path.basename(settings.tags_cache_file)}.bak"
+        )
+
+    try:
+        _write_json_atomically(settings.tags_cache_file, tags_data, keep_backup=True)
+    except OSError:
         pass
 
 
@@ -97,9 +145,9 @@ def load_excluded_tags_from_cache() -> Set[str]:
 
 
 def save_excluded_tags_to_cache(excluded: Set[str]) -> None:
-    ensure_cache_dir()
     try:
-        with open(settings.excluded_tags_cache_file, "w", encoding="utf-8") as f:
-            json.dump(list(excluded), f)
-    except IOError:
+        _write_json_atomically(
+            settings.excluded_tags_cache_file, sorted(excluded), keep_backup=True
+        )
+    except OSError:
         pass

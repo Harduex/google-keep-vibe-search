@@ -20,7 +20,7 @@ import sys
 import time
 from typing import List, Tuple
 
-from bench import RUN_DIR
+from bench import BENCH_CACHE_DIR, RUN_DIR, assert_cache_isolated
 from bench.corpora import load_newsgroups20
 from bench.metrics import ari, nmi, v_measure
 
@@ -79,12 +79,12 @@ def run() -> int:
         f"20 Newsgroups sample: {len(docs)} docs, {len(set(labels))} categories, seed {SAMPLE_SEED}"
     )
 
-    os.environ["CACHE_DIR"] = str(RUN_DIR / "bench_cache")
-    os.makedirs(os.environ["CACHE_DIR"], exist_ok=True)
-
     from app.services.tagging.cluster import cluster_notes
     from app.services.tagging.embed import embed_notes
     from app.services.tagging.preprocess import clean_note
+
+    # The cache was isolated in bench/__init__ before these imports; verify it took effect.
+    assert_cache_isolated()
 
     cleaned = [clean_note(doc) for doc in docs]
     keep = [i for i, text in enumerate(cleaned) if text and text.strip()]

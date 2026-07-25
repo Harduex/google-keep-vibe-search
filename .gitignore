@@ -175,8 +175,12 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
-# Cache files
+# Cache files — real note data. `cache/` alone does not cover a copy moved aside
+# for safekeeping (cache.bak-2026-07-26 sat untracked in a public repo for a few
+# minutes), so match any sibling variant too.
 cache/
+cache.bak*
+cache-*/
 
 # Node.js specific
 # Logs

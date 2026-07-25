@@ -13,11 +13,10 @@ import os
 import random
 import shutil
 import sys
-import tempfile
 import time
 from typing import Dict, List, Set, Tuple
 
-from bench import RUN_DIR
+from bench import BENCH_CACHE_DIR, RUN_DIR, assert_cache_isolated
 from bench.ablation import build_rankers
 from bench.corpora import BenchCorpus, load_beir_scifact
 from bench.metrics import mrr, ndcg_at_k, recall_at_k
@@ -132,14 +131,12 @@ def run() -> int:
     from app.services.entity_service import EntityService
     from app.services.reranker_service import RerankerService
 
+    # The cache was isolated in bench/__init__ *before* these imports could construct
+    # `settings`; verify it took effect rather than trusting it.
+    assert_cache_isolated()
+
     notes = as_notes(docs)
-    # A *fresh* cache per run, deleted afterwards. Sharing one between runs made the first
-    # run compute chunk/entity embeddings and later runs load them back from disk; the float
-    # round-trip flips near-ties, which showed up as `plus_chunk recall@1` moving 0.5525 ->
-    # 0.5325 between two consecutive runs of identical code. Every run now takes the same
-    # code path, so a difference in the numbers means a difference in the code.
-    cache_dir = tempfile.mkdtemp(prefix="bench_retrieval_", dir=str(RUN_DIR))
-    os.environ["CACHE_DIR"] = cache_dir
+    cache_dir = str(BENCH_CACHE_DIR)
 
     t_build = time.perf_counter()
     engine = VibeSearch(notes, force_refresh=True)

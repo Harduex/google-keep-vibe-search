@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 
 import { API_ROUTES } from '@/const';
 import {
@@ -116,7 +116,54 @@ export const useOrganize = () => {
   const [isApplying, setIsApplying] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [restoredAt, setRestoredAt] = useState<number | null>(null);
+
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Proposals cost one LLM call per cluster, so the server persists them as soon as they are
+  // generated. Pick any unapplied set back up on mount: a reload, a dev-server restart or a
+  // crash no longer throws the expensive part away.
+  useEffect(() => {
+    let cancelled = false;
+    const restorePending = async () => {
+      try {
+        const response = await fetch(API_ROUTES.ORGANIZE_PENDING);
+        if (!response.ok) {
+          return;
+        }
+        const data = await response.json();
+        if (cancelled || !data?.proposals?.length) {
+          return;
+        }
+        setProposals((prev) =>
+          prev.length > 0
+            ? prev
+            : data.proposals.map((p: TagProposal) => ({
+                proposal: p,
+                action: 'pending' as ProposalAction,
+              })),
+        );
+        setRestoredAt(data.generated_at ?? null);
+      } catch {
+        // Nothing to restore is the normal case; never block the tab on it.
+      }
+    };
+    restorePending();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const discardProposals = useCallback(async () => {
+    setProposals([]);
+    setProgress(null);
+    setRestoredAt(null);
+    try {
+      await fetch(API_ROUTES.ORGANIZE_PENDING, { method: 'DELETE' });
+    } catch {
+      // The local list is already cleared; the stale file is harmless and gets replaced.
+    }
+  }, []);
 
   const startCategorization = useCallback(async () => {
     setIsProcessing(true);
@@ -296,8 +343,20 @@ export const useOrganize = () => {
       }
 
       const result = await response.json();
-      setProposals([]);
-      setProgress(null);
+
+      // Only clear the list when something was actually applied. Clearing unconditionally is
+      // how an apply that tagged nothing — a rejected action, or a bug that skipped it
+      // server-side — threw away a generation that had cost hundreds of LLM calls.
+      const applied = (result?.notes_tagged || 0) > 0 || (result?.tags_created || 0) > 0;
+      if (applied) {
+        setProposals([]);
+        setProgress(null);
+      } else {
+        setError(
+          'Nothing was applied, so your proposals have been kept. ' +
+            (result?.message || 'No tags were created.'),
+        );
+      }
       return result;
     } catch (err) {
       setError(`Failed to apply tags: ${(err as Error).message}`);
@@ -324,6 +383,8 @@ export const useOrganize = () => {
     error,
     hasProposals,
     actionablCount,
+    restoredAt,
+    discardProposals,
     startCategorization,
     cancelCategorization,
     approveProposal,

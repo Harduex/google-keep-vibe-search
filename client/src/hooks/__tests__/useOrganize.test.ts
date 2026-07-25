@@ -192,3 +192,82 @@ describe('useOrganize NDJSON stream parser', () => {
     expect(result.current.progress?.stage).toBe('end');
   });
 });
+
+describe('useOrganize proposal survival', () => {
+  let applyResult = { message: 'Applied 0 tags to 0 notes', tags_created: 0, notes_tagged: 0 };
+
+  beforeEach(() => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    global.fetch = vi.fn((input: any, options?: any) => {
+      if (input === API_ROUTES.ORGANIZE_PENDING && options?.method !== 'DELETE') {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              proposals: [{ tag_name: 'Recipes', note_ids: ['a'] }],
+              generated_at: 1700000000,
+              granularity: 'broad',
+            }),
+        } as Response);
+      }
+      if (input === API_ROUTES.ORGANIZE_APPLY) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(applyResult) } as Response);
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response);
+    }) as any;
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it('restores proposals the server persisted, so a reload does not lose the generation', async () => {
+    const { result } = renderHook(() => useOrganize());
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(result.current.proposals).toHaveLength(1);
+    expect(result.current.restoredAt).toBe(1700000000);
+  });
+
+  it('keeps the proposals when an apply tagged nothing', async () => {
+    // The B8 experience: apply reported "Applied 0 tags to 0 notes" and the client cleared
+    // the list anyway, discarding a generation that cost hundreds of LLM calls.
+    applyResult = { message: 'Applied 0 tags to 0 notes', tags_created: 0, notes_tagged: 0 };
+    const { result } = renderHook(() => useOrganize());
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    act(() => {
+      result.current.approveProposal(0);
+    });
+    await act(async () => {
+      await result.current.applyProposals();
+    });
+
+    expect(result.current.proposals).toHaveLength(1);
+    expect(result.current.error).toContain('kept');
+  });
+
+  it('clears the proposals when an apply really tagged notes', async () => {
+    applyResult = { message: 'Applied 1 tags to 1 notes', tags_created: 1, notes_tagged: 1 };
+    const { result } = renderHook(() => useOrganize());
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    act(() => {
+      result.current.approveProposal(0);
+    });
+    await act(async () => {
+      await result.current.applyProposals();
+    });
+
+    expect(result.current.proposals).toHaveLength(0);
+    expect(result.current.error).toBeNull();
+  });
+});

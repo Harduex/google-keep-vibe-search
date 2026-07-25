@@ -1,5 +1,13 @@
+import os
+
+from app.core.config import settings
 from app.models.organize import ApplyAction, ApplyProposalsRequest
 from app.routes.organize import apply_proposals
+from app.services.proposal_store import (
+    clear_pending_proposals,
+    load_pending_proposals,
+    save_pending_proposals,
+)
 
 
 class FakeNoteService:
@@ -98,3 +106,60 @@ def test_apply_assign_tag_reject_is_noop():
     result = apply_proposals(req, note_service=svc)
     assert svc.tagged == []
     assert result["notes_tagged"] == 0
+
+
+class TestPendingProposalSurvival:
+    """Generating proposals costs one LLM call per cluster. Losing them to a reload, a crash
+    or an apply that turned out to be a no-op is the expensive failure, so they are persisted
+    the moment they are generated and cleared only once something was actually applied."""
+
+    def test_generated_proposals_are_persisted_and_restored(self, client):
+        proposals = [{"tag_name": "Recipes", "note_ids": ["note_06.json"]}]
+        save_pending_proposals(proposals, "broad")
+
+        restored = client.get("/api/organize/pending").json()
+
+        assert restored["proposals"] == proposals
+        assert restored["granularity"] == "broad"
+        assert restored["generated_at"] is not None
+
+    def test_nothing_pending_is_an_empty_answer_not_an_error(self, client):
+        assert client.get("/api/organize/pending").json()["proposals"] == []
+
+    def test_applying_something_clears_the_pending_set(self):
+        svc = FakeNoteService()
+        save_pending_proposals([{"tag_name": "Recipes", "note_ids": ["a"]}], "broad")
+
+        apply_proposals(
+            ApplyProposalsRequest(
+                actions=[ApplyAction(action="approve", tag_name="Recipes", note_ids=["a"])]
+            ),
+            note_service=svc,
+        )
+
+        assert load_pending_proposals() is None
+
+    def test_an_apply_that_tags_nothing_keeps_the_pending_set(self):
+        # The B8 shape: every action skipped server-side. Clearing here would throw away a
+        # generation in exchange for nothing.
+        svc = FakeNoteService()
+        save_pending_proposals([{"tag_name": "Recipes", "note_ids": ["a"]}], "broad")
+
+        result = apply_proposals(
+            ApplyProposalsRequest(
+                actions=[ApplyAction(action="merge_tags", source_tag="Ghost", target_tag="Real")]
+            ),
+            note_service=svc,
+        )
+
+        assert result["notes_tagged"] == 0
+        assert load_pending_proposals() is not None
+
+    def test_discarding_keeps_a_recoverable_copy(self):
+        save_pending_proposals([{"tag_name": "Recipes", "note_ids": ["a"]}], "broad")
+        path = os.path.join(settings.resolved_cache_dir, "pending_proposals.json")
+
+        clear_pending_proposals()
+
+        assert load_pending_proposals() is None
+        assert os.path.exists(f"{path}.bak")

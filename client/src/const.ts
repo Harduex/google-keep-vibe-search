@@ -24,6 +24,7 @@ export const API_ROUTES = {
   READY: '/api/ready',
   ORGANIZE_CATEGORIZE: '/api/organize/categorize',
   ORGANIZE_APPLY: '/api/organize/apply',
+  ORGANIZE_PENDING: '/api/organize/pending',
 };
 
 export const VIEW_MODES = {

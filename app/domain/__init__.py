@@ -1,0 +1,16 @@
+"""Content-addressed document model and the pure functions it depends on.
+
+This package is intentionally stdlib-only: no I/O, no third-party deps. It is the
+one shape every downstream layer (importers, store, indexes) speaks.
+"""
+
+from .model import Attachment, ChangeSet, Document, SourceDoc, content_hash, stable_id
+
+__all__ = [
+    "Attachment",
+    "ChangeSet",
+    "Document",
+    "SourceDoc",
+    "content_hash",
+    "stable_id",
+]

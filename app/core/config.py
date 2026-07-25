@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     chat_context_notes: int = 10
 
     # Agent mode
-    enable_agent_mode: bool = False
+
     agent_max_steps: int = 5
 
     # Image search

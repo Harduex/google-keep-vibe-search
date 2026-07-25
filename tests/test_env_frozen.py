@@ -1,7 +1,7 @@
 import hashlib
 from pathlib import Path
 
-ENV_EXAMPLE_SHA256 = "2f38a85c89635eb68020d9e675e32dda69f757ec7211c537e3c54ee7c22a7b0b"
+ENV_EXAMPLE_SHA256 = "4d997cfab411fc4fc15ade682e05a97ae8cc97c2a1c6a80f6c94ca08141cb998"
 
 
 def test_env_example_frozen():

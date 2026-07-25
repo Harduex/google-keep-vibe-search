@@ -57,15 +57,12 @@ def test_exclude_tags(client):
     client.post("/api/tags/excluded", json={"excluded_tags": []})
 
 
-@pytest.mark.parametrize("agent_mode", [True, False])
-def test_chat_streaming(client, agent_mode, monkeypatch):
+def test_chat_streaming(client, monkeypatch):
     """
     Pins B1, B6, B11, B5, B7.
     """
     from app.core.config import settings
 
-    monkeypatch.setattr(settings, "enable_agent_mode", agent_mode)
-    monkeypatch.setattr(client.app.state.chat_service, "agent", True if agent_mode else None)
     monkeypatch.setattr(client.app.state.chat_service.retrieval, "max_context_notes", 5)
     monkeypatch.setattr(settings, "agent_max_steps", 2)
     monkeypatch.setattr(settings, "chat_context_notes", 5)
@@ -88,11 +85,7 @@ def test_chat_streaming(client, agent_mode, monkeypatch):
     types = [ev["type"] for ev in events]
     assert "context" in types
     assert "done" in types
-
-    if agent_mode:
-        assert "agent_step" in types or "suggestions" in types or "phase" in types
-    else:
-        assert "suggestions" in types or "phase" in types
+    assert "agent_step" in types or "suggestions" in types or "phase" in types
 
     # Notes injected <= chat_context_notes (plus gap analysis)
     context_event = next((ev for ev in events if ev["type"] == "context"), None)

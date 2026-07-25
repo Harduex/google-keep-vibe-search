@@ -60,7 +60,7 @@ class DummyRetrieval:
     def search(self, query, max_results=None):
         return self.notes
 
-    async def get_context(self, messages, topic=None):
+    async def get_context(self, messages, *args, **kwargs):
         return list(self.notes), "sufficient"
 
 

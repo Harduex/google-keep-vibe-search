@@ -136,7 +136,6 @@ def get_chat_model():
         "chat_max_recent_messages": settings.chat_max_recent_messages,
         "chat_summarization_threshold": settings.chat_summarization_threshold,
         "agent_max_steps": settings.agent_max_steps,
-        "enable_agent_mode": settings.enable_agent_mode,
     }
 
 

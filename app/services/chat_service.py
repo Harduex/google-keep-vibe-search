@@ -78,23 +78,6 @@ class ChatService:
             return reranker.rerank(query, notes[:AGENT_RERANK_CANDIDATE_WINDOW], top_k=cap)
         return notes[:cap]
 
-    def _verify_and_extract_citations(
-        self, full_response: str, notes: List[Dict[str, Any]]
-    ) -> Tuple[str, List[Dict[str, Any]], Optional[int]]:
-        """Strip citations pointing outside the retrieved set, then extract the rest.
-
-        Shared by both stream paths: the legacy path never verified, so the default config
-        emitted unverified `[Note #N]` markers (B11). Returns the cleaned response, the
-        citations, and the number of stripped citations (None when there were none, which is
-        what `StreamingProtocol.done` wants in order to omit the field).
-        """
-        full_response, _valid, invalid = verify_citations(full_response, len(notes))
-        if invalid:
-            # Count only — never the response text or the note text it cites.
-            print(f"[citations] stripped {len(invalid)} invalid citation(s)")
-        citations = extract_citations(full_response, notes)
-        return full_response, citations, len(invalid) or None
-
     def _detect_conflicts(self, notes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Run conflict detection if verification service is available."""
         if not self.verification_service or len(notes) <= 1:
@@ -145,30 +128,6 @@ class ChatService:
         **kwargs,
     ) -> AsyncGenerator[bytes, None]:
         """Streaming chat with NDJSON protocol including phases and suggestions."""
-        if self.agent and use_notes_context:
-            async for chunk in self._stream_agentic(
-                messages, tags=tags, date_range=date_range, session_id=session_id
-            ):
-                yield chunk
-        else:
-            async for chunk in self._stream_legacy(
-                messages,
-                use_notes_context,
-                tags=tags,
-                date_range=date_range,
-                session_id=session_id,
-            ):
-                yield chunk
-
-    async def _stream_agentic(
-        self,
-        messages: List[Dict[str, str]],
-        tags: Optional[List[str]] = None,
-        date_range: Optional[Dict[str, str]] = None,
-        session_id: Optional[str] = None,
-        **kwargs,
-    ) -> AsyncGenerator[bytes, None]:
-        """Agentic retrieval: PydanticAI agent iteratively searches, then generates response."""
         import json
 
         from app.services.agent.pydantic_agent import gather_context_pydantic_agent
@@ -188,32 +147,34 @@ class ChatService:
             seq += 1
             return json.dumps(data).encode() + b"\n"
 
-        yield emit(self.protocol.phase("searching", "Agent searching your notes..."))
         relevant_notes = []
         gap_status = "sufficient"
 
-        async for item in gather_context_pydantic_agent(
-            query,
-            self.retrieval,
-            max_steps=settings.agent_max_steps,
-            tag_lookup=self._tag_lookup(),
-        ):
-            if isinstance(item, AgentStep):
-                yield emit(
-                    self.protocol.agent_step(
-                        step_number=item.step_number,
-                        action=item.action,
-                        params=item.params,
-                        result_summary=item.result_summary,
-                        notes_found=item.notes_found,
-                        reasoning=item.reasoning,
-                    )
-                )
-            elif isinstance(item, AgentResult):
-                relevant_notes = item.notes
-                gap_status = item.gap_status
+        if use_notes_context:
+            yield emit(self.protocol.phase("searching", "Searching your notes..."))
 
-        relevant_notes = self._cap_context_notes(query, relevant_notes)
+            async for item in gather_context_pydantic_agent(
+                query,
+                self.retrieval,
+                max_steps=settings.agent_max_steps,
+                tag_lookup=self._tag_lookup(),
+            ):
+                if isinstance(item, AgentStep):
+                    yield emit(
+                        self.protocol.agent_step(
+                            step_number=item.step_number,
+                            action=item.action,
+                            params=item.params,
+                            result_summary=item.result_summary,
+                            notes_found=item.notes_found,
+                            reasoning=item.reasoning,
+                        )
+                    )
+                elif isinstance(item, AgentResult):
+                    relevant_notes = item.notes
+                    gap_status = item.gap_status
+
+            relevant_notes = self._cap_context_notes(query, relevant_notes)
 
         conflicts = self._detect_conflicts(relevant_notes)
         yield emit(self.protocol.context(relevant_notes, conflicts, session_id or ""))
@@ -230,9 +191,12 @@ class ChatService:
                 full_response += delta
                 yield emit(self.protocol.delta(delta))
 
-            full_response, citations, warnings = self._verify_and_extract_citations(
-                full_response, relevant_notes
-            )
+            full_response, _valid, invalid = verify_citations(full_response, len(relevant_notes))
+            if invalid:
+                print(f"[citations] stripped {len(invalid)} invalid citation(s)")
+            citations = extract_citations(full_response, relevant_notes)
+            warnings = len(invalid) or None
+
             yield emit(self.protocol.done(full_response, citations, citation_warnings=warnings))
 
             suggestions = await self._generate_suggestions(full_response, relevant_notes)
@@ -259,71 +223,6 @@ class ChatService:
 
         except Exception as e:
             yield emit(self.protocol.error(str(e)))
-
-    async def _stream_legacy(
-        self,
-        messages: List[Dict[str, str]],
-        use_notes_context: bool = True,
-        tags: Optional[List[str]] = None,
-        date_range: Optional[Dict[str, str]] = None,
-        session_id: Optional[str] = None,
-        **kwargs,
-    ) -> AsyncGenerator[bytes, None]:
-        """Legacy single-shot retrieval path."""
-        relevant_notes = []
-        gap_status = "sufficient"
-
-        if use_notes_context:
-            yield self.protocol.phase("searching", "Searching your notes...")
-            relevant_notes, gap_status = await self.retrieval.get_context(
-                messages, tags=tags, date_range=date_range
-            )
-
-        conflicts = self._detect_conflicts(relevant_notes)
-        yield self.protocol.context(relevant_notes, conflicts, session_id or "")
-
-        windowed = await self.conversation_mgr.maybe_summarize(messages)
-        prepared = self.context_builder.build_messages(
-            windowed, relevant_notes if use_notes_context else [], conflicts, gap_status
-        )
-
-        yield self.protocol.phase("generating")
-        try:
-            full_response = ""
-            async for delta in self.llm.stream(prepared):
-                full_response += delta
-                yield self.protocol.delta(delta)
-
-            full_response, citations, warnings = self._verify_and_extract_citations(
-                full_response, relevant_notes
-            )
-            yield self.protocol.done(full_response, citations, citation_warnings=warnings)
-
-            suggestions = await self._generate_suggestions(full_response, relevant_notes)
-            if suggestions:
-                yield self.protocol.suggestions(suggestions)
-
-            if self.verification_service and citations:
-                try:
-                    verification_results = self.verification_service.verify_citations(
-                        full_response, citations, relevant_notes
-                    )
-                    yield self.protocol.verification(verification_results)
-                except Exception as e:
-                    print(f"[verification] Error: {e}")
-
-            # Grounding score
-            if self.grounding_service and relevant_notes:
-                try:
-                    grounding_result = self.grounding_service.score_response(
-                        full_response, relevant_notes
-                    )
-                    yield self.protocol.grounding(grounding_result)
-                except Exception as e:
-                    print(f"[grounding] Error: {e}")
-
-        except Exception as e:
-            yield self.protocol.error(str(e))
 
     async def _generate_suggestions(self, response: str, notes: List[Dict[str, Any]]) -> List[str]:
         """Generate follow-up question suggestions via LLM."""

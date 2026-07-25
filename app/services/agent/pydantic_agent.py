@@ -94,8 +94,11 @@ async def gather_context_pydantic_agent(
     # Compute query embedding ONCE per run
     try:
         raw_q_emb = search_service.engine.model.encode([query])[0]
-        q_norm = np.linalg.norm(raw_q_emb)
-        query_embedding = raw_q_emb / (q_norm + 1e-9)
+        if raw_q_emb is not None:
+            q_norm = np.linalg.norm(raw_q_emb)
+            query_embedding = raw_q_emb / (q_norm + 1e-9)
+        else:
+            query_embedding = np.zeros(384, dtype=np.float32)
     except Exception:
         query_embedding = np.zeros(384, dtype=np.float32)
 
@@ -249,6 +252,7 @@ async def gather_context_pydantic_agent(
                         idx is not None
                         and hasattr(search_service, "embeddings")
                         and idx < len(search_service.embeddings)
+                        and search_service.embeddings[idx] is not None
                     ):
                         emb = search_service.embeddings[idx]
                         emb_norm = emb / (np.linalg.norm(emb) + 1e-9)

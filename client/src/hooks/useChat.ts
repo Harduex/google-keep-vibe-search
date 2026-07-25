@@ -94,7 +94,6 @@ export interface ChatModelInfo {
   chat_max_recent_messages: number;
   chat_summarization_threshold: number;
   agent_max_steps: number;
-  enable_agent_mode: boolean;
 }
 
 export const useChat = () => {
@@ -138,7 +137,6 @@ export const useChat = () => {
           chat_max_recent_messages: data.chat_max_recent_messages || 6,
           chat_summarization_threshold: data.chat_summarization_threshold || 12,
           agent_max_steps: data.agent_max_steps || 5,
-          enable_agent_mode: !!data.enable_agent_mode,
         });
       } catch (err) {
         // eslint-disable-next-line no-console

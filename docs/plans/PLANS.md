@@ -100,7 +100,7 @@ report it instead of working around it.
 | T17 | 4 J | 1 | Delete `agent/tools.py`, `ClustersButton`, `newChat` dup | A14, A16 | ⅛ d | done |
 | T18 | 4 J | 2 | Fix dangling doc refs; dedupe agent instruction files | H3, H4 | ¼ d | done |
 | T19 | 4 K | 1 | Agent search tool routes through `RetrievalOrchestrator` | Q2 pre-req | ½ d | done |
-| T20 | 4 K | 3 | Flip agent mode default, delete `_stream_legacy` (serial, after T19) | Q2, A13 | ¼ d | todo |
+| T20 | 4 K | 3 | Flip agent mode default, delete `_stream_legacy` (serial, after T19) | Q2, A13 | ¼ d | done |
 | T21 | 5 L1 | 1 | `Document` / `SourceDoc` / `ChangeSet` domain model | A5 | ¼ d | todo |
 | T22 | 5 L2 | 2 | SQLite store + mmapped vector store | A3, A4, A15 | 1 d | todo |
 | T23 | 5 L3 | 2 | `Importer` protocol + keep-takeout + markdown-dir | Q4 | ½ d | todo |
@@ -135,7 +135,7 @@ task of that wave lands.
 | 1 | — | T01 → T02 | done |
 | 2 | A B C D E | 5 lanes, 2 rounds | done |
 | 3 | F G R T | T11·T33·T35 → T12·T13·T36 → T14 | done |
-| 4 | H I J K | 4 lanes → T18 → T20 | todo |
+| 4 | H I J K | 4 lanes → T18 → T20 | done |
 | 5 | L1–L6 | T21 → T22·T23 → T24·T25 → T26 | todo |
 | 6 | M N O P Q S | 6 lanes → T28 | todo |
 | 7 | — | T37 | todo |

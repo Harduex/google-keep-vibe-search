@@ -120,11 +120,9 @@ async def lifespan(app: FastAPI):
         max_context_notes=settings.chat_context_notes,
     )
 
-    # Agentic retrieval (feature-flagged)
-    agent = None
-    if settings.enable_agent_mode:
-        agent = True
-        t = _step("Agent mode enabled", t)
+    # Agentic retrieval
+    agent = True
+    t = _step("Agent mode active", t)
 
     chat_service = ChatService(
         retrieval=retrieval,

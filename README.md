@@ -109,7 +109,7 @@ All settings are read from `.env`. Copy `.env.example` to get started.
 | `CHAT_SUMMARIZATION_THRESHOLD` | `12` | Total messages before older ones are summarized |
 | `ENABLE_IMAGE_SEARCH` | `true` | Enable CLIP-based image search (downloads ~350 MB model on first run) |
 | `IMAGE_SEARCH_THRESHOLD` | `0.2` | Minimum image similarity score |
-| `ENABLE_AGENT_MODE` | `false` | Enable agentic RAG (iterative search with tool calling) |
+
 | `CACHE_DIR` | `./cache/` | Directory for embeddings and session cache |
 | `FORCE_CACHE_REFRESH` | `false` | Set `true` to ignore cached notes/embeddings on startup |
 
@@ -239,7 +239,7 @@ To install them manually: `uv run pre-commit install`.
 
 3. **Image search** — If enabled, attached images are embedded with OpenAI CLIP. Image similarity scores are merged with text scores via Reciprocal Rank Fusion.
 
-4. **Chat / RAG & Agentic Mode** — On each message, the backend runs multi-signal retrieval (latest message + recent context + topic + chunk-level search + continuity boost), injects the top notes into a structured system prompt, and streams the LLM response token-by-token. When `ENABLE_AGENT_MODE=true`, an agentic loop uses PydanticAI to execute 1-3 query probes per step across 3 search tools (`search_notes`, `search_chunks`, `filter_by_tag`) with PydanticAI validation retries and pure-math deterministic stopping (coverage thresholds, novelty ratios, max steps). Agent loop thresholds and internal limits are configured in `app/services/agent/constants.py`. The final `done` event includes verified `[Note #N]` citations.
+4. **Chat / RAG & Agentic Mode** — On each message, the backend runs multi-signal retrieval (latest message + recent context + topic + chunk-level search + continuity boost), injects the top notes into a structured system prompt, and streams the LLM response token-by-token. An agentic loop uses PydanticAI to execute 1-3 query probes per step across 3 search tools (`search_notes`, `search_chunks`, `filter_by_tag`) with PydanticAI validation retries and pure-math deterministic stopping (coverage thresholds, novelty ratios, max steps). Agent loop thresholds and internal limits are configured in `app/services/agent/constants.py`. The final `done` event includes verified `[Note #N]` citations.
 
 5. **Chunking** — Notes longer than 500 characters are split into paragraph-level chunks that are embedded independently, enabling higher-precision retrieval in large collections.
 

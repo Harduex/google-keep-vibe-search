@@ -1,0 +1,63 @@
+{
+  "build_seconds": 44.4,
+  "corpus": "scifact",
+  "metrics": {
+    "dense_bm25": {
+      "latency_ms": 11.16,
+      "mrr": 0.6994,
+      "ndcg@10": 0.7551,
+      "recall@1": 0.5125,
+      "recall@10": 0.9417,
+      "recall@5": 0.8767
+    },
+    "dense_only": {
+      "latency_ms": 8.57,
+      "mrr": 0.5572,
+      "ndcg@10": 0.59,
+      "recall@1": 0.4225,
+      "recall@10": 0.7367,
+      "recall@5": 0.6558
+    },
+    "full": {
+      "latency_ms": 47.07,
+      "mrr": 0.7067,
+      "ndcg@10": 0.7326,
+      "recall@1": 0.5925,
+      "recall@10": 0.8417,
+      "recall@5": 0.7767
+    },
+    "plus_chunk": {
+      "latency_ms": 25.8,
+      "mrr": 0.7019,
+      "ndcg@10": 0.7528,
+      "recall@1": 0.5425,
+      "recall@10": 0.9267,
+      "recall@5": 0.8608
+    },
+    "plus_entity": {
+      "latency_ms": 15.27,
+      "mrr": 0.7253,
+      "ndcg@10": 0.7696,
+      "recall@1": 0.5525,
+      "recall@10": 0.9217,
+      "recall@5": 0.8867
+    },
+    "plus_rerank": {
+      "latency_ms": 47.07,
+      "mrr": 0.7067,
+      "ndcg@10": 0.7326,
+      "recall@1": 0.5925,
+      "recall@10": 0.8417,
+      "recall@5": 0.7767
+    }
+  },
+  "models": {
+    "embedding": "unknown",
+    "reranker": "cross-encoder/ms-marco-MiniLM-L6-v2"
+  },
+  "sample": {
+    "docs": 1200,
+    "queries": 100,
+    "seed": 20260725
+  }
+}

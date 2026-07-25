@@ -1,0 +1,18 @@
+{
+  "cluster_seconds": 7.6,
+  "corpus": "newsgroups20",
+  "embed_seconds": 7.6,
+  "metrics": {
+    "ari": 0.169,
+    "llm_calls": 0,
+    "nmi": 0.4452,
+    "tag_count": 29,
+    "untagged_percent": 26.85,
+    "v_measure": 0.4452
+  },
+  "sample": {
+    "categories": 20,
+    "docs": 2000,
+    "seed": 20260725
+  }
+}

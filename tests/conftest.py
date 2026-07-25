@@ -161,22 +161,25 @@ def fixture_export_dir(tmp_path):
     return export_dir
 
 
+from app.core.config import settings
+
+
 @pytest.fixture
 def _wired_setup(fixture_export_dir, monkeypatch):
     """Core setup for wired_app and client."""
     monkeypatch.setenv("GOOGLE_KEEP_PATH", str(fixture_export_dir))
     monkeypatch.setenv("CACHE_DIR", str(fixture_export_dir / ".cache"))
+    monkeypatch.setattr(settings, "google_keep_path", str(fixture_export_dir))
+    monkeypatch.setattr(settings, "cache_dir", str(fixture_export_dir / ".cache"))
 
     patcher_st = mock.patch("app.search.SentenceTransformer", StubEmbedder)
-    patcher_ce_rerank = mock.patch("app.services.reranker_service.CrossEncoder", StubCrossEncoder)
-    patcher_ce_nli = mock.patch("app.services.verification_service.CrossEncoder", StubCrossEncoder)
+    patcher_ce = mock.patch("sentence_transformers.CrossEncoder", StubCrossEncoder)
     patcher_llm = mock.patch("app.core.lifespan.LLMClient", StubLLM)
     patcher_spacy_load = mock.patch("spacy.load", side_effect=stub_spacy_load)
     patcher_spacy_dl = mock.patch("spacy.cli.download")
 
     patcher_st.start()
-    patcher_ce_rerank.start()
-    patcher_ce_nli.start()
+    patcher_ce.start()
     patcher_llm.start()
     patcher_spacy_load.start()
     patcher_spacy_dl.start()
@@ -186,8 +189,7 @@ def _wired_setup(fixture_export_dir, monkeypatch):
             yield test_client, app
     finally:
         patcher_st.stop()
-        patcher_ce_rerank.stop()
-        patcher_ce_nli.stop()
+        patcher_ce.stop()
         patcher_llm.stop()
         patcher_spacy_load.stop()
         patcher_spacy_dl.stop()

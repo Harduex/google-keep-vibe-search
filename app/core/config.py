@@ -8,6 +8,12 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     google_keep_path: str = ""
 
+    # Default source_key namespace for the boot-time import. ``$GOOGLE_KEEP_PATH``
+    # is a *default source*, not the definition of the corpus: the store can hold
+    # documents from several sources. Anything else tuning import behaviour lives in
+    # app/store/constants.py rather than here.
+    default_source_key: str = "keep"
+
     # Search
     max_results: int = 300
     search_threshold: float = 0.3
@@ -110,6 +116,14 @@ class Settings(BaseSettings):
     @property
     def chat_sessions_dir(self) -> str:
         return os.path.join(self.resolved_cache_dir, "chat_sessions")
+
+    @property
+    def resolved_store_db_path(self) -> str:
+        return os.path.join(self.resolved_cache_dir, "store.db")
+
+    @property
+    def resolved_vector_store_dir(self) -> str:
+        return os.path.join(self.resolved_cache_dir, "vectors")
 
 
 settings = Settings()

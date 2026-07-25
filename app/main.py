@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.lifespan import lifespan
-from app.routes import chat, embeddings, images, notes, organize, search, stats, tags
+from app.routes import chat, embeddings, images, imports, notes, organize, search, stats, tags
 
 app = FastAPI(title="Google Keep Vibe Search", lifespan=lifespan)
 
@@ -23,6 +23,7 @@ app.include_router(stats.router)
 app.include_router(images.router)
 app.include_router(embeddings.router)
 app.include_router(organize.router)
+app.include_router(imports.router)
 
 if __name__ == "__main__":
     uvicorn.run("app.main:app", host="127.0.0.1", port=8000, reload=True)

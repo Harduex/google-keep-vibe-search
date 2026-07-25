@@ -21,6 +21,7 @@ from app.search import VibeSearch
 from app.services.chunking_service import ChunkingService
 from app.services.entity_service import EntityService
 from app.services.reranker_service import RerankerService
+from bench.ablation import build_rankers
 from bench.metrics import mrr, recall_at_k
 from tests.fixtures.notes import generate_synthetic_notes
 
@@ -119,99 +120,12 @@ def main():
         m /= n_q
         results[name] = (r1, r5, r10, m)
 
-    # dense only
-    def _dense(q: str):
-        scores = engine._semantic_search(q)
-        ranked = sorted(
-            [(engine.note_indices[i], s) for i, s in enumerate(scores)],
-            key=lambda x: x[1],
-            reverse=True,
-        )
-        return [engine.notes[i]["id"] for i, _ in ranked]
-
-    evaluate("dense only", _dense)
-
-    # dense+BM25
-    def _dense_bm25(q: str):
-        semantic = [
-            (engine.note_indices[i], float(engine._semantic_search(q)[i]))
-            for i in range(len(engine.note_indices))
-        ]
-        bm25 = engine._keyword_search(q)
-        fused = engine.rrf_fuse([semantic, bm25])
-        ranked = sorted(fused.items(), key=lambda x: x[1], reverse=True)
-        return [engine.notes[i]["id"] for i, _ in ranked]
-
-    evaluate("dense+BM25", _dense_bm25)
-
-    # +entity
-    def _plus_entity(q: str):
-        semantic = [
-            (engine.note_indices[i], float(engine._semantic_search(q)[i]))
-            for i in range(len(engine.note_indices))
-        ]
-        bm25 = engine._keyword_search(q)
-        entity_pairs = entity_service.get_entity_signal(q)
-        id_to_idx = {n["id"]: i for i, n in enumerate(engine.notes)}
-        entity = [(id_to_idx[nid], s) for nid, s in entity_pairs if nid in id_to_idx]
-        fused = engine.rrf_fuse([semantic, bm25, entity])
-        ranked = sorted(fused.items(), key=lambda x: x[1], reverse=True)
-        return [engine.notes[i]["id"] for i, _ in ranked]
-
-    evaluate("+entity", _plus_entity)
-
-    # +chunk
-    def _plus_chunk(q: str):
-        semantic = [
-            (engine.note_indices[i], float(engine._semantic_search(q)[i]))
-            for i in range(len(engine.note_indices))
-        ]
-        bm25 = engine._keyword_search(q)
-        entity_pairs = entity_service.get_entity_signal(q)
-        id_to_idx = {n["id"]: i for i, n in enumerate(engine.notes)}
-        entity = [(id_to_idx[nid], s) for nid, s in entity_pairs if nid in id_to_idx]
-
-        chunk_res = chunk_service.search_chunks(q, max_results=len(engine.notes))
-        chunk_ranked = [
-            (id_to_idx[n["id"]], float(n["score"])) for n in chunk_res if n["id"] in id_to_idx
-        ]
-
-        fused = engine.rrf_fuse([semantic, bm25, entity, chunk_ranked])
-        ranked = sorted(fused.items(), key=lambda x: x[1], reverse=True)
-        return [engine.notes[i]["id"] for i, _ in ranked]
-
-    evaluate("+chunk", _plus_chunk)
-
-    # +rerank
-    def _plus_rerank(q: str):
-        semantic = [
-            (engine.note_indices[i], float(engine._semantic_search(q)[i]))
-            for i in range(len(engine.note_indices))
-        ]
-        bm25 = engine._keyword_search(q)
-        entity_pairs = entity_service.get_entity_signal(q)
-        id_to_idx = {n["id"]: i for i, n in enumerate(engine.notes)}
-        entity = [(id_to_idx[nid], s) for nid, s in entity_pairs if nid in id_to_idx]
-
-        chunk_res = chunk_service.search_chunks(q, max_results=len(engine.notes))
-        chunk_ranked = [
-            (id_to_idx[n["id"]], float(n["score"])) for n in chunk_res if n["id"] in id_to_idx
-        ]
-
-        fused = engine.rrf_fuse([semantic, bm25, entity, chunk_ranked])
-        ranked = sorted(fused.items(), key=lambda x: x[1], reverse=True)
-        top_notes = [engine.notes[i] for i, _ in ranked[:20]]
-
-        reranked = reranker.rerank(q, top_notes, top_k=20)
-        return [n["id"] for n in reranked]
-
-    evaluate("+rerank", _plus_rerank)
-
-    # full
-    def _full(q: str):
-        return _plus_rerank(q)
-
-    evaluate("full", _full)
+    # The ablation ladder itself lives in bench/ablation.py, so tier 1 (this script, fixture
+    # corpus + stubs) and tier 2 (bench/run_retrieval.py, real corpus) cannot drift into
+    # measuring different pipelines.
+    rankers = build_rankers(engine, entity_service, chunk_service, reranker)
+    for name, ranker in rankers.items():
+        evaluate(name, ranker)
 
     t1 = time.time()
 
@@ -222,9 +136,9 @@ def main():
         print(f"{name:<20} | {r1:.3f} | {r5:.3f} | {r10:.3f} | {m:.3f}")
 
     print("\n--- Signal Impact Analysis ---")
-    base_mrr = results["dense only"][3]
+    base_mrr = results["dense_only"][3]
     for name, (r1, r5, r10, m) in results.items():
-        if name == "dense only":
+        if name == "dense_only":
             continue
         diff = m - base_mrr
         verdict = "improves" if diff > 0.001 else "degrades" if diff < -0.001 else "neutral"

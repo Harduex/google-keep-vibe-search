@@ -59,7 +59,15 @@ def load_beir_scifact() -> Optional[BenchCorpus]:
     with open(qrels_path, "r", encoding="utf-8") as f:
         next(f)  # header
         for line in f:
-            qid, _, did, score = line.strip().split("\t")
+            columns = line.strip().split("\t")
+            if len(columns) == 3:
+                # BEIR ships `query-id corpus-id score`; classic TREC qrels add an unused
+                # iteration column between the two ids. Accept both.
+                qid, did, score = columns
+            elif len(columns) == 4:
+                qid, _, did, score = columns
+            else:
+                continue
             if int(score) > 0:
                 q_idx = query_id_to_idx.get(qid)
                 d_idx = doc_id_to_idx.get(did)

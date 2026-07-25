@@ -5,7 +5,7 @@ SHELL := /bin/bash
 # recipe line before npm/tsc ever ran. A real nvm error still propagates — this is not `|| true`.
 NVM_SOURCE = if [ -s "$$HOME/.nvm/nvm.sh" ]; then . "$$HOME/.nvm/nvm.sh" && nvm install 20 && nvm use 20; fi
 
-.PHONY: setup dev dev-backend dev-frontend test lint format check build eval
+.PHONY: setup dev dev-backend dev-frontend test lint format check build eval eval-retrieval
 
 setup:
 	@echo "=== Setting up Python backend ==="
@@ -68,5 +68,11 @@ build:
 eval:
 	@echo "=== Evaluating Categorization Pipeline ==="
 	PYTHONPATH=. GOOGLE_KEEP_PATH=. uv run python scripts/eval_categorization.py
+
+# Tier-1 retrieval ablation over the synthetic fixture corpus: fast, deterministic, safe to
+# run on every change. Tier 2 (real models, real corpora) lives in bench/ — see bench/README.md.
+eval-retrieval:
+	@echo "=== Evaluating Retrieval Signals (fixture corpus) ==="
+	PYTHONPATH=. GOOGLE_KEEP_PATH=. uv run python scripts/eval_retrieval.py
 
 -include bench/bench.mk

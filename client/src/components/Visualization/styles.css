@@ -228,3 +228,29 @@
     padding: 6px 10px;
   }
 }
+
+/* Legend for the tag colours on the 3D map — identity is never colour alone. */
+.viz-tag-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  padding: 6px 10px;
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  list-style: none;
+}
+
+.viz-tag-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.viz-tag-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
+}

@@ -34,7 +34,7 @@ class SearchService:
     def image_note_map(self):
         return self.engine.image_note_map
 
-    def _note_tags(self, note: Dict[str, Any]) -> List[str]:
+    def tags_for(self, note: Dict[str, Any]) -> List[str]:
         """Tags for a note. The engine's dicts are never tag-enriched (enrichment mutates
         route-level copies), so the tag map has to come from the note service."""
         if self.note_service is not None:
@@ -54,7 +54,7 @@ class SearchService:
         10-character slice orders lexicographically, and both bounds are inclusive.
         """
         if tags:
-            note_tags = self._note_tags(note)
+            note_tags = self.tags_for(note)
             if not any(t in note_tags for t in tags):
                 return False
 

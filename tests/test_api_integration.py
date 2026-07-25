@@ -78,6 +78,26 @@ def test_exclude_tags(client):
     client.post("/api/tags/excluded", json={"excluded_tags": []})
 
 
+def test_embeddings_carry_tags_for_colouring(client):
+    """T15: the 3D map is coloured by tag, so the payload has to carry them.
+
+    The route read `note.get("tags")` off the engine's note dicts, which are never
+    tag-enriched (enrichment mutates route-level copies), so every point came back with
+    `tags: []` on a fresh server and the map had nothing to colour by.
+    """
+    resp = client.get("/api/embeddings")
+    assert resp.status_code == 200
+    points = resp.json()["embeddings"]
+
+    assert points
+    assert all("tags" in point for point in points)
+    # T07 seeds Keep's own labels as tags at startup, so the labelled fixture notes carry
+    # them here without any prior request having to warm a cache.
+    tagged = {point["title"]: point["tags"] for point in points if point["tags"]}
+    assert tagged.get("Labeled 6") == ["Label6"]
+    assert tagged.get("Labeled 7") == ["Label7"]
+
+
 def _stub_agent_decision(monkeypatch, queries):
     """Make the agent's decision step deterministic and offline.
 

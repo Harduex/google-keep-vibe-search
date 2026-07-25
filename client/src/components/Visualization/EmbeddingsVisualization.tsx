@@ -1,13 +1,37 @@
 import { OrbitControls, Text, Billboard } from '@react-three/drei';
 import { Canvas } from '@react-three/fiber';
-import { useRef, useState, useMemo, useCallback } from 'react';
+import { useRef, useState, useMemo, useCallback, useEffect } from 'react';
 import * as THREE from 'three';
 
 import { calculateScorePercentage } from '@/helpers';
 import { EmbeddingPoint } from '@/hooks/useEmbeddings';
 import { Note } from '@/types';
 
+import { buildTagColorScale } from './tagColors';
 import { VisualizationControls } from './VisualizationControls';
+
+/**
+ * Track the theme the document is actually in.
+ *
+ * Read from the DOM rather than by calling useTheme() again: a second hook instance would
+ * hold its own state and go stale the moment the user toggles the theme in the header.
+ */
+const useDocumentTheme = (): 'light' | 'dark' => {
+  const read = (): 'light' | 'dark' =>
+    document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+  const [mode, setMode] = useState<'light' | 'dark'>(read);
+
+  useEffect(() => {
+    const observer = new MutationObserver(() => setMode(read()));
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme'],
+    });
+    return () => observer.disconnect();
+  }, []);
+
+  return mode;
+};
 
 interface EmbeddingsVisualizationProps {
   embeddings: EmbeddingPoint[];
@@ -40,6 +64,14 @@ export const EmbeddingsVisualization = ({
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [isPointerOverPoint, setIsPointerOverPoint] = useState<boolean>(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const themeMode = useDocumentTheme();
+
+  // Built from every embedding, never from the filtered subset: a point must keep its
+  // colour when the threshold or the show-all toggle changes what is on screen.
+  const tagScale = useMemo(
+    () => buildTagColorScale(embeddings, themeMode),
+    [embeddings, themeMode],
+  );
 
   // Create a map of search result IDs and scores for filtering
   const searchResultMap = useMemo(() => {
@@ -125,9 +157,21 @@ export const EmbeddingsVisualization = ({
           onSelectNote={onSelectNote}
           spreadFactor={spreadFactor}
           setIsPointerOverPoint={setIsPointerOverPoint}
+          tagColorFor={tagScale.colorFor}
         />
         <OrbitControls enableZoom enablePan enableRotate />
       </Canvas>
+
+      {tagScale.legend.length > 0 && (
+        <ul className="viz-tag-legend" aria-label="Point colours by tag">
+          {tagScale.legend.map((entry) => (
+            <li key={entry.label}>
+              <span className="viz-tag-swatch" style={{ backgroundColor: entry.color }} />
+              {entry.label}
+            </li>
+          ))}
+        </ul>
+      )}
 
       <VisualizationControls
         isAllNotesView={isAllNotesView}
@@ -150,6 +194,7 @@ interface PointCloudProps {
   onSelectNote: (noteId: string) => void;
   spreadFactor: number;
   setIsPointerOverPoint: (isOver: boolean) => void;
+  tagColorFor: (tags: string[] | undefined) => string;
 }
 
 const PointCloud = ({
@@ -160,8 +205,10 @@ const PointCloud = ({
   onSelectNote,
   spreadFactor,
   setIsPointerOverPoint,
+  tagColorFor,
 }: PointCloudProps) => {
   const groupRef = useRef<THREE.Group>(null);
+  const hasSearchResults = searchResultMap.size > 0;
 
   // Scale factor to ensure points aren't too spread out or too clustered
   const scaleFactor = useMemo(() => {
@@ -208,10 +255,10 @@ const PointCloud = ({
         const isHovered = hoveredPoint === point.id;
         const [x, y, z] = point.coordinates.map((coord) => coord * scaleFactor);
 
-        // Calculate color based on match score for search results
-        let pointColor = '#9e9e9e'; // Default gray for non-search results
+        // A search result is coloured by how well it matched — magnitude, so a ramp. Every
+        // other point is coloured by its tag — identity, so a categorical hue.
+        let pointColor = tagColorFor(point.tags);
         if (isSearchResult) {
-          // Create a color gradient from orange (low score) to green (high score)
           if (score >= 70) {
             pointColor = '#4caf50'; // Green for high scores
           } else if (score >= 40) {
@@ -220,6 +267,10 @@ const PointCloud = ({
             pointColor = '#ff9800'; // Orange for low scores
           }
         }
+
+        // Dimming only makes sense against matches: with no search active the tag colours
+        // are the whole point of the view, so they render at full strength.
+        const opacity = isSearchResult ? 0.7 : hasSearchResults ? 0.15 : 0.75;
 
         return (
           <group key={point.id} position={[x, y, z]}>
@@ -233,7 +284,7 @@ const PointCloud = ({
                 color={pointColor}
                 emissive={isHovered ? '#ffffff' : '#000000'}
                 emissiveIntensity={isHovered ? 0.5 : 0}
-                opacity={isSearchResult ? 0.7 : 0.15}
+                opacity={opacity}
                 transparent={true}
               />
             </mesh>
@@ -273,6 +324,8 @@ const PointCloud = ({
                   >
                     {isSearchResult ? `${score}% - ` : ''}
                     {point.title || point.content.substring(0, 100) + '...'}
+                    {/* Names the tags, so a point's identity is never colour alone. */}
+                    {point.tags && point.tags.length > 0 ? `\n[${point.tags.join(', ')}]` : ''}
                   </Text>
                 </Billboard>
               </>

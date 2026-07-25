@@ -8,6 +8,8 @@ export interface EmbeddingPoint {
   id: string;
   title: string;
   content: string;
+  /** Tags the note carries, resolved server-side from the tag map (used to colour points). */
+  tags: string[];
   coordinates: [number, number, number];
 }
 

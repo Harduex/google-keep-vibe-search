@@ -49,7 +49,7 @@ class StubSearchService:
         self.note_service = None
 
     # Borrowed from the real service so the scope rule under test has one implementation.
-    _note_tags = SearchService._note_tags
+    tags_for = SearchService.tags_for
     in_scope = SearchService.in_scope
 
     def search(self, query: str, **kwargs):

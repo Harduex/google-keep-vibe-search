@@ -29,12 +29,16 @@ def get_embeddings(search_service: SearchService = Depends(get_search_service)):
 
         data = []
         for i, note_idx in enumerate(note_indices):
+            note = notes[note_idx]
             data.append(
                 {
-                    "id": notes[note_idx]["id"],
-                    "title": notes[note_idx]["title"],
-                    "content": notes[note_idx]["content"],
-                    "tags": notes[note_idx].get("tags", []),
+                    "id": note["id"],
+                    "title": note["title"],
+                    "content": note["content"],
+                    # Resolved through the service, not off the note dict: the engine's
+                    # notes are never tag-enriched, so `note.get("tags")` was [] for every
+                    # point and the map had nothing to colour by.
+                    "tags": search_service.tags_for(note),
                     "coordinates": embeddings_3d[i].tolist(),
                 }
             )

@@ -90,6 +90,17 @@ class _StubEngine:
         return list(self._results)
 
 
+class _TruncatingStubEngine(_StubEngine):
+    """Stub that honours `max_results` the way VibeSearch.search does — it slices
+    before returning, which is what makes post-filter truncation lossy."""
+
+    def search(self, query, **kwargs):
+        self.last_kwargs = kwargs
+        max_results = kwargs.get("max_results")
+        results = list(self._results)
+        return results[:max_results] if max_results is not None else results
+
+
 class TestSeedTagsFromLabels:
     """B3b/T07: Keep labels become tags -- additive and idempotent."""
 
@@ -189,9 +200,39 @@ class TestSearchServiceExcludedTags:
 
         service.search("q", max_results=7)
 
-        # kwargs are forwarded to the engine unchanged; filtering only post-processes
-        # the engine's own result list.
+        # With nothing excluded there is nothing to top up, so the engine still sees the
+        # requested size unchanged.
         assert engine.last_kwargs == {"max_results": 7}
+
+    def test_exclusions_do_not_shrink_the_result_count(self):
+        # The engine slices to max_results before returning, so filtering afterwards used
+        # to hand back fewer results than asked for -- a shrunk Search tab and a chat
+        # context below max_context_notes -- even though non-excluded matches existed
+        # below the cut. Here 2 of the top 3 are excluded: the old code returned 1 result
+        # for a request of 3.
+        engine = _TruncatingStubEngine(
+            [{"id": i} for i in ["a", "b", "c", "d", "e", "f", "g"]],
+        )
+        note_service = self._note_service(
+            note_tags={"a": ["Private"], "c": ["Private"]}, excluded_tags={"Private"}
+        )
+        service = SearchService(engine, note_service=note_service)
+
+        results = service.search("q", max_results=3)
+
+        assert [r["id"] for r in results] == ["b", "d", "e"]
+        # Over-fetched by the exact number of excluded-tagged notes, then cut back to 3.
+        assert engine.last_kwargs == {"max_results": 5}
+
+    def test_over_fetch_uses_the_configured_cap_when_none_requested(self):
+        engine = _TruncatingStubEngine([{"id": "a"}, {"id": "b"}])
+        note_service = self._note_service(note_tags={"a": ["Private"]}, excluded_tags={"Private"})
+        service = SearchService(engine, note_service=note_service)
+
+        results = service.search("q")
+
+        assert [r["id"] for r in results] == ["b"]
+        assert engine.last_kwargs == {"max_results": settings.max_results + 1}
 
 
 class TestB5LiveWiring:

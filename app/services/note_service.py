@@ -80,6 +80,19 @@ class NoteService:
 
         return notes_seeded
 
+    def excluded_note_count(self) -> int:
+        """How many notes carry at least one excluded tag.
+
+        This is the exact upper bound on how many results ``filter_by_excluded_tags``
+        can remove, so a caller that must return ``n`` results can over-fetch by this
+        much and still honour ``n`` (see ``SearchService.search``).
+        """
+        if not self.excluded_tags:
+            return 0
+        return sum(
+            1 for tags in self.note_tags.values() if any(t in self.excluded_tags for t in tags)
+        )
+
     def filter_by_excluded_tags(self, notes_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         if not self.excluded_tags:
             return notes_list

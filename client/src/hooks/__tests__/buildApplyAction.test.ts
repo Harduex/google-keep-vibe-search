@@ -60,19 +60,24 @@ describe('buildApplyAction', () => {
     });
   });
 
-  it('maps a classic merge (with a staged mergeTarget) to a merge_tags payload, not approve', () => {
-    // Regression for B8: the Merge button used to silently behave as approve —
-    // it dropped mergeTarget and tagged notes with their own name.
+  it('tags a classic merge with the target name, never with its own name', () => {
+    // Regression for B8, both halves. First the Merge button dropped mergeTarget and
+    // tagged the notes with their own name (behaved as approve). Then the fix emitted
+    // merge_tags for a source tag that was never applied, so the backend raised KeyError
+    // and skipped it — the notes ended up with no tag at all. Merging a proposal means
+    // tagging its notes with the target name.
     const payload = buildApplyAction(
       state({ tag_name: 'Gym', note_ids: ['a', 'b'] }, 'merge', undefined, 'Fitness'),
     );
     expect(payload).toEqual({
-      action: 'merge_tags',
-      source_tag: 'Gym',
-      target_tag: 'Fitness',
+      action: 'approve',
+      tag_name: 'Fitness',
+      note_ids: ['a', 'b'],
     });
-    expect(payload?.action).not.toBe('approve');
+    expect(payload?.tag_name).not.toBe('Gym');
     expect(payload?.action).not.toBe('merge');
+    // merge_tags is for gray-zone proposals, where both tags are already on disk.
+    expect(payload?.action).not.toBe('merge_tags');
   });
 
   it('drops a classic merge with no staged mergeTarget instead of falling back to approve', () => {
@@ -81,10 +86,10 @@ describe('buildApplyAction', () => {
     ).toBeNull();
   });
 
-  it('still emits merge_tags when the staged target equals the source (backend degrades it)', () => {
+  it('treats a self-merge as a plain approve of that tag', () => {
     const payload = buildApplyAction(
       state({ tag_name: 'Gym', note_ids: ['a'] }, 'merge', undefined, 'Gym'),
     );
-    expect(payload).toEqual({ action: 'merge_tags', source_tag: 'Gym', target_tag: 'Gym' });
+    expect(payload).toEqual({ action: 'approve', tag_name: 'Gym', note_ids: ['a'] });
   });
 });

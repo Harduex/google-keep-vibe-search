@@ -43,20 +43,24 @@ export const buildApplyAction = (state: ProposalState): ApplyActionPayload | nul
   }
 
   if (action === 'merge') {
-    // A classic proposal staged for merge always carries `mergeTarget` (set by
-    // `mergeProposals`). If it's missing, there is nothing to merge into — drop
-    // the action rather than silently falling back to "approve" (the bug this
-    // fixes: notes would get tagged with their own name). A merge whose target
-    // equals its own tag_name is still emitted as `merge_tags`; the backend's
-    // `rename_tag` rejects old_name === new_name and the route's existing
-    // `except (KeyError, ValueError): continue` skips it gracefully.
+    // A classic proposal staged for merge carries `mergeTarget` (set by `mergeProposals`
+    // from the target proposal's tag_name). If it's missing there is nothing to merge
+    // into, so drop the action rather than falling back to "approve", which would tag the
+    // notes with their own name (B8).
+    //
+    // Merging a *proposal* means "tag this cluster's notes with the target name" — so it
+    // is an approve under the target's name, not `merge_tags`. `merge_tags` renames a tag
+    // that is already applied; a proposal's tag never is, so emitting it here made
+    // rename_tag raise KeyError and the route skip the action, leaving the notes untagged
+    // and reporting "Applied 0 tags to 0 notes". `merge_tags` stays correct for gray-zone
+    // merge proposals (handled above), where both tags really do exist on disk.
     if (!state.mergeTarget) {
       return null;
     }
     return {
-      action: 'merge_tags',
-      source_tag: proposal.tag_name,
-      target_tag: state.mergeTarget,
+      action: 'approve',
+      tag_name: state.mergeTarget,
+      note_ids: proposal.note_ids,
     };
   }
 

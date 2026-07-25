@@ -45,7 +45,26 @@ def test_apply_classic_then_merge_then_assign_ordering():
     assert result["notes_tagged"] == 4  # a,b,c + assigned d
 
 
+def test_apply_merge_of_a_classic_proposal_tags_the_notes_with_the_target():
+    # B8, second half. A classic proposal's own tag is never on disk, so emitting
+    # merge_tags for it made rename_tag raise KeyError and the route skip the action:
+    # the Merge button reported "Applied 0 tags to 0 notes" and left the notes untagged.
+    # The client now sends the merge as an approve under the target's name — this is the
+    # payload the Merge button produces, and it must actually tag the notes.
+    svc = FakeNoteService()
+    req = ApplyProposalsRequest(
+        actions=[ApplyAction(action="approve", tag_name="Fitness", note_ids=["a", "b"])]
+    )
+
+    result = apply_proposals(req, note_service=svc)
+
+    assert svc.tagged == [(["a", "b"], "Fitness")]
+    assert result["notes_tagged"] == 2
+
+
 def test_apply_merge_skips_when_source_tag_absent():
+    # Still reachable for gray-zone merge proposals, where the source tag can have been
+    # rejected or renamed before apply. Classic proposals no longer emit this shape.
     svc = FakeNoteService()
     req = ApplyProposalsRequest(
         actions=[ApplyAction(action="merge_tags", source_tag="Ghost", target_tag="Real")]
@@ -58,10 +77,8 @@ def test_apply_merge_skips_when_source_tag_absent():
 
 
 def test_apply_merge_skips_when_source_equals_target():
-    # Regression for B8 (client side): buildApplyAction now emits merge_tags
-    # even when a proposal's staged mergeTarget equals its own tag_name. The
-    # backend needs no change to handle this — NoteService.rename_tag already
-    # rejects old_name == new_name with ValueError, and the route's existing
+    # A gray-zone merge_tags whose source and target coincide. NoteService.rename_tag
+    # rejects old_name == new_name with ValueError and the route's existing
     # except (KeyError, ValueError): continue skips it gracefully.
     svc = FakeNoteService(existing_tags={"Gym"})
     req = ApplyProposalsRequest(

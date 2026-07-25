@@ -75,6 +75,84 @@ Report the wall-clock saving from dropping the duplicate reduction.
 
 **Commit:** `fix(tagging): honour granularity and reduce dimensions once`
 
+### T38 — Stream proposals as they are named, actionable while the run continues
+
+**Owner request, 2026-07-25** (not derived from the audit, so it owns no finding).
+**Depends on:** T27, T28 — both restructure the pipeline this streams from; building it first
+means building it twice. **Runs alone in its own round, after T30**, because its write set
+crosses Lane M, Lane O and the Organize components (see the matrix footnote in `PLANS.md`).
+
+**Owns (for that serial round only):** `app/services/categorization_service.py`,
+`app/routes/organize.py`, `app/services/proposal_store.py`,
+`client/src/hooks/useOrganize.ts`, `client/src/components/Organize/**`,
+`client/src/hooks/__tests__/useOrganize.test.ts`, `tests/test_organize_apply.py`.
+
+**Rationale** Naming is one LLM call per cluster, sequential, size-descending — a real corpus
+takes hundreds of calls and many minutes. Today every proposal is withheld until the run ends,
+so the user waits with only a progress bar and is then handed the entire vocabulary at once
+(264 cards in the run that prompted this). The names exist the moment each cluster is named;
+withholding them wastes the whole generation window, during which the user could be reviewing.
+
+**Design decisions, taken with the owner (2026-07-25) — do not re-litigate these:**
+1. **The user's decisions win over consolidation.** Step 7 merges and renames tags produced in
+   step 6. Any tag the user has already acted on is *locked*: excluded from consolidation and
+   from being an auto-merge target, so nothing the user decided can be undone by the machine.
+   This is the whole point — the alternative (consolidation wins, user re-checks a diff)
+   invalidates work the user already paid attention for.
+2. **Stream into the Organize review list, not into the real tag list.** Proposals stay staged
+   and are applied in one action at the end, so a cancelled run costs nothing and no tag lands
+   on a note before it is reviewed.
+3. **Append in arrival order; never re-sort.** Naming is size-descending, so the most important
+   clusters arrive first. A list that re-sorts while the user works in it moves cards under the
+   cursor.
+
+**Do**
+1. **Stream one frame per named cluster.** The step-6 loop
+   (`categorization_service.py`, around the `_get_llm_tag_name` await) is already inside the
+   async generator and already `await queue.put(...)`s progress frames — emit
+   `{"type": "proposal", "proposal": {…}, "current": i+1, "total": total_llm}` there, with the
+   payload in exactly the shape one element of `vocab.to_proposals()` has, so the client keeps a
+   single renderer. Add `proposal` to the NDJSON type list in `AGENTS.md`.
+2. **Persist the partial set as it grows**, throttled, through the existing
+   `proposal_store.save_pending_proposals`. A crash or a killed stream must leave the generated
+   proposals on disk (this is why that store exists).
+3. **Lock list.** The client debounces staged decisions to `PUT /api/organize/pending/actions`,
+   stored as an `actions` map (tag name → staged action) in the same `pending_proposals.json`.
+   At the start of step 7, consolidation reads those tag names and skips them, both as merge
+   sources and as merge targets. One shared artifact serves crash-safety and the exemption — do
+   not add a second transport for it.
+4. **Reconcile at the end.** The final `label_updates` / `proposals` frame stays authoritative
+   for everything *unlocked*, and re-attaches staged actions by tag name.
+5. **Render during the run.** Drop the `!isProcessing` gate in `components/Organize/index.tsx`
+   so the list shows while the progress bar runs above it.
+6. **Move merging off array indices.** `onMerge(sourceIndex, targetIndex)` and the
+   `mergeTargets` list in `ProposalCard.tsx` are positional. In a list that grows underneath the
+   user, indices shift and a staged merge silently retargets. Key by tag name (unique within a
+   vocabulary). Merge targets are the proposals that have already arrived.
+7. **Restore staged actions with the proposals** when the tab remounts.
+
+**Out of scope** (deliberate, do not extend): applying tags live as they are generated,
+mirroring the emerging vocabulary into the tag sidebar, and resuming an interrupted naming run.
+
+**Checkpoint**
+```
+# one frame per named cluster, correct shape and count
+GOOGLE_KEEP_PATH=. uv run pytest tests/test_organize_apply.py -q
+# a locked tag survives consolidation unchanged; an unlocked duplicate is still consolidated
+# a staged merge stays on its intended target after 50 more proposals arrive  <- the bug (6) prevents
+cd client && npx vitest run src/hooks/__tests__/useOrganize.test.ts
+GOOGLE_KEEP_PATH=. make check
+make eval        # tagging output unchanged for a run with no staged actions
+```
+Paste the frame count vs cluster count, and confirm a no-staged-actions run produces the same
+final vocabulary as before the change.
+
+**Risk** Step 7 is the only place this *changes* behaviour rather than adding to it, and it
+decides the final vocabulary. Give it the most test attention; a run with an empty lock list
+must be byte-identical to today's output.
+
+**Commit:** `feat(organize): stream tag proposals as they are named`
+
 ---
 
 ## Lane N — chat hot path

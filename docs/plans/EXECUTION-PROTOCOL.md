@@ -28,7 +28,7 @@ yourself (§2.5).
    | 3 | **T11** · T33 · T35 | T12 · T13 · T36 | T14 | |
    | 4 | T15 · T16 · T17 · T19 | T18 | **T20** | |
    | 5 | **T21** | T22 · T23 | T24 · T25 | **T26** |
-   | 6 | T27 · T29 · T30 · T31 · T32 · T34 | T28 | | |
+   | 6 | T27 · T29 · T30 · T31 · T32 · T34 | T28 | **T38** | |
    | 7 | **T37** | | | |
 
    Bold = must run alone in its round; everything else in a round is concurrent.
@@ -43,6 +43,10 @@ yourself (§2.5).
    - **T20** depends only on T19 and could run in round 2, but is deliberately held to round 3, alone:
      it is the wave's riskiest deletion (the legacy chat path), and it lands last on an otherwise
      quiet tree.
+   - **T38** names T27/T28 but also waits for T30: its write set crosses Lane M, Lane O and the
+     Organize components, so it runs alone once every other wave-6 lane has landed. Running it
+     concurrently would need a lane row that overlaps Lane O — a plan bug, not a workaround (see
+     the matrix footnote in `PLANS.md`).
 4. **Cross-wave dependencies are already satisfied** by the wave barrier — e.g. T27 and T29 read
    `store/vectors.py` from T22 (wave 5). Do not re-verify; do not vendor a copy.
 

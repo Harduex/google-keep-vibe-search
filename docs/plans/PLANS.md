@@ -27,6 +27,7 @@ Wave 4  deprecations        PARALLEL ── 4 agents (H clusters · I topic · J
 Wave 5  store & ingestion   T21 SERIAL, then PARALLEL ── 4 agents in 2 rounds, then T26 SERIAL
    │
 Wave 6  unify + quality     PARALLEL ── 6 agents (M tagging unification · N–Q quality · S sessions)
+   │                                    then SERIAL T38 (streamed proposals — needs T27/T28 + T30)
    │
 Wave 7  release readiness   SERIAL  ── 1 agent   (comment sweep + pre-push safety audit; must run last)
 ```
@@ -72,6 +73,7 @@ report it instead of working around it.
 |   |   | ↳ Lane P owns `client/package.json`, so **T30 must not add a client dependency** — build the data layer in-house. If T30 concludes a dependency is genuinely required, that is a blocker to report, not a cross-lane edit. |   |
 | 6 | **Q** ops | `Dockerfile`, `docker-compose.yml`, `pyproject.toml`, `client/Dockerfile` | T32 |
 | 6 | **S** sessions | `app/services/session_service.py`, `app/routes/chat.py`, `tests/test_session_service.py` | T34 |
+|   |   | ↳ **T38 runs alone in round 3**, after every wave-6 lane has landed, so its write set is not listed as a lane row: it spans Lane M (`categorization_service.py`), Lane O (`client/src/hooks/useOrganize.ts`), plus `app/routes/organize.py`, `app/services/proposal_store.py` and `client/src/components/Organize/**` — which no lane owns. Listing those against Lane M would register a false overlap with Lane O while telling a concurrent agent nothing, since by round 3 there is no concurrent agent. The authoritative write set is in T38's spec. | T38 |
 | 7 | — | everything (**comments only**) + `docs/audit/PRE-PUSH-AUDIT.md` (new) | T37 |
 |   |   | ↳ The comments-only restriction is what makes a whole-repo write set safe: T37's checkpoint asserts every changed Python file is **AST-identical** to its parent commit. Mirrors T01, which owned everything for formatting only. |   |
 
@@ -118,11 +120,13 @@ report it instead of working around it.
 | T35 | 3 T | 1 | Benchmark corpora, scale generator, shared metrics | T4 | 1 d | done (loader fixed in review) |
 | T36 | 3 T | 2 | Signal ablation, tagging correctness, baseline gate | T4 | 1 d | done (rebuilt in review) |
 | T37 | 7 — | 1 | Production-readiness comment sweep + pre-push safety audit | — | ½ d | todo |
+| T38 | 6 M | 3 | Stream proposals as they are named, actionable mid-run (serial, after T30) | — | 1 d | todo |
 
-**Totals:** 37 tasks · ~20½ developer-days serial · ~8 wall-clock days at the lane parallelism above.
+**Totals:** 38 tasks · ~21½ developer-days serial · ~8 wall-clock days at the lane parallelism above.
 Every one of the 46 audit findings is owned by exactly one task — verified by the coverage script in
 § Verification below. **T37 owns no finding**: it was added at the repo owner's request (2026-07-25),
-not derived from the audit, so it does not affect the coverage invariant.
+not derived from the audit, so it does not affect the coverage invariant. **T38 owns no finding
+either**: it is an owner feature request from 2026-07-25, specced in `wave-6-unify-and-quality.md`.
 
 ## Status
 
@@ -137,7 +141,7 @@ task of that wave lands.
 | 3 | F G R T | T11·T33·T35 → T12·T13·T36 → T14 | done |
 | 4 | H I J K | 4 lanes → T18 → T20 | done |
 | 5 | L1–L6 | T21 → T22·T23 → T24·T25 → T26 | todo |
-| 6 | M N O P Q S | 6 lanes → T28 | todo |
+| 6 | M N O P Q S | 6 lanes → T28 → T38 | todo |
 | 7 | — | T37 | todo |
 
 ## Post-wave-4 review (2026-07-25)

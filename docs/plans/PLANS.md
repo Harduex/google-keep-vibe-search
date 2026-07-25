@@ -92,7 +92,7 @@ report it instead of working around it.
 | T09 | 2 D | 2 | Make proposal "merge" actually merge | B8 | ¼ d | done |
 | T10 | 2 E | 1 | Redaction helper; stop leaking prompts into logs | P1, P2, P3 | ¼ d | done |
 | T11 | 3 F | 1 | Synthetic fixture corpus + stubbed model/LLM `conftest` | T1, T2 | ½ d | done |
-| T12 | 3 F | 2 | End-to-end API integration test | T2 | ½ d | todo |
+| T12 | 3 F | 2 | End-to-end API integration test | T2 | ½ d | done |
 | T13 | 3 G | 2 | Retrieval eval harness (`make eval-retrieval`) | T4 | ½ d | todo |
 | T14 | 3 G | 3 | Categorization eval script (closes the `make eval` stub) | H3, T4 | ¼ d | todo |
 | T15 | 4 H | 1 | Remove Clusters tab + KMeans; recolour 3D map by tag | Q1, A2, A10 | ½ d | todo |

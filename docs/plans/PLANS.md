@@ -113,7 +113,7 @@ report it instead of working around it.
 | T30 | 6 O | 1 | Client data layer (cache + dedupe + invalidation) | A11 | ½ d | todo |
 | T31 | 6 P | 1 | Pick one styling system | A12 | ½ d | todo |
 | T32 | 6 Q | 1 | Docker/torch/packaging hygiene | H5, H6, H7 | ½ d | todo |
-| T33 | 3 R | 1 | Tests for the two NDJSON stream parsers | T3 | ½ d | todo |
+| T33 | 3 R | 1 | Tests for the two NDJSON stream parsers | T3 | ½ d | done |
 | T34 | 6 S | 1 | Session service hygiene | B14, B16 | ¼ d | todo |
 | T35 | 3 T | 1 | Benchmark corpora, scale generator, shared metrics | T4 | 1 d | todo |
 | T36 | 3 T | 2 | Signal ablation, tagging correctness, baseline gate | T4 | 1 d | todo |

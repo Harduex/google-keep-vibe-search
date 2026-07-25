@@ -8,12 +8,26 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 import networkx as nx
 
 from app.core.config import settings
+from app.domain import ChangeSet, Document
 
 
 class EntityService:
-    """Extracts entities from notes, clusters aliases, and provides entity-based retrieval signal."""
+    """Extracts entities from notes, clusters aliases, and provides entity-based retrieval signal.
+
+    Two ways to populate the index:
+
+    - The legacy constructor takes a list of note dicts and rebuilds the
+      entity index from scratch, caching it to ``entity_index.json`` keyed by
+      a whole-corpus hash.
+    - The :meth:`build` / :meth:`apply` interface takes content-addressed
+      :class:`~app.domain.model.Document` objects. :meth:`apply` extracts
+      entities only from ``added ∪ updated`` documents, drops ``removed``
+      document ids from the index, and leaves ``unchanged`` entries alone —
+      so one edited note does not re-extract the whole corpus.
+    """
 
     ENTITY_LABELS = {"PERSON", "GPE", "ORG", "PRODUCT"}
+    INDEX_NAME = "entity_index"
 
     def __init__(self, notes: List[Dict[str, Any]], cache_dir: Optional[str] = None):
         import spacy
@@ -27,6 +41,7 @@ class EntityService:
         self.cache_dir = cache_dir or settings.resolved_cache_dir
         self.entity_index: Dict[str, Set[str]] = {}  # canonical → note IDs
         self.alias_map: Dict[str, str] = {}  # surface form → canonical
+        self.sqlite_store = None
 
         self._build_index(notes)
 
@@ -86,6 +101,142 @@ class EntityService:
             json.dump(data, f)
         with open(cache_file + ".meta", "w") as f:
             json.dump({"hash": current_hash}, f)
+
+    # ------------------------------------------------------------------ #
+    # Store-backed incremental interface (build / apply)
+    # ------------------------------------------------------------------ #
+
+    def build(
+        self,
+        documents: List[Document],
+        sqlite_store=None,
+    ) -> None:
+        """Full rebuild from content-addressed documents.
+
+        Entity extraction is the only per-document cost here (there are no
+        dense vectors), so :meth:`build` is what today's constructor does; the
+        value of the new interface is :meth:`apply`'s incremental extraction.
+        """
+        if sqlite_store is not None:
+            self.sqlite_store = sqlite_store
+        notes = [_doc_to_note_dict(d) for d in documents]
+        self.entity_index = {}
+        self.alias_map = {}
+        raw_entities = self._extract_entities(notes)
+        self._cluster_entities(raw_entities)
+        if self.sqlite_store is not None:
+            self._record_index_state(len(documents))
+
+    def apply(
+        self,
+        change_set: ChangeSet,
+        sqlite_store=None,
+    ) -> None:
+        """Incremental update: extract entities only from ``added ∪ updated``
+        documents, drop ``removed`` document ids, leave ``unchanged`` entries.
+
+        Newly-extracted surface forms are clustered among themselves and merged
+        into the existing index; surface forms already aliased are folded into
+        their existing canonical. This is approximate (a global re-cluster may
+        find more aliases) but never touches the ``unchanged`` set.
+        """
+        if sqlite_store is not None:
+            self.sqlite_store = sqlite_store
+
+        # Drop removed and stale-updated doc ids from the index.
+        for doc in change_set.removed:
+            self._purge_doc_id(doc.id)
+        for doc in change_set.updated:
+            self._purge_doc_id(doc.id)
+
+        changed = list(change_set.added) + list(change_set.updated)
+        if changed:
+            notes = [_doc_to_note_dict(d) for d in changed]
+            raw = self._extract_entities(notes)
+            self._merge_entities(raw)
+
+        if self.sqlite_store is not None:
+            live_doc_count = len({nid for ids in self.entity_index.values() for nid in ids})
+            self._record_index_state(live_doc_count)
+
+    def _purge_doc_id(self, doc_id: str) -> None:
+        """Remove every mention of ``doc_id`` from the entity index."""
+        if not doc_id:
+            return
+        for canonical in list(self.entity_index.keys()):
+            ids = self.entity_index[canonical]
+            if doc_id in ids:
+                ids.discard(doc_id)
+                if not ids:
+                    del self.entity_index[canonical]
+
+    def _merge_entities(self, raw_entities: Dict[str, List[Tuple[str, str]]]) -> None:
+        """Merge newly-extracted entities into the existing index.
+
+        For each new surface form, if its lowercase is already aliased, add the
+        note id to that canonical's set; otherwise cluster it against existing
+        canonicals of the same label (Jaro-Winkler ≥ 0.75) or create a fresh
+        canonical.
+        """
+        import jellyfish
+
+        # Group new mentions by label.
+        mention_notes: Dict[str, Dict[str, Set[str]]] = {}
+        for note_id, entities in raw_entities.items():
+            for surface, label in entities:
+                mention_notes.setdefault(label, {}).setdefault(surface, set()).add(note_id)
+
+        # Existing surface forms, by label, for blocking.
+        existing_by_label: Dict[str, List[str]] = {}
+        for surface, canonical in self.alias_map.items():
+            label = self._canonical_label(canonical)
+            existing_by_label.setdefault(label, []).append(surface)
+
+        for label, surfaces_dict in mention_notes.items():
+            for surface, note_ids in surfaces_dict.items():
+                key = surface.lower()
+                canonical = self.alias_map.get(key)
+                if canonical is None:
+                    # Try to cluster against an existing surface of the same label.
+                    bucket = existing_by_label.get(label, [])
+                    for other in bucket:
+                        if (
+                            jellyfish.jaro_winkler_similarity(surface.lower(), other.lower())
+                            >= 0.75
+                        ):
+                            canonical = self.alias_map[other.lower()]
+                            break
+                    if canonical is None:
+                        canonical = surface
+                    self.alias_map[key] = canonical
+                    existing_by_label.setdefault(label, []).append(surface)
+                self.entity_index.setdefault(canonical, set()).update(note_ids)
+
+    def _canonical_label(self, canonical: str) -> str:
+        """Heuristic reverse-lookup of a canonical's label.
+
+        The index does not store labels, so we re-extract from the canonical's
+        own text. This is cheap (one NLP call per merge) and only used to gate
+        blocking during incremental merges.
+        """
+        doc = self.nlp(canonical)
+        for ent in doc.ents:
+            if ent.label_ in self.ENTITY_LABELS:
+                return ent.label_
+        return ""
+
+    def _record_index_state(self, doc_count: int) -> None:
+        if self.sqlite_store is None:
+            return
+        corpus_hash = hashlib.blake2s(
+            "\n".join(sorted(self.entity_index.keys())).encode("utf-8"),
+            digest_size=16,
+        ).hexdigest()
+        self.sqlite_store.set_index_state(
+            self.INDEX_NAME,
+            content_hash=corpus_hash,
+            row_count=len(self.entity_index),
+        )
 
     def _extract_entities(self, notes: List[Dict[str, Any]]) -> Dict[str, List[Tuple[str, str]]]:
         """Extract entities from notes. Returns {note_id: [(text, label), ...]}."""
@@ -189,3 +340,12 @@ class EntityService:
         note_ids = self.find_notes(canonicals)
         # All entity-matched notes get a uniform score (boosted via RRF position)
         return [(nid, 1.0) for nid in note_ids]
+
+
+def _doc_to_note_dict(doc: Document) -> Dict[str, Any]:
+    """Convert a Document to the dict shape the legacy extractor expects."""
+    return {
+        "id": doc.id,
+        "title": doc.title or "",
+        "content": doc.body or "",
+    }

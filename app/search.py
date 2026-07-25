@@ -9,9 +9,11 @@ from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 
 from app.core.config import settings
+from app.domain import ChangeSet, Document
 from app.services.search.bm25 import BM25Index
 from app.services.search.constants import RERANK_CANDIDATE_WINDOW
 from app.services.tagging.preprocess import clean_note
+from app.store import VectorStore
 
 if settings.enable_image_search:
     try:
@@ -26,6 +28,26 @@ if settings.enable_image_search:
 
 
 class VibeSearch:
+    """Dense + BM25 + image + entity search over the live note corpus.
+
+    Two ways to populate the index:
+
+    - The legacy constructor ``VibeSearch(notes, ...)`` builds everything from
+      a list of note dicts and persists embeddings to a side-car ``.npz`` cache
+      keyed by a whole-corpus hash. One edited note re-embeds everything.
+    - The :meth:`build` / :meth:`apply` interface takes content-addressed
+      :class:`~app.domain.model.Document` objects and routes vector I/O through
+      a :class:`~app.store.vectors.VectorStore` keyed by ``content_hash``. An
+      incremental :meth:`apply` embeds only ``added ∪ updated`` and drops
+      ``removed``. This is the A4 fix — one edited note re-embeds only itself.
+
+    Staleness under the new path is owned per-index via the optional
+    :class:`~app.store.sqlite.SQLiteStore` ``index_state`` ledger rather than a
+    global corpus hash.
+    """
+
+    INDEX_NAME = "vibe_search"
+
     def __init__(
         self,
         notes: List[Dict[str, Any]],
@@ -69,8 +91,17 @@ class VibeSearch:
         self.image_note_map = {}  # Maps image paths to note indices
         self.reranker = None  # Set externally for cross-encoder reranking
         self.entity_service = None  # Set externally for entity-based retrieval
+        # New-path bookkeeping (populated by build/apply; empty under legacy path)
+        self.vector_store: Optional[VectorStore] = None
+        self.sqlite_store = None
+        self._id_to_note_idx: Dict[str, int] = {}
+        self._id_to_content_hash: Dict[str, str] = {}
         if settings.enable_image_search:
             self._init_image_search()
+
+    # ------------------------------------------------------------------ #
+    # Image search init (unchanged)
+    # ------------------------------------------------------------------ #
 
     def _init_image_search(self):
         """Initialize image search capabilities by processing all images in notes."""
@@ -100,6 +131,10 @@ class VibeSearch:
                             if image_path not in self.image_note_map:
                                 self.image_note_map[image_path] = []
                             self.image_note_map[image_path].append(i)
+
+    # ------------------------------------------------------------------ #
+    # Legacy embedding cache (whole-corpus hash → .npz). Used by __init__.
+    # ------------------------------------------------------------------ #
 
     def load_or_compute_embeddings(self, force_refresh: bool = False):
         """Load embeddings from cache if valid or compute and save new ones.
@@ -191,6 +226,217 @@ class VibeSearch:
             # Fall back to computing new embeddings
             self.embeddings = self.model.encode(self.texts)
 
+    # ------------------------------------------------------------------ #
+    # Store-backed incremental interface (build / apply)
+    # ------------------------------------------------------------------ #
+
+    @classmethod
+    def from_model(
+        cls,
+        model,
+        vector_store: Optional[VectorStore] = None,
+        sqlite_store=None,
+        type_prefixes: Optional[List[str]] = None,
+    ) -> "VibeSearch":
+        """Construct an empty index without the legacy all-at-once build.
+
+        Use this when the corpus is loaded incrementally via :meth:`build` /
+        :meth:`apply` rather than the legacy constructor. Vector I/O goes
+        through ``vector_store`` (keyed by ``content_hash``), so the only time
+        the model runs on a document is when its ``content_hash`` is new.
+        """
+        instance = cls.__new__(cls)
+        instance.notes = []
+        instance.type_prefixes = type_prefixes or []
+        instance.model = model
+        instance.texts = []
+        instance.note_indices = []
+        dim = _model_dim(model)
+        instance.embeddings = np.zeros((0, dim), dtype=np.float32)
+        instance.bm25_index = BM25Index([])
+        instance.image_processor = None
+        instance.image_note_map = {}
+        instance.reranker = None
+        instance.entity_service = None
+        instance.vector_store = vector_store
+        instance.sqlite_store = sqlite_store
+        instance._id_to_note_idx = {}
+        instance._id_to_content_hash = {}
+        if settings.enable_image_search:
+            instance._init_image_search()
+        return instance
+
+    def build(
+        self,
+        documents: List[Document],
+        vector_store: Optional[VectorStore] = None,
+        sqlite_store=None,
+    ) -> None:
+        """Full rebuild from content-addressed documents.
+
+        Embeddings are stored in ``vector_store`` keyed by each document's
+        ``content_hash``; a second :meth:`build` with the same documents reuses
+        every stored vector and encodes none (the A4 idempotence property).
+        """
+        if vector_store is not None:
+            self.vector_store = vector_store
+        if sqlite_store is not None:
+            self.sqlite_store = sqlite_store
+        if self.vector_store is None:
+            raise RuntimeError(
+                "VibeSearch.build() requires a vector_store — pass one or use from_model(...)."
+            )
+
+        # Reset corpus state.
+        self.notes = []
+        self.texts = []
+        self.note_indices = []
+        self._id_to_note_idx = {}
+        self._id_to_content_hash = {}
+
+        for doc in documents:
+            self._index_document(doc)
+
+        self._rebuild_embeddings_from_store()
+        self.bm25_index = BM25Index(self.notes)
+        self._record_index_state()
+
+    def apply(
+        self,
+        change_set: ChangeSet,
+        vector_store: Optional[VectorStore] = None,
+        sqlite_store=None,
+    ) -> None:
+        """Incremental update: embed only ``added ∪ updated``, drop ``removed``.
+
+        ``unchanged`` is left untouched in the vector store (its vectors are
+        already correct); we only rebuild the in-memory matrix so it lines up
+        with the post-change corpus order.
+        """
+        if vector_store is not None:
+            self.vector_store = vector_store
+        if sqlite_store is not None:
+            self.sqlite_store = sqlite_store
+        if self.vector_store is None:
+            raise RuntimeError(
+                "VibeSearch.apply() requires a vector_store — pass one or use from_model(...)."
+            )
+
+        removed_ids = {d.id for d in change_set.removed}
+        if removed_ids:
+            # Drop vectors for removed docs and prune them from the corpus.
+            removed_hashes = [
+                self._id_to_content_hash.pop(rid)
+                for rid in removed_ids
+                if rid in self._id_to_content_hash
+            ]
+            if removed_hashes:
+                self.vector_store.drop(removed_hashes)
+            for rid in removed_ids:
+                self._id_to_note_idx.pop(rid, None)
+            self.notes = [n for n in self.notes if n.get("id") not in removed_ids]
+            self._id_to_note_idx = {n.get("id", ""): i for i, n in enumerate(self.notes)}
+
+        # ``updated`` are already in the corpus (same id, content changed) —
+        # drop their stale content_hash vector and overwrite the note in place.
+        for doc in change_set.updated:
+            idx = self._id_to_note_idx.get(doc.id)
+            if idx is None:
+                # Not present (e.g. first import after migration) — treat as add.
+                self._index_document(doc)
+                continue
+            old_hash = self._id_to_content_hash.get(doc.id)
+            if old_hash is not None and old_hash != doc.content_hash:
+                self.vector_store.drop([old_hash])
+            self.notes[idx] = self._doc_to_note_dict(doc)
+            self._id_to_content_hash[doc.id] = doc.content_hash
+
+        for doc in change_set.added:
+            self._index_document(doc)
+
+        # ``unchanged`` is intentionally left as-is (count only, no Documents).
+        self._rebuild_embeddings_from_store()
+        self.bm25_index = BM25Index(self.notes)
+        self._record_index_state()
+
+    def _index_document(self, doc: Document) -> None:
+        """Append a document to the corpus and track its content_hash."""
+        note_idx = len(self.notes)
+        self.notes.append(self._doc_to_note_dict(doc))
+        self._id_to_note_idx[doc.id] = note_idx
+        self._id_to_content_hash[doc.id] = doc.content_hash
+
+    def _doc_to_note_dict(self, doc: Document) -> Dict[str, Any]:
+        """Convert a Document to the dict shape this index and search() expect."""
+        title = doc.title or ""
+        for prefix in self.type_prefixes:
+            pattern = r"^\s*" + re.escape(prefix) + r"\s*[:\-—]\s+"
+            title = re.sub(pattern, "", title, flags=re.IGNORECASE)
+        body = doc.body or ""
+        cleaned = clean_note(f"{title} {body}".strip())
+        return {
+            "id": doc.id,
+            "title": title,
+            "content": body,
+            "cleaned_text": cleaned,
+            "created": doc.created_at.isoformat() if doc.created_at else "",
+            "edited": doc.edited_at.isoformat() if doc.edited_at else "",
+            "labels": list(doc.labels),
+        }
+
+    def _rebuild_embeddings_from_store(self) -> None:
+        """Rebuild ``self.texts``/``note_indices``/``self.embeddings`` from the
+        current corpus, reusing stored vectors and encoding only the missing
+        ``content_hash`` rows in a single batch.
+        """
+        self.texts = []
+        self.note_indices = []
+        live_hashes: List[str] = []
+        for i, note in enumerate(self.notes):
+            cleaned = note.get("cleaned_text") or clean_note(
+                f"{note.get('title', '')} {note.get('content', '')}".strip()
+            )
+            if not cleaned.strip():
+                continue
+            doc_id = note.get("id", "")
+            chash = self._id_to_content_hash.get(doc_id) or _hash_text(cleaned)
+            self._id_to_content_hash[doc_id] = chash
+            self.texts.append(cleaned)
+            self.note_indices.append(i)
+            live_hashes.append(chash)
+
+        if not self.texts:
+            self.embeddings = np.zeros((0, self.vector_store.dim), dtype=np.float32)
+            return
+
+        cached = self.vector_store.get(live_hashes)
+        missing_idx = [i for i, h in enumerate(live_hashes) if h not in cached]
+        if missing_idx:
+            missing_texts = [self.texts[i] for i in missing_idx]
+            missing_hashes = [live_hashes[i] for i in missing_idx]
+            new_vecs = np.asarray(self.model.encode(missing_texts), dtype=np.float32)
+            self.vector_store.upsert({h: v for h, v in zip(missing_hashes, new_vecs)})
+            for h, v in zip(missing_hashes, new_vecs):
+                cached[h] = v
+
+        self.embeddings = np.stack([cached[h] for h in live_hashes]).astype(np.float32)
+
+    def _record_index_state(self) -> None:
+        """Write this index's staleness row, if a SQLiteStore is attached."""
+        if self.sqlite_store is None:
+            return
+        # A stable per-corpus fingerprint: hash of the live content_hashes.
+        corpus_hash = _hash_text("\n".join(sorted(self._id_to_content_hash.values())))
+        self.sqlite_store.set_index_state(
+            self.INDEX_NAME,
+            content_hash=corpus_hash,
+            row_count=len(self._id_to_content_hash),
+        )
+
+    # ------------------------------------------------------------------ #
+    # Search
+    # ------------------------------------------------------------------ #
+
     def _keyword_search(self, query: str) -> List[Tuple[int, float]]:
         """Perform multilingual BM25 keyword search."""
         if not hasattr(self, "bm25_index") or self.bm25_index is None:
@@ -217,15 +463,12 @@ class VibeSearch:
                 fused[note_idx] = fused.get(note_idx, 0.0) + 1.0 / (k + rank + 1)
         return fused
 
-    def _image_search(self, query: str) -> Dict[int, float]:
-        """
-        Search for notes with images matching the query.
+    def _image_search(self, query: str) -> Dict[int, Tuple[float, str]]:
+        """Search notes with images matching the query.
 
-        Args:
-            query: The search query
-
-        Returns:
-            Dictionary mapping note indices to image match scores
+        Returns ``{note_idx: (score, image_path)}``. A6 fix: this method no
+        longer mutates ``self.notes`` — image-match metadata is returned to the
+        caller, which attaches it to per-request result copies only.
         """
         # If image search isn't enabled or processor isn't initialized, return empty result
         if not settings.enable_image_search or not self.image_processor:
@@ -238,17 +481,15 @@ class VibeSearch:
         if not image_matches:
             return {}
 
-        # Map image matches to notes and combine scores
-        note_scores = {}
+        # Map image matches to notes and keep the highest score per note.
+        note_scores: Dict[int, Tuple[float, str]] = {}
         for image_path, score in image_matches:
             # Find notes containing this image
             if image_path in self.image_note_map:
                 for note_idx in self.image_note_map[image_path]:
-                    # Keep highest score if multiple images in the same note match
-                    if note_idx not in note_scores or score > note_scores[note_idx]:
-                        # Store the reason for the match
-                        self.notes[note_idx]["matched_image"] = image_path
-                        note_scores[note_idx] = score
+                    cur = note_scores.get(note_idx)
+                    if cur is None or score > cur[0]:
+                        note_scores[note_idx] = (score, image_path)
 
         return note_scores
 
@@ -256,14 +497,16 @@ class VibeSearch:
         self, image_file: Union[str, BinaryIO], max_results: int = None
     ) -> List[Dict[str, Any]]:
         """
-        Search notes using an image as a query.
+        Search notes using an image as the query.
 
         Args:
             image_file: Image file path or file-like object to search with
             max_results: Maximum number of results to return
 
         Returns:
-            Sorted list of matching notes
+            Sorted list of matching notes. A6 fix: ``matched_image`` /
+            ``has_matching_images`` are attached to per-request result copies
+            only; the shared ``self.notes`` dicts are not mutated.
         """
         # If image search isn't enabled or processor isn't initialized, return empty result
         if not settings.enable_image_search or not self.image_processor:
@@ -276,25 +519,22 @@ class VibeSearch:
         if not image_matches:
             return []
 
-        # Map image matches to notes and combine scores
-        note_scores = {}
+        # Map image matches to notes and keep the highest score per note.
+        note_scores: Dict[int, Tuple[float, str]] = {}
         for image_path, score in image_matches:
-            # Find notes containing this image
             if image_path in self.image_note_map:
                 for note_idx in self.image_note_map[image_path]:
-                    # Keep highest score if multiple images in the same note match
-                    if note_idx not in note_scores or score > note_scores[note_idx]:
-                        # Store the reason for the match
-                        self.notes[note_idx]["matched_image"] = image_path
-                        note_scores[note_idx] = score
+                    cur = note_scores.get(note_idx)
+                    if cur is None or score > cur[0]:
+                        note_scores[note_idx] = (score, image_path)
 
-        # Create results list
+        # Build per-request result objects.
         results = []
-        for note_idx, score in note_scores.items():
+        for note_idx, (score, image_path) in note_scores.items():
             if score > settings.image_search_threshold:
                 note = self.notes[note_idx].copy()
                 note["score"] = float(score)
-                # Add a flag to indicate this note has matching images
+                note["matched_image"] = image_path
                 note["has_matching_images"] = True
                 results.append(note)
 
@@ -304,7 +544,13 @@ class VibeSearch:
         return results[: max_results or settings.max_results]
 
     def search(self, query: str, max_results: int = None) -> List[Dict[str, Any]]:
-        """Search notes using RRF fusion of semantic, BM25 keyword, and image signals."""
+        """Search notes using RRF fusion of semantic, BM25 keyword, and image signals.
+
+        A6 fix: ``matched_image`` / ``has_matching_images`` are attached to
+        per-request result copies only; the shared ``self.notes`` dicts are no
+        longer mutated, so :meth:`search` is safe to call concurrently with
+        anything else that reads ``self.notes``.
+        """
         if not query.strip():
             return []
 
@@ -321,9 +567,9 @@ class VibeSearch:
         # Get BM25 keyword search scores (already as [(note_idx, score)])
         keyword_ranked = self._keyword_search(query)
 
-        # Get image search scores if enabled
-        image_score_map = self._image_search(query)
-        image_ranked = [(idx, score) for idx, score in image_score_map.items()]
+        # Get image search scores if enabled. A6: _image_search no longer mutates notes.
+        image_matches = self._image_search(query)
+        image_ranked = [(idx, score) for idx, (score, _) in image_matches.items()]
 
         # RRF fusion across all available signals
         ranked_lists = [semantic_ranked, keyword_ranked]
@@ -344,22 +590,17 @@ class VibeSearch:
 
         fused_scores = self.rrf_fuse(ranked_lists)
 
-        # Track which notes have image matches for UI
-        for note_idx in image_score_map:
-            self.notes[note_idx]["has_matching_images"] = True
-
-        # Build result set from all notes that appeared in any signal
-        keyword_idx_set = {idx for idx, _ in keyword_ranked}
-        image_idx_set = set(image_score_map.keys())
-
+        # Build per-request result objects. Image-match metadata is attached to
+        # the *copy* returned to this caller only, never to the shared dict.
         results = []
         for note_idx, fused_score in sorted(fused_scores.items(), key=lambda x: x[1], reverse=True):
-            # Clean up image flag for notes without matches
-            if note_idx not in image_idx_set and "has_matching_images" in self.notes[note_idx]:
-                del self.notes[note_idx]["has_matching_images"]
-
             note = self.notes[note_idx].copy()
             note["score"] = float(fused_score)
+            if note_idx in image_matches:
+                score, image_path = image_matches[note_idx]
+                note["has_matching_images"] = True
+                if image_path:
+                    note["matched_image"] = image_path
             results.append(note)
 
         # Cross-encoder reranking if available. Only the top RERANK_CANDIDATE_WINDOW
@@ -378,5 +619,30 @@ class VibeSearch:
         query_embedding = self.model.encode([query])[0]
 
         # Calculate cosine similarities
-        similarities = cosine_similarity([query_embedding], self.embeddings)[0]
+        embeddings = np.asarray(self.embeddings)
+        if embeddings.shape[0] == 0:
+            return np.zeros(0, dtype=np.float32)
+        similarities = cosine_similarity([query_embedding], embeddings)[0]
         return similarities
+
+
+def _model_dim(model) -> int:
+    """Best-effort embedding dimension lookup across SentenceTransformer / stubs."""
+    for attr in ("get_sentence_embedding_dimension",):
+        fn = getattr(model, attr, None)
+        if callable(fn):
+            try:
+                dim = int(fn())
+                if dim > 0:
+                    return dim
+            except Exception:
+                pass
+    # Fall back to a probe encode.
+    probe = model.encode(["probe"])
+    probe = np.asarray(probe)
+    return int(probe.shape[-1]) if probe.ndim > 1 else 1
+
+
+def _hash_text(text: str) -> str:
+    """Stable content hash for ad-hoc keys (matches domain.content_hash shape)."""
+    return hashlib.blake2s(text.encode("utf-8"), digest_size=16).hexdigest()

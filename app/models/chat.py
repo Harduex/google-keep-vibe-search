@@ -12,7 +12,8 @@ class ChatRequest(BaseModel):
     messages: List[ChatMessage]
     stream: bool = False
     useNotesContext: bool = True
-    topic: Optional[str] = None
+    tags: Optional[List[str]] = None
+    date_range: Optional[Dict[str, str]] = None
     session_id: Optional[str] = None
 
 

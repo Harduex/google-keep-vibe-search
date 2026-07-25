@@ -24,16 +24,31 @@ class RetrievalOrchestrator:
         self.max_context_notes = max_context_notes
 
     def get_relevant_notes(
-        self, query: str, max_notes: Optional[int] = None
+        self,
+        query: str,
+        max_notes: Optional[int] = None,
+        tags: Optional[List[str]] = None,
+        date_range: Optional[Dict[str, str]] = None,
     ) -> List[Dict[str, Any]]:
         max_notes = max_notes or self.max_context_notes
-        return self.search_service.search(query, max_results=max_notes)
+        import inspect
+
+        kwargs = {}
+        sig = inspect.signature(self.search_service.search)
+        if "tags" in sig.parameters or any(
+            p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
+        ):
+            kwargs["tags"] = tags
+            kwargs["date_range"] = date_range
+        return self.search_service.search(query, max_results=max_notes, **kwargs)
 
     async def get_context(
         self,
         messages: List[Dict[str, str]],
-        topic: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        date_range: Optional[Dict[str, str]] = None,
         previous_note_ids: Optional[List[str]] = None,
+        **kwargs,
     ) -> Tuple[List[Dict[str, Any]], str]:
         """Multi-signal retrieval pipeline. Returns (notes, gap_status)."""
         latest_message = ""
@@ -42,7 +57,7 @@ class RetrievalOrchestrator:
                 latest_message = msg["content"]
                 break
 
-        if not latest_message and not topic:
+        if not latest_message:
             return [], "sufficient"
 
         # Prompt decomposition: break complex queries into sub-queries
@@ -52,7 +67,12 @@ class RetrievalOrchestrator:
 
         # Note-level search (primary query)
         primary_results = (
-            self.get_relevant_notes(latest_message, max_notes=self.max_context_notes + 5)
+            self.get_relevant_notes(
+                latest_message,
+                max_notes=self.max_context_notes + 5,
+                tags=tags,
+                date_range=date_range,
+            )
             if latest_message
             else []
         )
@@ -61,7 +81,9 @@ class RetrievalOrchestrator:
         decomposed_results = []
         if len(sub_queries) > 1:
             for sq in sub_queries:
-                decomposed_results.extend(self.get_relevant_notes(sq, max_notes=5))
+                decomposed_results.extend(
+                    self.get_relevant_notes(sq, max_notes=5, tags=tags, date_range=date_range)
+                )
 
         # Query collapse: skip context retrieval if it duplicates the primary query
         context_results = []
@@ -69,12 +91,9 @@ class RetrievalOrchestrator:
         if len(user_messages) > 1:
             recent_context = " ".join(user_messages[-3:])
             if not self._is_duplicate_query(recent_context, [latest_message]):
-                context_results = self.get_relevant_notes(recent_context, max_notes=5)
-
-        topic_results = []
-        if topic:
-            if not self._is_duplicate_query(topic, [latest_message]):
-                topic_results = self.get_relevant_notes(topic, max_notes=5)
+                context_results = self.get_relevant_notes(
+                    recent_context, max_notes=5, tags=tags, date_range=date_range
+                )
 
         # Chunk-level search for more precise retrieval on long notes
         chunk_results = []
@@ -86,7 +105,6 @@ class RetrievalOrchestrator:
         merged = self._merge_and_rerank(
             primary_results,
             context_results,
-            topic_results,
             previous_note_ids,
             chunk_results=chunk_results,
             decomposed_results=decomposed_results,
@@ -110,7 +128,6 @@ class RetrievalOrchestrator:
         self,
         primary: List[Dict],
         context: List[Dict],
-        topic: List[Dict],
         previous_ids: Optional[List[str]],
         chunk_results: Optional[List[Dict]] = None,
         decomposed_results: Optional[List[Dict]] = None,
@@ -124,8 +141,6 @@ class RetrievalOrchestrator:
         ranked_lists = [to_ranked(primary)]
         if context:
             ranked_lists.append(to_ranked(context))
-        if topic:
-            ranked_lists.append(to_ranked(topic))
         if chunk_results:
             ranked_lists.append(to_ranked(chunk_results))
         if decomposed_results:
@@ -152,7 +167,7 @@ class RetrievalOrchestrator:
 
         # Dedup by id
         note_map: Dict[str, Dict] = {}
-        for notes_list in [primary, context, topic, chunk_results or [], decomposed_results or []]:
+        for notes_list in [primary, context, chunk_results or [], decomposed_results or []]:
             for note in notes_list:
                 nid = note.get("id", "")
                 if nid not in note_map:

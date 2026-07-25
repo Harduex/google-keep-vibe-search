@@ -97,7 +97,8 @@ async def chat(
             response_text, relevant_notes = await chat_service.generate_chat_completion(
                 messages,
                 use_notes_context=request.useNotesContext,
-                topic=request.topic,
+                tags=request.tags,
+                date_range=request.date_range,
             )
             return ChatResponse(
                 response=response_text,
@@ -108,7 +109,8 @@ async def chat(
                 chat_service.stream_chat_with_protocol(
                     messages,
                     use_notes_context=request.useNotesContext,
-                    topic=request.topic,
+                    tags=request.tags,
+                    date_range=request.date_range,
                     session_id=request.session_id,
                 ),
                 media_type="application/x-ndjson",

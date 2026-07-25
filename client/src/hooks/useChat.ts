@@ -106,7 +106,9 @@ export const useChat = () => {
   const [modelName, setModelName] = useState<string | null>(null);
   const [modelInfo, setModelInfo] = useState<ChatModelInfo | null>(null);
   const [useNotesContext, setUseNotesContext] = useState<boolean>(true);
-  const [topic, setTopic] = useState<string>('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [dateRange, setDateRange] = useState<{ start?: string; end?: string }>({});
+  const [availableTags, setAvailableTags] = useState<{ name: string; count: number }[]>([]);
   const [currentPhase, setCurrentPhase] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [agentSteps, setAgentSteps] = useState<AgentStep[]>([]);
@@ -156,6 +158,20 @@ export const useChat = () => {
       // eslint-disable-next-line no-console
       console.error('Error fetching sessions:', err);
     }
+  }, []);
+
+  useEffect(() => {
+    const fetchTags = async () => {
+      try {
+        const res = await fetch(API_ROUTES.TAGS);
+        const data = await res.json();
+        setAvailableTags(data.tags || []);
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('Error fetching tags:', err);
+      }
+    };
+    fetchTags();
   }, []);
 
   // Load sessions on mount
@@ -305,7 +321,6 @@ export const useChat = () => {
         messages: [...messages, userMessage].map(({ role, content }) => ({ role, content })),
         stream: true,
         useNotesContext,
-        topic: topic.trim() || undefined,
         session_id: currentSessionId || undefined,
       };
 
@@ -506,29 +521,8 @@ export const useChat = () => {
         setIsLoading(false);
       }
     },
-    [
-      messages,
-      stopGenerating,
-      useNotesContext,
-      topic,
-      sessionId,
-      createSession,
-      saveSessionMessages,
-    ],
+    [messages, stopGenerating, useNotesContext, sessionId, createSession, saveSessionMessages],
   );
-
-  const clearChat = useCallback(() => {
-    stopGenerating();
-    setSessionId(null);
-    setMessages([]);
-    setRelevantNotes([]);
-    setConflicts([]);
-    setCurrentPhase(null);
-    setSuggestions([]);
-    setAgentSteps([]);
-    setGroundingResult(null);
-    setError(null);
-  }, [stopGenerating]);
 
   const newChat = useCallback(() => {
     stopGenerating();
@@ -543,6 +537,8 @@ export const useChat = () => {
     setError(null);
   }, [stopGenerating]);
 
+  const clearChat = newChat;
+
   const toggleNotesContext = useCallback(() => {
     setUseNotesContext((prev) => !prev);
   }, []);
@@ -556,12 +552,15 @@ export const useChat = () => {
     modelName,
     modelInfo,
     useNotesContext,
-    topic,
+    selectedTags,
+    setSelectedTags,
+    dateRange,
+    setDateRange,
+    availableTags,
     currentPhase,
     suggestions,
     agentSteps,
     groundingResult,
-    setTopic,
     sendMessage,
     clearChat,
     stopGenerating,

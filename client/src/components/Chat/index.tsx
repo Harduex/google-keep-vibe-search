@@ -16,7 +16,6 @@ interface ChatProps {
 
 export const Chat = ({ query, onShowRelated }: ChatProps) => {
   const [inputValue, setInputValue] = useState('');
-  const [showTopicInput, setShowTopicInput] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatMessagesRef = useRef<HTMLDivElement>(null);
@@ -33,8 +32,6 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
     modelInfo,
     useNotesContext,
     toggleNotesContext,
-    topic,
-    setTopic,
     currentPhase,
     suggestions,
     agentSteps,
@@ -132,17 +129,6 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInputValue(e.target.value);
-  }, []);
-
-  const handleTopicChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      setTopic(e.target.value);
-    },
-    [setTopic],
-  );
-
-  const toggleTopicInput = useCallback(() => {
-    setShowTopicInput((prev) => !prev);
   }, []);
 
   const handleKeyDown = useCallback(
@@ -331,39 +317,6 @@ export const Chat = ({ query, onShowRelated }: ChatProps) => {
           </div>
 
           <form className="chat-input" onSubmit={handleSubmit}>
-            <div className="chat-input-controls">
-              {useNotesContext && (
-                <button
-                  type="button"
-                  className="topic-toggle-button"
-                  onClick={toggleTopicInput}
-                  title={showTopicInput ? 'Hide topic input' : 'Show topic input'}
-                  aria-expanded={showTopicInput}
-                >
-                  <span className="material-icons">
-                    {showTopicInput ? 'expand_less' : 'expand_more'}
-                  </span>
-                  <span>Topic</span>
-                </button>
-              )}
-            </div>
-
-            {useNotesContext && showTopicInput && (
-              <div className="topic-input-container">
-                <input
-                  id="topic-input"
-                  type="text"
-                  value={topic}
-                  onChange={handleTopicChange}
-                  placeholder="Optional: (leave empty to use your question)"
-                  disabled={isLoading}
-                />
-                <div className="topic-help-text">
-                  Specify a topic to search for context in your notes
-                </div>
-              </div>
-            )}
-
             <div className="input-wrapper">
               <textarea
                 id="chat-message-input"

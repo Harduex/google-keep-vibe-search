@@ -90,6 +90,21 @@ half-applied (§8).
 
 ## 4. Gates
 
+**A gate is evidence, not a claim.** The post-wave-4 review (`PLANS.md` § Post-wave-4 review) found
+a wave barrier declared on a gate that could not have been green, three "done" features that did not
+work, and a benchmark that compared hardcoded numbers to themselves. Every one of those passed
+because a *claim* about a gate was accepted in place of its *output*. So:
+
+- Paste the command and its result. "make check → exit 0" without the counts is not evidence.
+- A checkpoint naming `make X` is satisfied by running `make X`, not by the target existing — and
+  certainly not by the target *not* existing.
+- A checkpoint saying "test T asserts P" is satisfied by grepping T for P.
+- A new regression test must be shown red against the unfixed code. If you cannot make it fail, you
+  have not characterised the bug.
+- If a checkpoint turns out to be unmeetable, say so and stop. Reporting a task `done` with an
+  unmet checkpoint is the one failure this plan cannot absorb, because every later wave is built on
+  it.
+
 Three levels, all mandatory in this order:
 
 1. **The floor — `make check`** (lint + format check + typecheck + both test suites, non-mutating)
@@ -123,6 +138,13 @@ fictions. When a spec says "no regression", satisfy the tier its checkpoint name
 an **improvement**, that claim needs tier 2 (`make bench-compare` against the committed baseline in
 `bench/baselines/`). Re-baselining is a deliberate act in its own commit (`make bench-accept`), never
 a side effect of a benchmark run.
+
+**There is no committed tier-2 baseline yet.** The ones T36 shipped were fabricated — round numbers
+its runners reproduced verbatim — and are deleted along with those runners. `make bench-compare`
+exits non-zero while no baseline exists, because an unmeasured run is not a passing run. Any task
+whose checkpoint needs tier 2 (T19's parity gate, and the "results unchanged" claims in T25, T26,
+T27, T28) must first establish one: `make bench` on a quiet machine, read the tables, then
+`make bench-accept` in its own commit. See `bench/README.md`.
 
 **Every bug-fix task ships a regression test that fails before the fix and passes after.** State
 both results in the commit body. Most of the wave-2 bugs survived for months precisely because

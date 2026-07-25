@@ -3,7 +3,7 @@
 **Paste this file's contents to a fresh agent to resume the plan.** It is written for someone with
 none of the originating conversation's context.
 
-**Last updated:** 2026-07-25, at the wave-4 barrier · `HEAD` = `24ff6d8` · **resume at wave 5**.
+**Last updated:** 2026-07-25, after the post-wave-4 review · **resume at wave 5**.
 
 > Keep this current: refresh it at every wave barrier, in the barrier commit, alongside the
 > `PLANS.md` § Status update. A stale resume file is worse than none — it will confidently point the
@@ -21,26 +21,14 @@ Precedence: `AGENTS.md` > EXECUTION-PROTOCOL > wave file > PLANS.md.
 
 ## State
 
-Waves 1–4 complete (26 task commits + 7 orchestrator commits), tree clean, branch `master`:
+Waves 1–4 complete, then reviewed and repaired. Tree clean, branch `master`, nothing ever pushed
+(`origin/master` is still at `6dab505`).
 
-```
-24ff6d8 chore(plan): complete Wave 4 barrier and remove wave-4-deprecations spec      <- HEAD
-cb73ef5 refactor(chat): single agentic path, remove the legacy mode flag (T20)
-150bcc3 refactor(agent): retrieve through the shared orchestrator (T19)
-56f3b48 refactor: delete unused AgentTools and repair doc references (T17, T18)
-6e3d546 refactor(chat): drop the no-op topic input for tag and date scoping (T16)
-ba80742 refactor: remove KMeans clusters tab, colour the 3D map by tag (T15)
-031d05a chore(plan): complete Wave 3 barrier and remove wave-3-safety-net spec
-2addd76 test: privacy-safe categorization eval and fix the make eval target (T14)
-```
-
-T01–T20, T33, T35, T36 are `done` in § Task index and § Status. Waves 5–7 untouched.
-**Nothing has ever been pushed** — `origin/master` is still at `6dab505`.
-
-Barrier gate on a clean tree: `GOOGLE_KEEP_PATH=. make check` → **exit 0**, 220 pytest passed
-(181 at wave 1 start), 11 vitest files / 57 tests, eslint 0 errors (2 pre-existing warnings in
-`GalleryContext.tsx`, `ImageGallery/index.tsx`), tsc clean. PLANS.md invariants: overlaps 0,
-46 findings none unowned.
+**Read `PLANS.md` § Post-wave-4 review before starting wave 5.** A review of all 31 wave-1–4
+commits found five tasks marked `done` whose deliverable did not work, plus two protocol
+deviations — including a barrier declared on a red gate and a benchmark tier that reported
+hardcoded numbers. All are fixed; the § Task index rows say which tasks were completed in review.
+The lesson is recorded there and applies directly to how waves 5–7 should be gated.
 
 ## Next steps, in order
 
@@ -50,9 +38,40 @@ Barrier gate on a clean tree: `GOOGLE_KEEP_PATH=. make check` → **exit 0**, 22
    **Round 3 = T24 (Lane L4 — Ingest API) · T25 (Lane L5 — Index apply)**.
    **Round 4 = T26 SERIAL (Lane L6 — Cutover)**.
 2. Dispatch Round 1 using the concurrency protocol below.
-3. At the wave-5 barrier (after T26): run `make check` yourself, flip § Status, re-run both § Verification
-   scripts, refresh this file, **delete `wave-5-store.md` in the barrier commit**, then **stop and report**.
-   The owner wants a barrier stop before each new wave.
+3. At the wave-5 barrier (after T26): run `make check` yourself **and paste its output**, flip
+   § Status, re-run both § Verification scripts, refresh this file, **delete `wave-5-store.md` in
+   the barrier commit**, then **stop and report**. The owner wants a barrier stop before each new
+   wave.
+
+## Gate discipline (tightened after the review)
+
+- A task's **checkpoint is the deliverable**. Where it says `make X`, run `make X` and paste the
+  output in the commit body. Where it says a test asserts something, name the test and grep it for
+  the assertion. Wave-2 commits carry a before/after regression proof each — match that bar; wave 3
+  and 4 dropped to bullet summaries and that is precisely where the unverified work turned up.
+- **Never claim an invariant you have not just run.** Both § Verification scripts print their result;
+  paste it.
+- A **new test must be shown to fail** against the unfixed code, or it is not a regression test.
+- Assertions about hermeticity are cheap to get wrong: `tests/test_api_integration.py::
+  test_wired_app_loads_no_real_models` asserts every model in the wired app is a stub. If a change
+  makes it fail, the fixture is loading real weights — fix the patch target, do not relax the test.
+
+## Verified gate, as of this checkpoint
+
+`GOOGLE_KEEP_PATH=. make check` → **exit 0**: 243 pytest passed in 107 s, 12 vitest files /
+64 tests, eslint 0 errors (2 pre-existing warnings in `GalleryContext.tsx`,
+`ImageGallery/index.tsx`), tsc clean, black/isort clean. PLANS.md invariants: `overlaps: 0`,
+`unowned: none` (the coverage script now handles findings the plan split into lettered parts,
+e.g. B3 → B3a/B3b; it previously printed `['B3']` while the barrier notes claimed "none").
+
+The suite went from 220 tests / 170 s to 243 / 107 s: the extra tests are the review's regression
+tests, and the speed-up is real models and a live LLM call leaving the unit suite (the wired
+fixture was loading real NLI weights, and one chat test drove the real agent loop into its step
+timeout).
+
+Tier-1 eval: `make eval-retrieval` (fixture corpus, ~6 s). Tier-2 benchmarks: `make bench-fetch`
+once, then `make bench` / `make bench-compare` — real models over SciFact and 20 Newsgroups, minutes
+and a GPU, never wired into `make check`. See `bench/README.md`.
 
 ## The concurrency protocol — brief every lane agent with this
 
@@ -72,7 +91,8 @@ All lanes share ONE working tree. Lane ownership makes their *edits* disjoint bu
   forbidden from judging or fixing it. The driver adjudicates — `git status` maps dirty paths to
   lanes.
 - Stage explicit paths only. Never `git add -A`/`.`/`-a`; never stash/restore/checkout/reset/clean/
-  amend.
+  amend. (`git checkout <file>` also destroys uncommitted work in that file — use a scratch copy if
+  you need to test against the pre-change version.)
 - Agents touch `PLANS.md` only in the commit phase, and only their own § Task index row. **They leave § Status alone; the driver flips it.**
 - Commit message first line = the spec's `Commit:` line verbatim. **No trailers.** One task = one
   commit, straight to `master`.
@@ -88,10 +108,13 @@ All lanes share ONE working tree. Lane ownership makes their *edits* disjoint bu
   (LM Studio), so notes never leave the machine.
 - **`github.com/Harduex/deep-semantic-search` is NOT adopted** (owner decision, 2026-07-25).
 - **The owner may read `.env`; agents may not.** Use the config object.
+- **No benchmark baseline is committed yet.** The placeholders were fabricated and are deleted; a
+  real one has to be produced by `make bench` and accepted deliberately via `make bench-accept`, in
+  its own commit. Until then `make bench-compare` exits non-zero by design.
 
 ## Key locations & commands
 
-- `PLANS.md` — wave graph, ownership matrix, § Task index (State column), § Status.
+- `PLANS.md` — wave graph, ownership matrix, § Task index (State column), § Status, § Post-wave-4 review.
 - `EXECUTION-PROTOCOL.md` — §1.3 dispatch rounds, §2 ownership, §3 commits + wave-file deletion policy, §4 gates.
 - Remaining specs: `wave-5-store.md`, `wave-6-unify-and-quality.md`, `wave-7-release-readiness.md`. Waves 1–4 files are deleted (policy).
 - Gate: `GOOGLE_KEEP_PATH=. make check`.

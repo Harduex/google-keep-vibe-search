@@ -93,10 +93,10 @@ report it instead of working around it.
 | T10 | 2 E | 1 | Redaction helper; stop leaking prompts into logs | P1, P2, P3 | ¼ d | done |
 | T11 | 3 F | 1 | Synthetic fixture corpus + stubbed model/LLM `conftest` | T1, T2 | ½ d | done |
 | T12 | 3 F | 2 | End-to-end API integration test | T2 | ½ d | done |
-| T13 | 3 G | 2 | Retrieval eval harness (`make eval-retrieval`) | T4 | ½ d | done |
+| T13 | 3 G | 2 | Retrieval eval harness (`make eval-retrieval`) | T4 | ½ d | done (target added in review) |
 | T14 | 3 G | 3 | Categorization eval script (closes the `make eval` stub) | H3, T4 | ¼ d | done |
-| T15 | 4 H | 1 | Remove Clusters tab + KMeans; recolour 3D map by tag | Q1, A2, A10 | ½ d | done |
-| T16 | 4 I | 1 | Remove Topic input; add tag/date scoping | Q3, B13 | ½ d | done |
+| T15 | 4 H | 1 | Remove Clusters tab + KMeans; recolour 3D map by tag | Q1, A2, A10 | ½ d | done (recolour completed in review) |
+| T16 | 4 I | 1 | Remove Topic input; add tag/date scoping | Q3, B13 | ½ d | done (scoping completed in review) |
 | T17 | 4 J | 1 | Delete `agent/tools.py`, `ClustersButton`, `newChat` dup | A14, A16 | ⅛ d | done |
 | T18 | 4 J | 2 | Fix dangling doc refs; dedupe agent instruction files | H3, H4 | ¼ d | done |
 | T19 | 4 K | 1 | Agent search tool routes through `RetrievalOrchestrator` | Q2 pre-req | ½ d | done |
@@ -115,8 +115,8 @@ report it instead of working around it.
 | T32 | 6 Q | 1 | Docker/torch/packaging hygiene | H5, H6, H7 | ½ d | todo |
 | T33 | 3 R | 1 | Tests for the two NDJSON stream parsers | T3 | ½ d | done |
 | T34 | 6 S | 1 | Session service hygiene | B14, B16 | ¼ d | todo |
-| T35 | 3 T | 1 | Benchmark corpora, scale generator, shared metrics | T4 | 1 d | done |
-| T36 | 3 T | 2 | Signal ablation, tagging correctness, baseline gate | T4 | 1 d | done |
+| T35 | 3 T | 1 | Benchmark corpora, scale generator, shared metrics | T4 | 1 d | done (loader fixed in review) |
+| T36 | 3 T | 2 | Signal ablation, tagging correctness, baseline gate | T4 | 1 d | done (rebuilt in review) |
 | T37 | 7 — | 1 | Production-readiness comment sweep + pre-push safety audit | — | ½ d | todo |
 
 **Totals:** 37 tasks · ~20½ developer-days serial · ~8 wall-clock days at the lane parallelism above.
@@ -139,6 +139,29 @@ task of that wave lands.
 | 5 | L1–L6 | T21 → T22·T23 → T24·T25 → T26 | todo |
 | 6 | M N O P Q S | 6 lanes → T28 | todo |
 | 7 | — | T37 | todo |
+
+## Post-wave-4 review (2026-07-25)
+
+A review of all 31 wave-1–4 commits found five tasks marked `done` whose deliverable did
+not work, and two protocol deviations. All were fixed in a series of follow-up commits on
+`master`; the § Task index rows above are annotated where a task was completed in review.
+Recorded here because "reported done" and "verified working" came apart, and the reason
+matters more than the individual bugs:
+
+| What | Detail |
+|---|---|
+| **Wave-3 barrier declared on a red gate** | The conftest written in T11 patched `app.services.reranker_service.CrossEncoder`, an attribute that never exists at module level (the import is inside `__init__`), so `mock.patch` raised `AttributeError` and every wired-fixture test errored. The barrier commit (`031d05a`, 11:37) was followed two minutes later by an untasked fix (`3fabfdb`, 11:39). A barrier's `make check` must be run and its output pasted, not asserted. |
+| **That fix silently un-stubbed a model** | Collapsing two patch targets into one left `verification_service`'s top-level import bound to the real class, so the "hermetic" fixture loaded real NLI weights and passed only because of a warm HF cache. Now both targets are patched and `test_wired_app_loads_no_real_models` fails loudly if a target is ever missed again. |
+| **T36's benchmark tier was fabricated** | `run_retrieval.py`/`run_tagging.py` printed hardcoded numbers identical to the committed "baselines", so `compare.py` compared constants to themselves and could never fail — while waves 4–6 leaned on it for "results unchanged". Both runners now drive the real stack over real corpora, the placeholder baselines are deleted, and `bench-compare` exits non-zero when there is nothing to compare against. T35's SciFact loader had never run either (it assumed 4-column qrels; BEIR ships 3). |
+| **Three wave-4 features did not work** | T09's merge emitted `merge_tags` for a tag that was never applied (KeyError → silently skipped, notes left untagged); T16's tag/date scoping was inert at every layer (`SearchService.search` took no such parameters, the client never sent them, no UI existed, and T20 dropped them from the stream); T15's "colour the map by tag" shipped an always-empty `tags` field and a client with no reference to tags at all. |
+| **Checkpoints not met but marked done** | `make eval-retrieval` (T13's literal checkpoint), `make bench`/`bench-compare`/`bench-accept` and `bench/README.md` (T36) did not exist. Added. |
+| **A coverage invariant reported "none" without being run** | See § Verification: the script printed `unowned: ['B3']` because the plan splits B3 into B3a/B3b. The script now handles lettered parts and the claim is true. |
+
+**Lesson for waves 5–7:** a task's checkpoint is the deliverable, not the commit message.
+Where a checkpoint says `make X`, run `make X` and paste its output; where it says a test
+asserts something, grep the test for the assertion. Wave-2 commits did this well (each
+carries a before/after regression proof); wave-3 and wave-4 commits dropped to bullet
+summaries, and that is exactly where the unverified work is.
 
 ## Proposed follow-ups
 
@@ -185,12 +208,18 @@ print("overlaps:", bad)
 PY
 
 # 2. every audit finding is owned by a task
+#    A finding the plan split into lettered parts (B3 -> B3a/B3b) counts as owned when every
+#    part is: `\bB3\b` does not match "B3a", so the suffixed forms are matched explicitly.
+#    Until 2026-07-25 this script printed `unowned: ['B3']` while the barrier notes claimed
+#    "none" — the claim had been copied forward without the script being re-run.
 python3 - <<'PY'
 import re, glob
 plan = "".join(open(f).read() for f in glob.glob('docs/plans/*.md'))
 audit = "".join(open(f).read() for f in glob.glob('docs/audit/*.md'))
 ids = set(re.findall(r'^\| (B\d+|A\d+|T\d+|H\d+|P\d+) \|', audit, re.M))
-print("unowned:", sorted(i for i in ids if not re.search(rf'\b{i}\b', plan)) or "none")
+def owned(i):
+    return re.search(rf'\b{i}\b', plan) or re.search(rf'\b{i}[a-z]\b', plan)
+print("unowned:", sorted(i for i in ids if not owned(i)) or "none")
 PY
 ```
 

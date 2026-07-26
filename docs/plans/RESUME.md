@@ -14,8 +14,8 @@ Option A** (remove the dead Tailwind, extract CSS tokens), and **T32 is cleared 
    and re-imports from the Takeout export (15,381 note pairs, path intact). **The next app boot
    re-ingests and re-embeds the whole corpus — a long GPU run.** No wave-6 task depends on a warm
    cache; `make check` and `make eval` are fully isolated and do not need one.
-2. **The repo is already PUBLIC** — see § Decisions & constraints. This does not change the
-   never-push rule for the local 57 commits.
+2. **The repo is PUBLIC and the plan's work through `6250507` is pushed** — see § Decisions &
+   constraints. Agents still never push; that stays the owner's call alone.
 
 > Keep this current: refresh it at every wave barrier, in the barrier commit, alongside the
 > `PLANS.md` § Status update. A stale resume file is worse than none — it will confidently point the
@@ -33,9 +33,10 @@ Precedence: `AGENTS.md` > EXECUTION-PROTOCOL > wave file > PLANS.md.
 
 ## State
 
-Waves 1–5 complete, each reviewed and repaired before the next started. Branch `master`, 57 commits
-unpushed (`origin/master` is still at `6dab505`). **The working tree is clean** and the gate is
-green — see § Verified gate.
+Waves 1–5 complete, each reviewed and repaired before the next started. Branch `master`.
+**The whole plan so far is now published** — the owner pushed on 2026-07-26, so `origin/master` is
+`6250507` and everything through the pre-wave-6 work is public. **The working tree is clean** and the
+gate is green — see § Verified gate.
 
 **Read `PLANS.md` § Post-wave-4 review and § Proposed follow-ups before starting Wave 6.** The
 wave-5 review found the same failure mode the wave-4 review did — tasks committed `done` whose
@@ -92,10 +93,10 @@ migration script not built). Both lessons apply to how wave 6 is gated.
    models (A7) · T41 finish the redaction sweep · T42 delete the legacy embedding path. Spec:
    `wave-7-deployability.md`. Owner decision 2026-07-26: **single-user, loopback-only, no auth** —
    T39 makes that boundary explicit and defends it rather than adding auth.
-5. **Wave 8 — release** (serial, `wave-8-release.md`): T37 comment sweep + pre-push audit, then
-   **T43** rewriting the 58 unpushed commit messages for a public reader. T43 runs after T37 so it
-   cleans T37's own message, and its rewrite changes every SHA in the range — the plan docs' ~20 SHA
-   citations must be re-pointed afterwards, which T43's checkpoint asserts.
+5. **Wave 8 — release** (serial, `wave-8-release.md`): T37 comment sweep + pre-push audit.
+   **T43 is retired** — it would have rewritten the unpushed commit messages, and the branch was
+   published before it could run. T37's audit is now a *delta* over what waves 6–7 add, since the
+   full history was audited on 2026-07-26 with no hard findings.
 
 ## Gate discipline (tightened after the review)
 
@@ -170,11 +171,12 @@ All lanes share ONE working tree. Lane ownership makes their *edits* disjoint bu
 
 ## Decisions & constraints
 
-- **Local-only, never push.** Publishing is the owner's decision at the end of the plan, and a leak
-  audit is a mandatory precondition of any push — now T37's job.
-- **The repo is already PUBLIC** (`github.com/Harduex/google-keep-vibe-search`, last pushed
-  2026-07-24), so history up to `origin/master` = `6dab505` is published; the 57 local commits are
-  not. A full-history audit (gitleaks self-test PASS, all refs + 7 stashes) found no secrets, keys,
+- **Published, but agents still never push.** The owner published on 2026-07-26; pushing remains the
+  owner's decision alone, and a leak audit stays a precondition of any push — T37's job. No lane agent
+  pushes, ever, published branch or not.
+- **The repo is PUBLIC** (`github.com/Harduex/google-keep-vibe-search`) and, since 2026-07-26, so is
+  the plan's work through `6250507`. A full-history audit (gitleaks self-test PASS, all refs + 7
+  stashes) found no secrets, keys,
   dumps, or committed cache/note artifacts. One advisory left deliberately in place — see `PLANS.md`
   § Proposed follow-ups. **This does not relax the never-push rule.**
 - **§5 config is frozen for lanes:** no new env vars, no `.env`/`.env.example` edits. New tuning
@@ -192,6 +194,7 @@ All lanes share ONE working tree. Lane ownership makes their *edits* disjoint bu
 - `PLANS.md` — wave graph, ownership matrix, § Task index (State column), § Status, § Post-wave-4 review.
 - `EXECUTION-PROTOCOL.md` — §1.3 dispatch rounds, §2 ownership, §3 commits + wave-file deletion policy, §4 gates.
 - Remaining specs: `wave-6-unify-and-quality.md`, `wave-7-deployability.md` (new 2026-07-26),
-  `wave-8-release.md` (was `wave-7-release-readiness.md`; renumbered, T37 unchanged + T43 added).
-  Waves 1–5 files are deleted (policy).
+  `wave-8-release.md` (was `wave-7-release-readiness.md`; renumbered, T37 unchanged, T43 retired).
+  Waves 1–5 files are deleted (policy). Unscheduled ideas live in `docs/feature-ideas/` — the imports
+  UI and the extra importers are there, not in any wave.
 - Gate: `GOOGLE_KEEP_PATH=. make check`.

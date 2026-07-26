@@ -31,8 +31,8 @@ Wave 6  unify + quality     PARALLEL ── 6 agents (M tagging unification · N
    │
 Wave 7  deployability       PARALLEL ── 4 agents (U posture · V cold start · W redaction · X legacy path)
    │                                    one round; write sets disjoint by construction
-Wave 8  release             SERIAL  ── 1 agent   (T37 comment sweep + pre-push audit, then T43
-                                        commit-message rewrite; both must run last, on a quiet tree)
+Wave 8  release             SERIAL  ── 1 agent   (T37 comment sweep + pre-push audit; must run
+                                        last, on a quiet tree. T43 retired — branch went public)
 ```
 
 Waves are hard barriers: Wave *n+1* starts only when every lane in Wave *n* is committed and CI is
@@ -83,8 +83,7 @@ report it instead of working around it.
 | 7 | **X** legacy path | `app/search.py`, `tests/test_search_cache.py`, `tests/test_phase1_algorithms.py`, `scripts/eval_retrieval.py`, `scripts/eval_categorization.py` | T42 |
 |   |   | ↳ Two boundaries the specs state explicitly, because both lanes would otherwise reach for the same file: `app/search.py` has `str(e)` sites but belongs to **Lane X** — Lane W reports them instead of editing. And `ChunkingService.load_or_compute_embeddings` is legacy in the same way `app/search.py`'s path is, but its call site is `lifespan.py`, which **Lane V** owns — so Lane X leaves it and records a follow-up. |   |
 | 8 | — | everything (**comments only**) + `docs/audit/PRE-PUSH-AUDIT.md` (new) | T37 |
-| 8 | — | commit **messages** in `origin/master..master` only; **no tree changes** | T43 |
-|   |   | ↳ The comments-only restriction is what makes a whole-repo write set safe: T37's checkpoint asserts every changed Python file is **AST-identical** to its parent commit. Mirrors T01, which owned everything for formatting only. T43's equivalent guard is `git diff backup/pre-t43 HEAD --stat` returning empty. |   |
+|   |   | ↳ The comments-only restriction is what makes a whole-repo write set safe: T37's checkpoint asserts every changed Python file is **AST-identical** to its parent commit. Mirrors T01, which owned everything for formatting only. |   |
 
 ---
 
@@ -133,15 +132,17 @@ report it instead of working around it.
 | T40 | 7 V | 1 | Construct reranker/NLI/grounding models on first use | A7 (completion) | ½ d | todo |
 | T41 | 7 W | 1 | Route every raw exception string through `safe_exc` | P1–P3 (completion) | ½ d | todo |
 | T42 | 7 X | 1 | Delete the legacy whole-corpus embedding cache | A1 (third impl) | ½ d | todo |
-| T43 | 8 — | 2 | Rewrite the unpushed commit messages for a public reader (serial, after T37) | — | ½ d | todo |
+| T43 | 8 — | 2 | ~~Rewrite the unpushed commit messages for a public reader~~ | — | — | **retired** (branch published 2026-07-26 — see § Superseded) |
 | T38 | 6 M | 3 | Stream proposals as they are named, actionable mid-run (serial, after T30) | — | 1 d | todo |
 
-**Totals:** 43 tasks · ~24 developer-days serial · ~9½ wall-clock days at the lane parallelism above.
-**29 done, 14 remaining** (wave 6: T27–T32, T34, T38 · wave 7: T39–T42 · wave 8: T37, T43).
+**Totals:** 43 tasks, one retired · ~23½ developer-days serial · ~9 wall-clock days at the lane
+parallelism above. **29 done, 13 remaining, 1 retired** (wave 6: T27–T32, T34, T38 · wave 7: T39–T42
+· wave 8: T37 · retired: T43).
 
 Every one of the 46 audit findings is owned by exactly one task — verified by the coverage script in
-§ Verification below. **T37, T38 and T43 own no finding**: all three are owner requests (2026-07-25,
--25 and -26), not derived from the audit, so they do not affect the coverage invariant.
+§ Verification below. **T37 and T38 own no finding**: both are owner requests (2026-07-25), not
+derived from the audit, so they do not affect the coverage invariant. T43 owned none either and is
+now retired.
 
 **H8 was owned only nominally until 2026-07-26.** The coverage script counted it as covered because
 the string `H8` appeared in T32's prose, while its substance — no auth, `allow_origins=["*"]` with
@@ -169,7 +170,7 @@ task of that wave lands.
 | 5 | L1–L6 | T21 → T22·T23 → T24·T25 → T26 | done |
 | 6 | M N O P Q S | 6 lanes → T28 → T38 | todo |
 | 7 | U V W X | 4 lanes, 1 round | todo |
-| 8 | — | T37 → T43 | todo |
+| 8 | — | T37 (T43 retired) | todo |
 
 ## Post-wave-4 review (2026-07-25)
 
@@ -264,6 +265,14 @@ PY
 ```
 
 ## Superseded
+
+- **T43 — rewrite the unpushed commit messages.** Written and retired the same day (2026-07-26). Its
+  precondition was that the 60 commits were unpushed; the owner pushed them, so `origin/master` is now
+  `6250507` and rewriting those messages would rewrite published history for a cosmetic gain — while
+  not un-publishing anything, since the old SHAs stay cloned and cached wherever they were fetched.
+  The plan coordinates in those messages are noise, not a leak: the full-history audit of the same day
+  found no secrets, no note text and no committed cache data. What survives is a convention rather
+  than a task — new commit messages stay coordinate-free. Detail in `wave-8-release.md`.
 
 - `23-live-acceptance-signoff.md` — its subject (the unwired v2 tagging pipeline, finding A1) is
   resolved by **T27**. Its four acceptance checkpoints move into T27's checkpoint verbatim; the file

@@ -3,19 +3,29 @@
 **Paste this file's contents to a fresh agent to resume the plan.** It is written for someone with
 none of the originating conversation's context.
 
-**Last updated:** 2026-07-26 (second refresh) — **Wave 5 barrier committed (`828331a`); a pre-wave-6
-driver commit then fixed a data-destroying `make eval`.** **Resume by dispatching Wave 6 round 1**
-(T27 · T29 · T30 · T31 · T32 · T34) — see Next steps. Owner decisions already taken: **T31 takes
-Option A** (remove the dead Tailwind, extract CSS tokens), and **T32 is cleared to run
-`docker compose build && up`** as its checkpoint.
+**Last updated:** 2026-07-26 (third refresh) — **Wave 6 round 1 committed: T27 · T29 · T30 · T31 ·
+T32 · T34 all landed straight to `master` in six commits (`9adc290`→`85c2f26`), combined gate green.**
+**Resume by dispatching Wave 6 round 2** — T28 alone (depends on T27, now in) — then T38 in round 3
+(serial). See Next steps. Owner decisions already taken: **T31 = Option A** (done), **T32 cleared to
+run `docker compose build && up`** (its backend half verified; the owner runs the full bring-up).
 
-**Two things changed outside the plan, both owner-authorised:**
+**Out-of-order landing to note:** **T39 (wave 7 Lane U) landed early in `a4588b5`** (loopback CORS,
+8 MiB body cap, rate limiter, `app/core/security.py`) — its task-index row and wave-7 § Status are
+marked done. Wave 7 still has T40 · T41 · T42 outstanding.
+
+**Three things changed outside the plan, all owner-authorised:**
 1. **`cache/` was deleted** (2026-07-26) for a clean slate; the owner keeps note backups externally
    and re-imports from the Takeout export (15,381 note pairs, path intact). **The next app boot
-   re-ingests and re-embeds the whole corpus — a long GPU run.** No wave-6 task depends on a warm
-   cache; `make check` and `make eval` are fully isolated and do not need one.
+   re-ingests and re-embeds the whole corpus — a long GPU run.** No remaining wave-6/7 task depends
+   on a warm cache; `make check` and `make eval` are fully isolated and do not need one.
 2. **The repo is PUBLIC and the plan's work through `6250507` is pushed** — see § Decisions &
-   constraints. Agents still never push; that stays the owner's call alone.
+   constraints. The wave-6-round-1 commits (`9adc290`→`ee886c6`) are local, NOT pushed. Agents still
+   never push; that stays the owner's call alone.
+3. **A quota outage mid-wave-6-round-1 stopped 4 of 6 lane agents mid-work.** They were re-dispatched
+   against their partial WIP (each told "finish, don't redo"), all six reported READY, the combined
+   `make check` passed, and each lane was committed with explicit paths. No work was lost; the
+   re-dispatched agents verified the prior instances' edits and fixed two real bugs Lane M's prior
+   instance had left (incremental-mode zero-LLM guarantee was dead; eval-stability frame ordering).
 
 > Keep this current: refresh it at every wave barrier, in the barrier commit, alongside the
 > `PLANS.md` § Status update. A stale resume file is worse than none — it will confidently point the
@@ -33,15 +43,52 @@ Precedence: `AGENTS.md` > EXECUTION-PROTOCOL > wave file > PLANS.md.
 
 ## State
 
-Waves 1–5 complete, each reviewed and repaired before the next started. Branch `master`.
-**The whole plan so far is now published** — the owner pushed on 2026-07-26, so `origin/master` is
-`6250507` and everything through the pre-wave-6 work is public. **The working tree is clean** and the
-gate is green — see § Verified gate.
+Waves 1–5 complete; **wave 6 round 1 complete** (T27/T29/T30/T31/T32/T34). Branch `master`,
+working tree clean, gate green (see § Verified gate). `origin/master` is still `6250507` — **the
+wave-6-round-1 commits are local only, not pushed.** T39 (wave 7) landed early in `a4588b5`.
 
-**Read `PLANS.md` § Post-wave-4 review and § Proposed follow-ups before starting Wave 6.** The
-wave-5 review found the same failure mode the wave-4 review did — tasks committed `done` whose
-checkpoint had never actually been run — and added two wave-5-specific follow-ups (A7 lazy-models,
-migration script not built). Both lessons apply to how wave 6 is gated.
+**Read `PLANS.md` § Post-wave-4 review and § Proposed follow-ups before resuming.** Wave-6 round 1
+followed the tightened gate discipline: each lane ran its own checkpoint, the combined `make check`
+was run on the full tree before any commit, and each commit's body carries the checkpoint output.
+Two of the re-dispatched lanes (S, N) found their prior instance's work already complete and
+verified-only; Lane M's re-dispatch found and fixed two real bugs the prior instance had left.
+
+### Wave 6 round 1 complete — committed 2026-07-26
+
+Six commits straight to `master`, order P→O→Q→S→N→M (independent → riskiest last):
+
+- **T31 (`9adc290`) · Lane P — styling, Option A.** Removed Tailwind (deps + Vite plugin + `@theme`
+  block); lifted 30+ inline hex literals onto a `:root` custom-property token layer in `index.css`;
+  reproduced LoadingScreen's utility classes under `.loading-overlay` (visual byte-identical). CSS
+  bundle 83.46→77.81 kB. Follow-up: LoadingScreen.tsx still carries inert utility-class strings
+  (dead, harmless — file unowned this wave).
+- **T30 (`5642e4a`) · Lane O — client data layer.** New in-house `dataLayer.ts` (~100 LOC,
+  fetchJson + URL-keyed cache + dedupe + prefix-invalidate + pub/sub) and `useCachedQuery.ts`;
+  converted useTags/useStats/useAllNotes/useEmbeddings; left the two NDJSON streaming hooks alone.
+  Zero new deps. Net −156 LOC. Required test: three useTags mounts → exactly 1 `/api/tags` request.
+- **T32 (`921dddc`) · Lane Q — ops/packaging.** torch split into `gpu` (default, cu121 pin kept) /
+  `cpu` uv dependency-groups via `[tool.uv] conflicts`; black target py38→py310, README 3.9+→3.10+;
+  dropped nltk + rank-bm25 (both grep-clean); declared `pre-commit` in dev group. Dockerfile
+  secrets/HEALTHCHECK/loopback + `.dockerignore` were already in `a4588b5` (confirmed, not redone).
+  Owner checkpoint: full `docker compose build && up && curl /api/ready` (backend half verified).
+- **T34 (`5b59182`) · Lane S — sessions.** `PATCH .../sessions/{id}` title moved to
+  `RenameSessionRequest` body, `?title=` kept as deprecated alias (client moves in T30);
+  `list_sessions` streams only id/title/updated_at + message count (bodies never decoded); the
+  `except (...,Exception)` catch-all narrowed to `(OSError, json.JSONDecodeError, ValidationError)`
+  with `safe_exc` type logging. Two follow-ups recorded (entity_service silent-except; loadSession
+  drops citations).
+- **T29 (`fcb1cac`) · Lane N — chat hot path.** Orchestrator reads stored note vectors from
+  `VectorStore.get(ids)` instead of re-encoding (hot-path note-text encodes 2–4+10+N → 1 query
+  batch); `detect_conflicts` short-circuits >25 notes and caps NLI pairs at 20. Decision parity
+  asserted vs encode-based baseline. 8 new red-then-green tests.
+- **T27 (`85c2f26`) · Lane M — one tagging pipeline.** Folded v2 skeleton (manifest stability,
+  incremental zero-LLM mode, central+MMR sampling, VectorStore-backed embed cache) into the shipped
+  `categorization_service.py` and deleted the losing halves (`tagging/{naming,pipeline,dedupe}.py`
+  + their 2 test files). Fixed `_sanitize_tag_name` underscore bug, seeded `existing_tags` from
+  Keep labels, ported off removed PydanticAI API. Two real bugs the re-dispatch caught & fixed:
+  incremental-mode labels marked everything noise (auto-apply was dead), and manifest-reused names
+  hit the early `proposals` frame (broke the eval stability metric). `make eval`: stability 100%,
+  untagged 0%, incremental LLM calls 0.
 
 ### Wave 5 complete — barrier closed 2026-07-26
 
@@ -78,25 +125,35 @@ migration script not built). Both lessons apply to how wave 6 is gated.
 
 ## Next steps, in order
 
-1. **Dispatch Wave 6 round 1** — T27 (M tagging) · T29 (N hot path) · T30 (O client data) ·
-   T31 (P styling, **Option A**) · T32 (Q ops, **containers cleared**) · T34 (S sessions). Spec:
-   `docs/plans/wave-6-unify-and-quality.md`. Brief every lane with § The concurrency protocol below.
-2. **Then T28** (round 2, depends on T27), then **T38 alone in round 3** (serial — its write set
-   crosses Lane M and Lane O, so it lands once every wave-6 lane is in).
-3. **Brief Lane M on three pre-wave findings** recorded in `PLANS.md` § Proposed follow-ups: the
-   underscore bug in `_sanitize_tag_name` (fix it in T27, which owns that file); the `make eval`
-   stability metric is a prompt-hash change-detector, not a semantic one, so expect to re-baseline
-   deliberately rather than read a drop as regression; and the 7 v2 tagging test files carry only
-   **12 tests total** against ~1,000 LOC being merged — "all tagging tests green" is a weak gate for
-   a change this size, so require added coverage, not just green.
-4. **Wave 7 — deployability** (new, 4 parallel lanes, 1 round): T39 posture (H8) · T40 lazy heavy
-   models (A7) · T41 finish the redaction sweep · T42 delete the legacy embedding path. Spec:
-   `wave-7-deployability.md`. Owner decision 2026-07-26: **single-user, loopback-only, no auth** —
-   T39 makes that boundary explicit and defends it rather than adding auth.
+1. **Dispatch Wave 6 round 2 — T28 alone** (Lane M, depends on T27 which is now in). Spec:
+   `docs/plans/wave-6-unify-and-quality.md` § T28. It fixes B4: `_get_cluster_sizing()` computes
+   `min_cluster_size`/`min_samples`/UMAP params from the granularity choice but `cluster_notes()`
+   ignores them and uses `tagging/constants.py`, so the Granularity selector is inert and UMAP runs
+   twice per categorize run. Pass the sizing into clustering, reduce once, reuse for centroids/MMR.
+   Checkpoint: `make eval` (specific yields strictly more clusters than broad); a test spying that
+   UMAP is fitted exactly once per run. Report the wall-clock saving. Brief with § The concurrency
+   protocol below; it's a single-lane round (no concurrency).
+2. **Then T38 alone in round 3** (serial — its write set crosses Lane M and Lane O, so it lands once
+   every wave-6 lane is in; T30 is now in, so after T28 it's unblocked). Spec: `wave-6-unify-and-quality.md`
+   § T38. Streams tag proposals as they are named so the user can review mid-run. Design decisions
+   taken with the owner (2026-07-25) are in the spec — do not re-litigate. **Add `proposal` to the
+   NDJSON type list in `AGENTS.md`** (matrix-gap, granted to T38 for its serial round).
+3. **Wave 6 barrier:** once T28 + T38 are in, run the combined `make check` + `make eval`, then
+   delete `docs/plans/wave-6-unify-and-quality.md` in the barrier commit (EXECUTION-PROTOCOL §3),
+   grepping first for any source comment that quotes the file by name.
+4. **Wave 7 — deployability** (4 parallel lanes, 1 round): **T39 already done** (`a4588b5`) ·
+   T40 lazy heavy models (A7) · T41 finish the redaction sweep · T42 delete the legacy embedding
+   path. Spec: `wave-7-deployability.md`. Owner decision 2026-07-26: **single-user, loopback-only,
+   no auth** — T39 makes that boundary explicit and defends it rather than adding auth.
 5. **Wave 8 — release** (serial, `wave-8-release.md`): T37 comment sweep + pre-push audit.
-   **T43 is retired** — it would have rewritten the unpushed commit messages, and the branch was
-   published before it could run. T37's audit is now a *delta* over what waves 6–7 add, since the
-   full history was audited on 2026-07-26 with no hard findings.
+   **T43 is retired.** T37's audit is now a *delta* over what waves 6–7 add, since the full history
+   was audited on 2026-07-26 with no hard findings — but the wave-6-round-1 commits are local and
+   unaudited, so T37 covers them.
+
+**Follow-ups added by wave-6 round 1** (in `PLANS.md` § Proposed follow-ups, to pick up later):
+T34's `entity_service.py` silent-except (B16 class, file unowned this wave) and `loadSession` drops
+citations on reload (needs a client change); T31's inert Tailwind class strings in
+`LoadingScreen.tsx` (dead, harmless).
 
 ## Gate discipline (tightened after the review)
 
@@ -113,32 +170,30 @@ migration script not built). Both lessons apply to how wave 6 is gated.
 
 ## Verified gate, as of this checkpoint
 
-**Pre-wave-6 gate — `GOOGLE_KEEP_PATH=. make check` run by the driver on the clean tree, exit 0**:
-**328** pytest passed, 1 skipped, 84.9 s; 12 vitest files / 67 tests; eslint 0 errors (2 warnings);
-tsc clean; black/isort clean over 127 files. 325 → 328 is the three new `scripts/` isolation guards.
+**Post-wave-6-round-1 gate — `GOOGLE_KEEP_PATH=. make check` on the committed tree (`85c2f26`),
+run twice (once before the commit sequence, once after), exit 0 both times**: **397** pytest passed,
+1 skipped, ~89 s; **14 vitest files / 77 tests**; eslint 0 errors; tsc clean; black/isort clean.
+The pytest count rose 328 → 397 (+69) and vitest 12 files/67 → 14 files/77 tests (+2 files, +10
+tests) from wave-6 round 1. Per-lane checkpoint evidence is in each commit body.
 
-**Pre-wave-6 `make eval`, exit 0** — the T27/T28/T38 checkpoint, run for the first time on the
-isolated path. Fixture-corpus baseline: tag count 2, uncategorized 0.0%, mean cluster size 14.0,
-mean confidence 0.93, **primary-tag stability 100.0%** (target ≥95%), LLM calls 2, peak RSS 1989 MB,
-peak VRAM 519 MB. `cache/` was **not** recreated by the run — isolation confirmed empirically, which
-is stronger evidence than the static import-order guard. Read the stability caveat in `PLANS.md`
-§ Proposed follow-ups before treating a drop as a regression.
+**T27 `make eval`, exit 0** (run by Lane M on the merged tagging pipeline). Fixture-corpus baseline:
+tag count 2, uncategorized 0.0%, mean confidence 0.93, **primary-tag stability 100.0%** (target
+≥95%), LLM calls 2 (run 2 reused 2/2 from manifest, 0 naming calls), incremental run over 1 added
+note LLM calls 0. Read the stability caveat in `PLANS.md` § Proposed follow-ups before treating a
+drop as a regression — it is a prompt-hash change-detector, not a semantic metric.
 
-**Earlier, wave-5 barrier gate (`828331a`), exit 0**: 325 pytest passed, 1 skipped, 95.9 s. The count
-dropped from 337 (Round 2) to 325 because T26 deleted `tests/test_parser.py` and
-`tests/test_cache_service.py` (their subjects, `app/parser.py` and `app/services/cache_service.py`,
-were deleted in the same commit) — net wave-5 additions are still positive: T22 +32, T23 +35,
-T24 +~20, T25 +7, minus the two deleted files.
+**Earlier, pre-wave-6 gate** (for reference): 328 pytest passed, 1 skipped; 12 vitest files / 67
+tests. The wave-5 barrier gate (`828331a`) was 325 pytest (count dropped 337→325 because T26 deleted
+two test files along with their subjects). The T25/T26 parity gate `make eval-retrieval` was fixed
+in the wave-5 barrier (it had been broken since `fa27fb8`) — fixture baseline `dense_only` R@1 0.607
+/ R@5 0.687 / R@10 0.833 / MRR 0.683.
 
-**T25/T26 parity gate — `make eval-retrieval`, exit 0** (5.5–6.6 s). Fixture-corpus baseline:
-`dense_only` R@1 0.607 / R@5 0.687 / R@10 0.833 / MRR 0.683. This is the gate that had been broken
-since `fa27fb8` and was fixed in this barrier — see § Wave-5 review findings.
+PLANS.md invariants, re-run at the wave-6-round-1 close: `overlaps: 0`, `unowned: none` (the
+coverage script handles findings the plan split into lettered parts, e.g. B3 → B3a/B3b).
 
-PLANS.md invariants, re-run at the barrier: `overlaps: 0`, `unowned: none` (the coverage script
-handles findings the plan split into lettered parts, e.g. B3 → B3a/B3b).
-
-**The tree is clean; no in-flight lane work remains.** The last commit is the pre-wave-6 driver
-commit (eval isolation + `scripts/` guard + `.gitignore` hardening + these doc updates).
+**The tree is clean; wave-6 round 1 is fully committed.** The last commit is `ee886c6`
+(docs/plans status update). Wave-6 rounds 2 (T28) and 3 (T38) remain, then the wave-6 barrier
+(delete `wave-6-unify-and-quality.md`). **The wave-6-round-1 commits are local — NOT pushed.**
 
 Tier-1 eval: `make eval-retrieval` (fixture corpus, ~6 s). Tier-2 benchmarks: `make bench-fetch`
 once, then `make bench` / `make bench-compare` — real models over SciFact and 20 Newsgroups, minutes

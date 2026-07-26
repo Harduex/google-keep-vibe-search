@@ -31,13 +31,13 @@ This task builds the UI and removes that environment variable as the definition 
 | # | Job | Where | What to do |
 |---|---|---|---|
 | 1 | Defines the corpus; startup imports it | `app/services/note_service.py:128`, `app/ingest.py:355` `default_import` | **Remove.** Replaced by the UI. |
-| 2 | **Base folder for serving note images** | `app/routes/images.py:17`, `app/image_processor.py:208` | **Must survive as per-source data.** See step 6. This is the one that silently breaks. |
+| 2 | **Base folder for serving note images** | `app/routes/images.py:17`, `app/image_processor.py:208` | **Copy the attachments into the app at import time.** See step 6. This is the one that silently breaks. |
 | 3 | Startup validation — the app refuses to boot without it | `app/core/config.py:52-62` `validate_google_keep_path` | **Remove the validator.** A fresh install must boot with an empty store. |
 | 4 | Privacy guard: tests/benchmarks/evals assert `GOOGLE_KEEP_PATH=.` so they cannot read real notes | `bench/__init__.py:23`, `scripts/eval_*.py`, `Makefile:35,57,70,76`, `.github/workflows/ci.yml:38` | **Remove last, and only after job 1 and 2 are gone.** See step 8. Do not touch the separate `CACHE_DIR` isolation — that stays exactly as it is. |
 
 Job 2 is why "just delete the env var" is wrong: notes carry image attachments whose files live in
 the export folder, and `/api/image` resolves them against `settings.google_keep_path` with a
-containment check. Each **source** needs to remember its own root folder.
+containment check. Step 6 removes that dependency entirely rather than relocating it.
 
 ## 3. Backend: two small additions
 
@@ -140,23 +140,70 @@ In `app/core/lifespan.py`, delete the call that imports from `settings.google_ke
 store with no documents boots with `ready: true` and `/api/search` returns an empty list rather than
 a 500.
 
-## 6. Move the image root into the store (the part that breaks silently)
+## 6. Make the import self-contained (copy attachments in)
 
-Note images are files on disk under each source's folder. Once the corpus can come from several
-folders, one global path cannot resolve them.
+**Design decision, owner 2026-07-26:** after an import finishes, the app must not depend on the
+imported folder still existing. A user should be able to delete the Takeout export, or import from a
+USB stick and unplug it, and everything keeps working. So attachments are **copied into the app's own
+storage**, not referenced in place.
 
-1. Add an `attachment_root TEXT` column to the `documents` table — or, if you prefer one row per
-   source, a `sources` table keyed by `source_key`. Bump `SCHEMA_VERSION` in
-   `app/store/constants.py` and handle the migration in the existing hook in `app/store/sqlite.py`.
-2. `IngestService.ingest` records the import path as that source's `attachment_root`.
-3. `app/routes/images.py` resolves an image against **that source's** root instead of
-   `settings.google_keep_path`. **Keep the containment check exactly as it is** —
-   `Path.is_relative_to` after resolving both sides, and never echo the attempted path back. That
-   check closed a real path-traversal finding; do not simplify it.
-4. Same change in `app/image_processor.py:208`.
+This is a better answer than remembering a per-source root folder, for three reasons beyond
+portability:
 
-**Verify:** `GOOGLE_KEEP_PATH=. uv run pytest tests/test_images.py -q` — the traversal tests must
-still pass. If you cannot make them pass without weakening the containment check, stop and report.
+- **It deletes a security surface.** Today `/api/image/{path}` takes a user-supplied path and defends
+  itself with a resolve-then-`is_relative_to` containment check, which exists because a sibling-prefix
+  traversal got through once. Serving by content hash means there is no path to traverse: validate
+  `^[a-f0-9]{64}$` and look it up. The containment check is not relocated — it becomes unnecessary.
+- **Re-import stays idempotent for free.** Content-addressed storage means the same image lands at the
+  same key, so a second import copies nothing.
+- **The container gets simpler.** The read-only notes mount is needed only while importing, not for
+  the app to run.
+
+### The cost, measured on the owner's corpus (2026-07-26)
+
+**3,792 attachments, 3,053 MB.** Grouping by file size — metadata only, never reading attachment
+bytes — puts the *ceiling* on content-hash dedup at 196 files / 191 MB, i.e. **6.3%**. So assume the
+copy costs ~2.9 GB and roughly doubles `cache/`. That is the price of self-containment; it is worth
+paying, but state it in the UI before the copy starts (see step 4.3) rather than surprising the user.
+
+### Steps
+
+1. **Storage layout.** `cache/attachments/<first-2-hex>/<sha256><ext>`. The two-character fanout keeps
+   any one directory from holding thousands of entries. Reuse `settings.resolved_cache_dir` — do not
+   introduce a second location, and do not add a config variable for it (config is frozen).
+2. **An `attachments` table** in `app/store/sqlite.py`: `doc_id`, `original_relpath` (what the note
+   body references), `sha256`, `mime`, `bytes`. Index on `doc_id` and on `sha256`. Bump
+   `SCHEMA_VERSION` in `app/store/constants.py` and use the existing migration hook.
+   A table rather than a JSON column, so an attachment can be reference-counted by hash later.
+3. **Copy during ingest**, in `IngestService._apply` alongside the document upsert: for each
+   attachment of an added/updated document, hash the bytes, and copy only if that key is not already
+   on disk. Copy **only attachments of live documents** — a trashed Keep note's images are not worth
+   2.9 GB of anyone's disk.
+4. **Report it in the dry run.** Add `attachment_count` and `attachment_bytes` to `ImportCounts`
+   (`app/models/imports.py:27`) so `dry_run` answers "how much disk will this cost" before the user
+   commits to it.
+5. **Serve by hash.** Replace `GET /api/image/{image_path:path}` with
+   `GET /api/attachments/{sha256}`, resolving through the table. Keep the old route as a redirect only
+   if something still needs it — the client is the only caller, so prefer changing the client.
+   `app/image_processor.py:208` reads from the attachment store too, not from an export path.
+6. **Do not delete attachments on soft delete.** A removed document may come back (the restore path
+   in `compute_change_set` folds it into `added`), and its images should survive with it. Garbage
+   collecting unreferenced hashes is a separate, later task — note it in `PLANS.md`
+   § Proposed follow-ups rather than building it here.
+
+**Verify:**
+```
+GOOGLE_KEEP_PATH=. uv run pytest tests/test_images.py -q
+# rewrite these tests for the new route. The traversal cases become assertions that a
+# non-hash path is rejected as malformed -- keep a test proving `../` cannot escape,
+# even though by construction it now cannot, so a future refactor that reintroduces
+# path handling fails loudly.
+```
+Then the property that is the whole point of this step:
+```
+# import a fixture folder, then MOVE the folder away, then request an attachment
+# -> it must still serve. That test is the definition of "self-contained".
+```
 
 ## 7. Validate the path the UI now supplies
 
@@ -176,7 +223,8 @@ Do this **last**, and only once steps 5 and 6 are done and green.
 2. Remove `GOOGLE_KEEP_PATH` from `.env.example`, `README.md` (config table, quick start, and the
    "No notes loaded" troubleshooting entry — rewrite that to point at the Imports tab), and the
    `environment:` block of `docker-compose.yml`. **Keep the read-only volume mount** at `/data/Keep`
-   so a containerised user still has a path to type into the UI; document that path in the README.
+   so a containerised user has a path to type into the UI — but document it as needed *only while
+   importing*, since step 6 makes the running app independent of it.
 3. Only after nothing in `app/` reads it: remove `GOOGLE_KEEP_PATH=.` from `Makefile` (4 lines),
    `.github/workflows/ci.yml:38`, `scripts/eval_categorization.py:4`, `scripts/eval_retrieval.py:8`
    and the guard in `bench/__init__.py:23`.
@@ -203,5 +251,7 @@ a URL or cloud API. Each is a separate idea.
 ## 10. Acceptance
 
 A user who has never edited `.env` can start the app, see an empty state, type a folder path in the
-Imports tab, preview the change counts, run the import with live progress, and then search their
-notes. Running the same import again reports everything as unchanged and embeds nothing.
+Imports tab, preview the change counts and the disk cost, run the import with live progress, and then
+search their notes. Running the same import again reports everything as unchanged, embeds nothing and
+copies nothing. **Deleting the imported folder afterwards breaks nothing** — notes, tags, search and
+images all keep working, which is the point of the whole task.

@@ -143,7 +143,10 @@ export const scrollToElement = (selector: string, offset = 0): void => {
 /**
  * Calculate score percentage
  */
-export const calculateScorePercentage = (score: number): number => {
+export const calculateScorePercentage = (score?: number | null): number | null => {
+  if (score === undefined || score === null || Number.isNaN(score)) {
+    return null;
+  }
   return Math.round(score * 100);
 };
 

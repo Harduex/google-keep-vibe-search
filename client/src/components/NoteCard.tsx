@@ -196,9 +196,9 @@ export const NoteCard = memo(
                 )}
               </span>
             ))}
-            {scorePercentage ? (
+            {scorePercentage !== null && (
               <span className="note-badge badge-score">{scorePercentage}% match</span>
-            ) : null}
+            )}
             {hasMatchingImages && (
               <span className="note-badge badge-image-match">
                 <span className="material-icons">image_search</span> Image match

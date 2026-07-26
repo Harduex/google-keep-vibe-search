@@ -77,7 +77,10 @@ export const EmbeddingsVisualization = ({
   const searchResultMap = useMemo(() => {
     const map = new Map<string, number>();
     searchResults.forEach((result) => {
-      map.set(result.id, calculateScorePercentage(result.score));
+      const pct = calculateScorePercentage(result.score);
+      if (pct !== null) {
+        map.set(result.id, pct);
+      }
     });
     return map;
   }, [searchResults]);

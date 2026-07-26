@@ -21,7 +21,7 @@ export interface Note {
   archived: boolean;
   pinned: boolean;
   color: NoteColor;
-  score: number;
+  score?: number;
   annotations?: Annotation[];
   attachments?: Attachment[];
   has_matching_images?: boolean;

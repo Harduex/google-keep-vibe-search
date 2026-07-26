@@ -315,7 +315,7 @@ class NoteService:
         all_notes = []
         for note in self.notes:
             note_copy = note.copy()
-            note_copy["score"] = 1.0
+            note_copy.pop("score", None)
             note_id = note_copy.get("id")
             note_copy["tags"] = self.note_tags.get(note_id, [])
             note_copy.pop("matched_image", None)

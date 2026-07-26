@@ -168,9 +168,37 @@ paying, but state it in the UI before the copy starts (see step 4.3) rather than
 
 ### Steps
 
-1. **Storage layout.** `cache/attachments/<first-2-hex>/<sha256><ext>`. The two-character fanout keeps
-   any one directory from holding thousands of entries. Reuse `settings.resolved_cache_dir` — do not
-   introduce a second location, and do not add a config variable for it (config is frozen).
+1. **One concrete module: `app/store/attachments.py`.** Exactly three functions, no class, no
+   protocol, no second implementation:
+
+   ```python
+   def put(data: bytes, ext: str) -> str    # sha256 of data; writes only if absent; returns the hash
+   def path_for(sha256: str, ext: str) -> Path
+   def exists(sha256: str) -> bool
+   ```
+
+   Layout: `cache/attachments/<first-2-hex>/<sha256><ext>`, rooted at
+   `settings.resolved_cache_dir`. The two-character fanout keeps any one directory from holding
+   thousands of entries. Do not introduce a second location and do not add a config variable for it
+   (config is frozen).
+
+   **Every caller uses these functions and never builds a path itself.** That is what keeps the
+   traversal surface closed — there is no place left for a user-supplied path to enter.
+
+   **Deliberately not abstracted.** An earlier draft proposed an `AttachmentStore` protocol so a
+   cloud backend could be swapped in. That was speculative generality: there is no second
+   implementation, no cloud deployment planned, and no object-storage dependency anywhere in
+   `pyproject.toml`. The portability lives in the *content addressing*, not in an interface — a
+   sha256 key is equally valid as a filename or an object name, so if remote storage ever becomes
+   real, rewriting the bodies of three functions is a smaller job than having maintained an
+   abstraction for months against the possibility. Do not add the protocol back without a second
+   implementation that actually exists.
+
+   Related: do **not** store attachments in a GCS emulator (`fake-gcs-server` or the `gcloud`
+   emulator). Those are test doubles for code that talks to real GCS — their durability is a local
+   directory plus an HTTP hop. Using one as real storage would put 3 GB of the user's images behind a
+   second unauthenticated localhost service, add a gRPC dependency, and require new config, while the
+   database and vector index stay on local disk anyway. Rejected 2026-07-26.
 2. **An `attachments` table** in `app/store/sqlite.py`: `doc_id`, `original_relpath` (what the note
    body references), `sha256`, `mime`, `bytes`. Index on `doc_id` and on `sha256`. Bump
    `SCHEMA_VERSION` in `app/store/constants.py` and use the existing migration hook.

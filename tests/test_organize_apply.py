@@ -13,13 +13,22 @@ from app.services.proposal_store import (
 class FakeNoteService:
     def __init__(self, existing_tags=None):
         self.tagged = []  # (note_ids, tag)
+        self.persisted = 0  # full tag-map writes
         self.renamed = []  # (old, new)
         self.existing_tags = set(existing_tags or [])
 
-    def tag_notes(self, note_ids, tag_name):
+    def tag_notes(self, note_ids, tag_name, save=True):
+        # `save` mirrors the real signature: the route defers every write and calls
+        # persist_tags once, so a double that rejects the kwarg would pass its own
+        # tests while the route raised TypeError in production.
         self.tagged.append((list(note_ids), tag_name))
         self.existing_tags.add(tag_name)
+        if save:
+            self.persisted += 1
         return len(note_ids)
+
+    def persist_tags(self):
+        self.persisted += 1
 
     def rename_tag(self, old_name, new_name):
         # Mirrors NoteService.rename_tag's real guards so route-level tests of

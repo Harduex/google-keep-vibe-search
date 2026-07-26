@@ -84,7 +84,8 @@ def apply_proposals(
             name = action.tag_name
         if not name or not action.note_ids:
             continue
-        note_service.tag_notes(action.note_ids, name)
+        # Deferred: one write at the end instead of one per action.
+        note_service.tag_notes(action.note_ids, name, save=False)
         tags_created.add(name)
         total_tagged += len(action.note_ids)
 
@@ -102,13 +103,19 @@ def apply_proposals(
     for action in assigns:
         if not action.note_id or not action.tag:
             continue
-        note_service.tag_notes([action.note_id], action.tag)
+        note_service.tag_notes([action.note_id], action.tag, save=False)
         tags_created.add(action.tag)
         total_tagged += 1
 
+    # Every tag_notes call above deferred its write; persist the whole map once. This is
+    # unconditional and comes before the clear: the tags must be on disk before the
+    # pending set is discarded, or a crash here loses both.
+    if total_tagged or tags_created:
+        note_service.persist_tags()
+
     # Only once something was actually applied. An apply that tagged nothing — every action
-    # rejected, or the B8-class bug where they were silently skipped — must leave the pending
-    # set intact, or the expensive generation is lost to a no-op.
+    # rejected, or a bug that silently skipped them — must leave the pending set intact, or
+    # the expensive generation is lost to a no-op.
     if total_tagged or tags_created:
         clear_pending_proposals()
 

@@ -103,6 +103,8 @@ class NoteService:
         self.notes: List[Dict[str, Any]] = []
         self.note_tags: Dict[str, List[str]] = {}
         self.excluded_tags: Set[str] = set()
+        self._id_index: Optional[Dict[str, str]] = None
+        self._id_index_size: int = -1
 
     def _ensure_store(self) -> SQLiteStore:
         if self.store is None:
@@ -131,6 +133,7 @@ class NoteService:
 
         docs = store.get_many(ids)
         self.notes = [self._doc_to_dict(doc) for doc in docs]
+        self.invalidate_id_index()
         return self.notes
 
     @staticmethod
@@ -209,16 +212,60 @@ class NoteService:
             if not any(t in self.excluded_tags for t in self.note_tags.get(note.get("id"), []))
         ]
 
-    def _resolve_note_id(self, nid: str) -> Optional[str]:
+    def _build_id_index(self) -> None:
+        """Map both id and external_id to the canonical id, in one pass."""
+        index: Dict[str, str] = {}
         for n in self.notes:
-            if n.get("id") == nid or n.get("external_id") == nid:
-                return n.get("id")
-        return None
+            canonical = n.get("id")
+            if not canonical:
+                continue
+            index[canonical] = canonical
+            ext = n.get("external_id")
+            if ext:
+                # Only if it does not shadow a real id: a canonical id always wins,
+                # so a collision cannot silently retarget a tag.
+                index.setdefault(ext, canonical)
+        self._id_index = index
+        self._id_index_size = len(self.notes)
 
-    def tag_notes(self, note_ids: List[str], tag_name: str) -> int:
+    def invalidate_id_index(self) -> None:
+        """Drop the id index. Call after replacing or mutating ``notes``."""
+        self._id_index = None
+        self._id_index_size = -1
+
+    def _resolve_note_id(self, nid: str) -> Optional[str]:
+        """Canonical id for an id or external_id, or None.
+
+        Indexed because this used to scan every note per call, and `tag_notes` calls
+        it once per id — applying a vocabulary covering the corpus was O(notes x ids),
+        which is why the apply button appeared to hang for minutes at 15,380 notes.
+
+        The size check catches the common staleness case (notes replaced wholesale, as
+        a reload or a test does) without paying to hash the corpus on every lookup;
+        `invalidate_id_index` covers the rest.
+        """
+        if self._id_index is None or self._id_index_size != len(self.notes):
+            self._build_id_index()
+        return self._id_index.get(nid) if self._id_index else None
+
+    def persist_tags(self) -> None:
+        """Write the tag map once. Pair with ``tag_notes(..., save=False)``."""
+        save_tags_to_cache(self.note_tags)
+
+    def tag_notes(self, note_ids: List[str], tag_name: str, save: bool = True) -> int:
+        """Apply one tag to many notes.
+
+        ``save=False`` defers the write so a caller applying many actions pays for one
+        serialisation instead of one per action: each write rewrites the whole tag map
+        and copies the previous version to ``.bak``, which at 264 proposals over a
+        3.1 MB file was seconds of pure I/O on top of an already slow apply. Callers
+        that defer MUST call :meth:`persist_tags`.
+        """
         resolved = [self._resolve_note_id(nid) for nid in note_ids]
         invalid_ids = [nid for nid, r in zip(note_ids, resolved) if r is None]
         if invalid_ids:
+            # Before mutating anything: a rejected call must not leave a half-applied
+            # tag map behind for a later persist_tags to write out.
             raise ValueError(f"Invalid note IDs: {invalid_ids}")
 
         for r_id in resolved:
@@ -227,7 +274,8 @@ class NoteService:
                 if tag_name not in tags:
                     tags.append(tag_name)
 
-        save_tags_to_cache(self.note_tags)
+        if save:
+            save_tags_to_cache(self.note_tags)
         return len(note_ids)
 
     def bulk_tag_notes(self, assignments: Dict[str, List[str]]) -> int:

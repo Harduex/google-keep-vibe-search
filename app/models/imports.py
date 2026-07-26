@@ -1,14 +1,12 @@
-"""Pydantic request/response models for the ``/api/imports`` routes (T24).
+"""Pydantic request/response models for the ``/api/imports`` routes.
 
-These mirror the documented ``POST /api/imports {source_key, importer, path,
-dry_run}`` shape from ``docs/plans/wave-5-store.md`` §T24 and the per-bucket
-``ChangeSet`` counts the ingestion pipeline returns.
+These mirror the ``POST /api/imports {source_key, importer, path, dry_run}``
+shape and the per-bucket ``ChangeSet`` counts the ingestion pipeline returns.
 
-Per the DRIVER RULING in the wave-5 brief, there is no ``restored`` bucket on
-the response: a document that reappears after a soft delete is reported as
-``added``. The ``imports`` history table (T22) does carry a legacy
-``restored`` column for forward compatibility, but it is surfaced as ``0``
-here so the public API stays aligned with ``ChangeSet``.
+There is deliberately no ``restored`` bucket on the response: a document that
+reappears after a soft delete is reported as ``added``. The ``imports`` history
+table does carry a ``restored`` column for forward compatibility, but it is
+surfaced as ``0`` here so the public API stays aligned with ``ChangeSet``.
 """
 
 from __future__ import annotations

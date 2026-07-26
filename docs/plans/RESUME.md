@@ -3,7 +3,7 @@
 **Paste this file's contents to a fresh agent to resume the plan.** It is written for someone with
 none of the originating conversation's context.
 
-**Last updated:** 2026-07-25, mid-wave-5 — T21, T22, T23 all committed; wave-5 Round 2 closed green. **Resume at wave-5 Round 3** (dispatch T24 ∥ T25) — see Next steps.
+**Last updated:** 2026-07-26 — **Wave 5 complete and barrier-closed.** All six lanes (T21–T26) committed and verified; the wave-5 spec file is deleted in the barrier commit. **Resume at Wave 6** (dispatch T27 · T29 · T30 · T31 · T32 · T34 in round 1) — see Next steps.
 
 > Keep this current: refresh it at every wave barrier, in the barrier commit, alongside the
 > `PLANS.md` § Status update. A stale resume file is worse than none — it will confidently point the
@@ -21,56 +21,59 @@ Precedence: `AGENTS.md` > EXECUTION-PROTOCOL > wave file > PLANS.md.
 
 ## State
 
-Waves 1–4 complete, then reviewed and repaired. Branch `master`, nothing ever pushed
-(`origin/master` is still at `6dab505`). **The working tree is NOT clean** — see below.
+Waves 1–5 complete, each reviewed and repaired before the next started. Branch `master`, nothing
+ever pushed (`origin/master` is still at `6dab505`). **The working tree is NOT clean** — the
+wave-5 barrier commit is staged but uncommitted; see Next steps.
 
-**Read `PLANS.md` § Post-wave-4 review before continuing wave 5.** A review of all 31 wave-1–4
-commits found five tasks marked `done` whose deliverable did not work, plus two protocol
-deviations — including a barrier declared on a red gate and a benchmark tier that reported
-hardcoded numbers. All are fixed; the § Task index rows say which tasks were completed in review.
-The lesson is recorded there and applies directly to how waves 5–7 should be gated.
+**Read `PLANS.md` § Post-wave-4 review and § Proposed follow-ups before starting Wave 6.** The
+wave-5 review found the same failure mode the wave-4 review did — tasks committed `done` whose
+checkpoint had never actually been run — and added two wave-5-specific follow-ups (A7 lazy-models,
+migration script not built). Both lessons apply to how wave 6 is gated.
 
-### Wave 5 in progress — Round 2 closed; Round 3 next
+### Wave 5 complete — barrier closed 2026-07-26
 
-- **Round 1 — T21 (Lane L1, domain model): DONE.** Committed as `e2f66ee`
-  (`feat(domain): content-addressed document model with stable ids`). Verified by the driver:
-  4 paths only, no trailers, T21 row flipped to `done`. `app/domain` exposes `SourceDoc`,
-  `Document`, `ChangeSet`, `Attachment`, `stable_id(source_key, external_id)`, `content_hash(title, body)`.
-  **Note for downstream:** `ChangeSet.unchanged` is `list[str]` (ids only), not `list[Document]` —
-  T24's `ingest` / T25's `apply` must treat unchanged as a count, not iterate full objects.
-- **Round 2 — T22 (Lane L2) ∥ T23 (Lane L3): DONE, both committed after a green combined gate.**
-  The driver ran `GOOGLE_KEEP_PATH=. make check` over the combined tree → **exit 0** (337 pytest
-  passed, 1 skipped, 90.4 s; 67 vitest; eslint 0 errors; tsc/black/isort clean). 270→337 = +32
-  (T22) +35 (T23), plus the 1 documented skip.
-  - **T22 — `90966b9`** `feat(store): sqlite document store and mmapped vector store`.
-    `app/store/` (`__init__.py`, `sqlite.py`, `vectors.py`, `constants.py`) + `tests/test_store.py`
-    (32 passed). A4 idempotence proven as a *measured* zero (re-upsert 5k → `written=0`); vectors
-    keyed by `content_hash` not position (asserted).
-  - **T23 — `2a8e10f`** `feat(importers): pluggable importers for keep takeout and markdown folders`.
-    `app/importers/` (`__init__.py`, `base.py`, `keep.py`, `markdown.py`) + `tests/test_importers.py`
-    (35 passed, 1 skipped). SourceDoc counts: synthetic keep 27+3, synthetic markdown 27+3. Ports
-    `parser.py` (T06/T07 fixes retained); `app/parser.py` left for T26. Stdlib only.
-  - **T23 blocker (not a T23 failure):** `bench/corpora.py::load_markdown_vault()` is a stub that
-    returns `None` — Lane R / T35 never shipped a real CC-licensed markdown vault. The real-corpus
-    acceptance test **skips cleanly** with a documented reason; **no count was fabricated** (the T36
-    failure mode, avoided). Recorded as a Round-2 finding; T35 should ship the vault so the skip
-    becomes a real assertion. It did not gate T23.
+- **Round 1 — T21 (`e2f66ee`), Round 2 — T22 (`90966b9`) ∥ T23 (`2a8e10f`):** committed in prior
+  session, verified green. See git history for detail.
+- **Round 3 — T24 (`c225c8e`) ∥ T25 (`594bf30`):** both committed.
+  - **T24** — `app/ingest.py` (diff/upsert, one writer transaction, vectors keyed by
+    `content_hash`), `app/routes/imports.py` + `app/models/imports.py` (`POST /api/imports` with
+    `dry_run`, `GET /api/imports`, NDJSON stream variant). `tests/test_ingest.py` carries the 7
+    contract tests including the A4 assertion (12 added → 12 embeddings, not 2,012) and the A5
+    stable-id regression guard.
+  - **T25** — `VibeSearch.build(documents)` / `apply(ChangeSet)` on `app/search.py`, plus
+    `build`/`apply` on `chunking_service.py` and `entity_service.py`. Vector I/O routes through
+    `store/vectors.py`; `search()` no longer mutates the shared note dicts (A6). Parity gate
+    `make eval-retrieval` is green (see below).
+- **Round 4 — T26 (`3e07cc7`):** lifespan boots from the store (SELECT + mmap, no parse-and-embed);
+  `NoteService` is a thin read/tag façade; `app/services/cache_service.py` and `app/parser.py`
+  deleted. **Owner migrated the real cache by hand, so `scripts/migrate_to_store.py` was not built**
+  (recorded in § Proposed follow-ups — the mapping is lossless and mechanical if ever needed).
+  README "Project structure" + "How it works" and `SYSTEM-OVERVIEW.md` §1.1 updated in the barrier
+  commit.
+
+### Wave-5 review findings (recorded in `PLANS.md` § Proposed follow-ups)
+
+- **`make eval-retrieval` had been broken since `998d718`** — `scripts/eval_retrieval.py` imported
+  `app.search` before `bench.ablation`, tripping `bench/__init__.py`'s import-order guard, so the
+  T25 *and* T26 parity checkpoint exited 2 and had never run green. **Fixed in the barrier commit**
+  (bench imported first; `CACHE_DIR` read from `settings` instead of re-set in `main()`). This is
+  the post-wave-4 lesson recurring: a checkpoint named `make X` is met by running `make X`.
+- **A7 lazy-heavy-models is half-met.** Lifespan no longer re-embeds on boot (the primary win), but
+  still eagerly constructs `RerankerService` / `VerificationService` (NLI) / `GroundingService`,
+  which a plain `/api/search` never touches. Deferred to a later wave — it is a behaviour change on
+  the lifespan wiring, outside wave 5's "where data lives" scope.
 
 ## Next steps, in order
 
-**The paused Round-2 gate is resolved** — T22 (`90966b9`) and T23 (`2a8e10f`) are committed after a
-green combined `make check`. Do not re-dispatch them.
-
-1. **Round 3 = T24 (Lane L4 — Ingest API) ∥ T25 (Lane L5 — Index apply)** — dispatch concurrently.
-   Both consume the store (T22); T25 routes vector I/O through `store/vectors.py`. Brief each lane
-   with the concurrency protocol below. Remember `ChangeSet.unchanged` is `list[str]` (ids), not
-   `list[Document]` — treat it as a count. Wait for both to report `READY FOR GATE`, then run
-   `GOOGLE_KEEP_PATH=. make check` yourself and **paste its output** before issuing commit tokens.
-2. **Round 4 = T26 SERIAL (Lane L6 — Cutover)** — depends on T22, T23, T24, T25.
-3. At the wave-5 barrier (after T26): run `make check` yourself **and paste its output**, flip
-   § Status, re-run both § Verification scripts, refresh this file, **delete `wave-5-store.md` in
-   the barrier commit**, then **stop and report**. The owner wants a barrier stop before each new
-   wave.
+1. **Commit the wave-5 barrier** (staged): `scripts/eval_retrieval.py` fix, README + SYSTEM-OVERVIEW
+   doc updates, `PLANS.md` (T24/T25/T26 → `done`, wave-5 Status → `done`, new follow-ups),
+   `RESUME.md` (this refresh), and **delete `docs/plans/wave-5-store.md`** in the same commit per
+   `EXECUTION-PROTOCOL.md` §3. Commit message first line verbatim from the barrier convention.
+2. **Stop and report** — the owner wants a barrier stop before each new wave.
+3. **Wave 6 (after owner go-ahead)** — dispatch round 1: T27 (M tagging) · T29 (N hot path) ·
+   T30 (O client data) · T31 (P styling) · T32 (Q ops) · T34 (S sessions). Spec:
+   `docs/plans/wave-6-unify-and-quality.md`. Then T28 (round 2), then **T38 alone in round 3**
+   (serial — its write set crosses Lane M and Lane O, so it lands once every wave-6 lane is in).
 
 ## Gate discipline (tightened after the review)
 
@@ -87,23 +90,24 @@ green combined `make check`. Do not re-dispatch them.
 
 ## Verified gate, as of this checkpoint
 
-**Last green `make check` the driver actually ran and pasted: the combined wave-5 Round-2 tree,
-after T22/T23 were coded and before they were committed** → **exit 0**: 337 pytest passed, 1
-skipped, 90.4 s; 12 vitest files / 67 tests; eslint 0 errors (2 pre-existing warnings in
-`GalleryContext.tsx`, `ImageGallery/index.tsx`); tsc clean; black/isort clean. 270→337 over the
-round = +32 (T22 store) +35 (T23 importers); the +1 skip is the documented T23 markdown-vault
-stub (T35), not a fabricated count. That combined run greenlit both `90966b9` and `2a8e10f`.
+**Wave-5 barrier gate — `GOOGLE_KEEP_PATH=. make check` run by the driver on the barrier tree
+(after the T25 eval-retrieval fix + T26 doc updates), exit 0**: 325 pytest passed, 1 skipped,
+95.9 s; 12 vitest files / 67 tests; eslint 0 errors; tsc clean; black/isort clean. The count
+dropped from 337 (Round 2) to 325 because T26 deleted `tests/test_parser.py` and
+`tests/test_cache_service.py` (their subjects, `app/parser.py` and `app/services/cache_service.py`,
+were deleted in the same commit) — net wave-5 additions are still positive: T22 +32, T23 +35,
+T24 +~20, T25 +7, minus the two deleted files.
 
-PLANS.md invariants: `overlaps: 0`, `unowned: none` (the coverage script handles findings the
-plan split into lettered parts, e.g. B3 → B3a/B3b).
+**T25/T26 parity gate — `make eval-retrieval`, exit 0** (5.5–6.6 s). Fixture-corpus baseline:
+`dense_only` R@1 0.607 / R@5 0.687 / R@10 0.833 / MRR 0.683. This is the gate that had been broken
+since `998d718` and was fixed in this barrier — see § Wave-5 review findings.
 
-**The tree is clean of in-flight lane work** — T22/T23 are committed; only this docs refresh is
-uncommitted. Round 3 (T24 ∥ T25) has not started.
+PLANS.md invariants, re-run at the barrier: `overlaps: 0`, `unowned: none` (the coverage script
+handles findings the plan split into lettered parts, e.g. B3 → B3a/B3b).
 
-The suite went from 220 tests / 170 s to 243 / 107 s over the review: the extra tests are the
-review's regression tests, and the speed-up is real models and a live LLM call leaving the unit
-suite (the wired fixture was loading real NLI weights, and one chat test drove the real agent loop
-into its step timeout).
+**The tree holds only the barrier commit's staged changes** — the eval-retrieval fix, the README
+and SYSTEM-OVERVIEW doc updates, the PLANS.md row/status flips + follow-ups, this RESUME.md
+refresh, and the deletion of `wave-5-store.md`. No in-flight lane work remains.
 
 Tier-1 eval: `make eval-retrieval` (fixture corpus, ~6 s). Tier-2 benchmarks: `make bench-fetch`
 once, then `make bench` / `make bench-compare` — real models over SciFact and 20 Newsgroups, minutes
@@ -152,5 +156,5 @@ All lanes share ONE working tree. Lane ownership makes their *edits* disjoint bu
 
 - `PLANS.md` — wave graph, ownership matrix, § Task index (State column), § Status, § Post-wave-4 review.
 - `EXECUTION-PROTOCOL.md` — §1.3 dispatch rounds, §2 ownership, §3 commits + wave-file deletion policy, §4 gates.
-- Remaining specs: `wave-5-store.md`, `wave-6-unify-and-quality.md`, `wave-7-release-readiness.md`. Waves 1–4 files are deleted (policy).
+- Remaining specs: `wave-6-unify-and-quality.md`, `wave-7-release-readiness.md`. Waves 1–5 files are deleted (policy).
 - Gate: `GOOGLE_KEEP_PATH=. make check`.

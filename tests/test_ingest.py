@@ -4,8 +4,8 @@ Every test here uses synthetic SourceDocs built in memory plus a deterministic
 fake embedder (hash → fixed-dim vector). Nothing reads the real export, the
 real cache, or any real model weights — see AGENTS.md privacy boundary.
 
-These tests ARE the contract for the seven behaviours wave-5-store.md §T24
-names, in order:
+These tests ARE the contract for the seven ingestion behaviours T24 names,
+in order:
 
 1. import twice → second run reports all ``unchanged``, zero writes, zero
    embeddings;

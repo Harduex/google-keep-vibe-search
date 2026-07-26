@@ -15,14 +15,22 @@ warnings.filterwarnings("ignore")
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+# Import bench BEFORE any app.* module. bench/__init__.py pins CACHE_DIR to an
+# isolated per-run dir at import time and refuses to load if app.core.config has
+# already been imported (which would have bound `settings` to the real cache/).
+# Importing app.* first would set that guard off and, worse, leave `settings`
+# pointing at the real cache. This script is a parity checkpoint for changes to
+# the retrieval stack, so the ordering is load-bearing.
+import bench  # noqa: F401  — imported for its import-time side effect
+from bench.ablation import build_rankers
+from bench.metrics import mrr, recall_at_k
+
 from sentence_transformers import SentenceTransformer
 
 from app.search import VibeSearch
 from app.services.chunking_service import ChunkingService
 from app.services.entity_service import EntityService
 from app.services.reranker_service import RerankerService
-from bench.ablation import build_rankers
-from bench.metrics import mrr, recall_at_k
 from tests.fixtures.notes import generate_synthetic_notes
 
 GOLDEN_QUERIES: List[Tuple[str, Set[str]]] = [
@@ -89,13 +97,17 @@ def main():
 
     print(f"Loaded {len(notes)} fixture notes.")
 
-    # 2. Init components
+    # 2. Init components. CACHE_DIR was pinned by ``bench/__init__`` at import
+    # time to a per-run isolated dir, so ``settings`` already resolves there —
+    # setting it again here would be too late (settings is constructed on first
+    # app import). Route every index at the same isolated cache via settings.
     os.environ["EMBEDDING_MODEL"] = "all-MiniLM-L6-v2"
-    os.environ["CACHE_DIR"] = "/tmp/fake_cache"
-    os.makedirs("/tmp/fake_cache", exist_ok=True)
+    from app.core.config import settings
+
+    cache_dir = settings.resolved_cache_dir
 
     engine = VibeSearch(notes, force_refresh=True)
-    entity_service = EntityService(notes, cache_dir="/tmp/fake_cache")
+    entity_service = EntityService(notes, cache_dir=cache_dir)
     chunk_service = ChunkingService(engine.model)
     chunk_service.build_chunks(notes)
     chunk_service.load_or_compute_embeddings()

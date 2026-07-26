@@ -25,6 +25,13 @@ five UI tabs, one FastAPI process, one React SPA.
 
 ### 1.1 Container view
 
+> **Updated 2026-07-26 by wave 5 (T26).** The original audit (commit `6dab505`) recorded the
+> pre-remediation architecture below; wave 5 replaced the "re-parse on every change" model with a
+> durable document store. The diagram and the prose underneath are edited in place to reflect that;
+> the rest of this document still describes the system **as audited at `6dab505`**, and its findings
+> (`B*`/`A*`/`T*`/`H*`/`P*`) cite file:line locations from that commit. The target-state design lives
+> in `ARCHITECTURE-PROPOSAL.md` §1.
+
 ```
 ┌────────────────────────────────────────────────────────┐
 │ « BROWSER »                                            │
@@ -37,8 +44,9 @@ five UI tabs, one FastAPI process, one React SPA.
 ┌─────────────────────────────────────┐
 │ « HTTP LAYER »                      │
 │ fastapi app  [uvicorn]              │
-│  8 routers, Depends() injection     │
+│  9 routers, Depends() injection     │
 │  CORS "*" · no auth · no rate limit │
+│  POST /api/imports  [diff + dry_run]│
 └──────────────────┬──────────────────┘
                    ├───────────────────────── resolves services from [app.state]
                    ▼
@@ -55,19 +63,32 @@ five UI tabs, one FastAPI process, one React SPA.
 │ dense note + chunk vectors  [MiniLM]    │                                                  │
 │  bm25 · entity  [spaCy] · image  [CLIP] │                                                  │
 │  rerank  [ms-marco] · nli  [deberta]    │                                                  │
+│  build(documents) / apply(ChangeSet)    │                                                  │
 └────────────────────┬────────────────────┘                                                  │
-                     ├─────────────────────────── loads + persists vectors in [npz]          │
+                     ├─────── reads/writes vectors via [VectorStore, keyed by content_hash]  │
+                     ▼                                                                       │
+┌──────────────────────────────────────────────┐                                             │
+│ « STORE & INGEST LAYER »                     │                                             │
+│ SQLiteStore  [documents·tags·imports·ledger] │                                             │
+│  VectorStore  [mmapped .npy + id↔row map]    │                                             │
+│  IngestService  [importer stream → ChangeSet]│                                             │
+└────────────────────┬─────────────────────────┘                                             │
+                     ├─────────────────── populated once by [Importer], then incrementally   │
                      ▼                                                                       │
 ┌──────────────────────────────────────────────┐                                             │
 │ « LOCAL RESOURCES — external to the app »    │                                             │
-│ keep takeout export  [read-only fs]          │                                             │
-│  cache/  [4 npz + 6 json, 6 hash schemes]    │◀────────────────────────────────────────────┘
+│ keep takeout / markdown-dir  [read-only fs]  │◀────────────────────────────────────────────┘
+│  cache/store.db  [sqlite, WAL]               │
+│  cache/vectors/*.npy  [memmap, per index]    │
 │  llm endpoint  [Ollama / LM Studio / OpenAI] │
 └──────────────────────────────────────────────┘
 ```
 
-No database. No background worker. No second front door. No write path to the export — the source
-folder is read-only and every derived artefact lands in `cache/`.
+One database (`cache/store.db`, SQLite in WAL mode) holds documents, tags, import history and a
+per-index staleness ledger; dense vectors live in memory-mapped `.npy` matrices keyed by each
+document's `content_hash`, so an incremental import embeds only added/edited notes. No background
+worker. No second front door. No write path to the source — the export folder is read-only and every
+derived artefact lands in `cache/`.
 
 ### 1.2 Chat request flow (agent mode)
 

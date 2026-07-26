@@ -143,23 +143,27 @@ Access the app at http://localhost (port 80 → frontend, port 8000 → backend 
 app/                    # FastAPI backend
   core/
     config.py           # Pydantic BaseSettings (all env vars)
-    lifespan.py         # App startup/shutdown
+    lifespan.py         # App startup/shutdown — boots from the document store
     dependencies.py     # FastAPI Depends() injection
     exceptions.py       # Custom exception handlers
+  domain/               # Content-addressed document model (SourceDoc, Document, ChangeSet)
+  store/                # SQLite document store + mmapped vector store (keyed by content_hash)
+    sqlite.py           #   documents, tags, imports history, per-index staleness ledger
+    vectors.py          #   one .npy matrix per index kind, memory-mapped
+  importers/            # Pluggable importers → SourceDoc (keep-takeout, markdown-dir)
+  ingest.py             # The single writer: importer stream → ChangeSet (diff/upsert)
   models/               # Pydantic request/response models
   services/
-    note_service.py     # Note loading, tag CRUD
-    cache_service.py    # Embedding and note cache I/O
+    note_service.py     # Thin read/tag façade over the store
     search_service.py   # Wraps VibeSearch
     chat_service.py     # LLM calls, streaming, RAG retrieval
     session_service.py  # Chat session persistence (JSON files)
     chunking_service.py # Note → chunks for high-precision retrieval
     citation_service.py # Parse [Note #N] citations from responses
-  routes/               # One file per API route group
+  routes/               # One file per API route group (incl. POST /api/imports)
   prompts/
     system_prompts.py   # LLM system prompt templates
-  search.py             # VibeSearch: embedding + scoring
-  parser.py             # Google Keep JSON → Note objects
+  search.py             # VibeSearch: embedding + scoring (build / apply incremental)
   image_processor.py    # CLIP image embeddings
 
 client/                 # React + TypeScript frontend (Vite)
@@ -176,12 +180,18 @@ client/                 # React + TypeScript frontend (Vite)
     hooks/              # useSearch, useChat, useTags, useOrganize, ...
 
 tests/                  # pytest backend tests
-  conftest.py
-  test_parser.py
-  test_citation_service.py
-  test_session_service.py
-  test_chunking_service.py
+  conftest.py           # Synthetic fixture corpus + isolated cache dir (autouse)
+  test_store.py         # SQLite + vector store round-trips, idempotence, concurrency
+  test_importers.py     # keep-takeout + markdown-dir importers
+  test_ingest.py        # ingestion diff/upsert contract tests (A4, A5)
+  test_search_cache.py  # VibeSearch.build / apply incremental indexing
 ```
+
+The corpus is no longer "a folder of JSON files re-parsed on every change". It is a
+durable SQLite document store (`cache/store.db`) plus a memory-mapped vector store
+(`cache/vectors/`), populated once via an importer and updated incrementally —
+editing one note re-embeds only that note, not the whole corpus. See
+`docs/audit/ARCHITECTURE-PROPOSAL.md` §1–2 for the design.
 
 ### Running tests
 
@@ -233,19 +243,32 @@ To install them manually: `uv run pre-commit install`.
 
 ## How it works
 
-1. **Startup** — Notes are parsed from Google Keep JSON files, passed through `sentence-transformers` to produce embeddings, and cached to `./cache/`. Subsequent loads skip re-embedding unchanged notes.
+1. **Ingestion & storage** — Notes are read once by a pluggable importer
+   (`keep-takeout` for a Google Keep export, `markdown-dir` for an
+   Obsidian-style folder) into content-addressed documents stored in a SQLite
+   document store (`cache/store.db`), with dense vectors in a memory-mapped
+   store (`cache/vectors/`) keyed by each note's content hash. A `POST /api/imports`
+   call (or a first boot with a default source configured) runs the diff/upsert
+   pipeline: only added or edited notes are embedded, so re-importing an
+   unchanged export is a no-op and adding 12 notes to a 2,000-note store costs
+   12 embeddings, not 2,012.
 
-2. **Semantic search** — Your query is embedded with the same model. Cosine similarity ranks notes. An optional keyword overlap score is blended in for better precision on exact matches.
+2. **Startup** — The app opens the document store and memory-maps the vectors,
+   rather than re-parsing and re-embedding the export. Subsequent boots load in
+   seconds; only a note whose content hash is absent from the vector store is
+   ever encoded.
 
-3. **Image search** — If enabled, attached images are embedded with OpenAI CLIP. Image similarity scores are merged with text scores via Reciprocal Rank Fusion.
+3. **Semantic search** — Your query is embedded with the same model. Cosine similarity ranks notes. An optional keyword overlap score is blended in for better precision on exact matches.
 
-4. **Chat / RAG & Agentic Mode** — On each message, the backend runs multi-signal retrieval (latest message + recent context + topic + chunk-level search + continuity boost), injects the top notes into a structured system prompt, and streams the LLM response token-by-token. An agentic loop uses PydanticAI to execute 1-3 query probes per step across 3 search tools (`search_notes`, `search_chunks`, `filter_by_tag`) with PydanticAI validation retries and pure-math deterministic stopping (coverage thresholds, novelty ratios, max steps). Agent loop thresholds and internal limits are configured in `app/services/agent/constants.py`. The final `done` event includes verified `[Note #N]` citations.
+4. **Image search** — If enabled, attached images are embedded with OpenAI CLIP. Image similarity scores are merged with text scores via Reciprocal Rank Fusion.
 
-5. **Chunking** — Notes longer than 500 characters are split into paragraph-level chunks that are embedded independently, enabling higher-precision retrieval in large collections.
+5. **Chat / RAG & Agentic Mode** — On each message, the backend runs multi-signal retrieval (latest message + recent context + topic + chunk-level search + continuity boost), injects the top notes into a structured system prompt, and streams the LLM response token-by-token. An agentic loop uses PydanticAI to execute 1-3 query probes per step across 3 search tools (`search_notes`, `search_chunks`, `filter_by_tag`) with PydanticAI validation retries and pure-math deterministic stopping (coverage thresholds, novelty ratios, max steps). Agent loop thresholds and internal limits are configured in `app/services/agent/constants.py`. The final `done` event includes verified `[Note #N]` citations.
 
-6. **Sessions** — Chat histories are persisted as JSON in `./cache/chat_sessions/`. The session sidebar lets you switch, rename, and delete conversations.
+6. **Chunking** — Notes longer than 500 characters are split into paragraph-level chunks that are embedded independently, enabling higher-precision retrieval in large collections.
 
-7. **Tag Management** — Tags can be managed from multiple locations:
+7. **Sessions** — Chat histories are persisted as JSON in `./cache/chat_sessions/`. The session sidebar lets you switch, rename, and delete conversations.
+
+8. **Tag Management** — Tags can be managed from multiple locations:
    - **Search results** — The Tag Filters panel excludes tagged notes from results; individual tags can be removed from notes via badge buttons.
    - **All Notes** — The Tag Filter panel supports filtering by tag with inline rename.
    - **Note cards** — Each tag badge supports inline rename and removal.
@@ -256,9 +279,9 @@ To install them manually: `uv run pre-commit install`.
 
 ## Troubleshooting
 
-**No notes loaded** — Check `GOOGLE_KEEP_PATH` points to the folder that contains `.json` files (not the parent Takeout folder).
+**No notes loaded** — The store is populated by an import. Either set `GOOGLE_KEEP_PATH` to the folder containing `.json` files (imported automatically on first boot), or run `POST /api/imports` against an importer (`keep-takeout` or `markdown-dir`).
 
-**Slow first start** — Embedding all notes and (if enabled) images takes a few minutes on first run. Subsequent starts load from cache.
+**Slow first start** — The first import embeds every note (and, if enabled, every image), which takes a few minutes on a large corpus. Subsequent boots open the SQLite store and memory-map the vectors in seconds, and re-imports only embed notes whose content changed.
 
 **Chat not responding** — Verify your LLM endpoint is reachable: `curl http://localhost:11434/v1/models` for Ollama. Check that `LLM_MODEL` matches an available model.
 

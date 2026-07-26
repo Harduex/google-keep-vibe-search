@@ -106,9 +106,9 @@ report it instead of working around it.
 | T21 | 5 L1 | 1 | `Document` / `SourceDoc` / `ChangeSet` domain model | A5 | ¼ d | done |
 | T22 | 5 L2 | 2 | SQLite store + mmapped vector store | A3, A4, A15 | 1 d | done |
 | T23 | 5 L3 | 2 | `Importer` protocol + keep-takeout + markdown-dir | Q4 | ½ d | done |
-| T24 | 5 L4 | 3 | Ingestion diff/upsert + `/api/imports` (+ `dry_run`) | Q4, A4 | 1 d | todo |
-| T25 | 5 L5 | 3 | Indexes gain `build(all)` / `apply(ChangeSet)` | A4 | 1 d | todo |
-| T26 | 5 L6 | 4 | Cutover: lifespan on store, migration, drop `cache_service` (serial) | A3, A7 | 1 d | todo |
+| T24 | 5 L4 | 3 | Ingestion diff/upsert + `/api/imports` (+ `dry_run`) | Q4, A4 | 1 d | done |
+| T25 | 5 L5 | 3 | Indexes gain `build(all)` / `apply(ChangeSet)` | A4 | 1 d | done |
+| T26 | 5 L6 | 4 | Cutover: lifespan on store, migration, drop `cache_service` (serial) | A3, A7 | 1 d | done (migration owner-handled; A7 lazy-models deferred — see follow-ups) |
 | T27 | 6 M | 1 | Merge the two tagging pipelines into one | A1 | 1½ d | todo |
 | T28 | 6 M | 2 | Wire granularity through; one UMAP pass | B4 | ¼ d | todo |
 | T29 | 6 N | 1 | Reuse stored vectors on the chat hot path | A8 | ½ d | todo |
@@ -140,7 +140,7 @@ task of that wave lands.
 | 2 | A B C D E | 5 lanes, 2 rounds | done |
 | 3 | F G R T | T11·T33·T35 → T12·T13·T36 → T14 | done |
 | 4 | H I J K | 4 lanes → T18 → T20 | done |
-| 5 | L1–L6 | T21 → T22·T23 → T24·T25 → T26 | todo |
+| 5 | L1–L6 | T21 → T22·T23 → T24·T25 → T26 | done |
 | 6 | M N O P Q S | 6 lanes → T28 → T38 | todo |
 | 7 | — | T37 | todo |
 
@@ -186,6 +186,9 @@ Tasks discovered while executing the plan. Add here instead of building them
 | owner (2026-07-25) | **Decision, not open work:** `github.com/Harduex/deep-semantic-search` is **not** adopted in this project for now. It is currently referenced nowhere (no import, no dependency, no lockfile entry); the retrieval stack is built directly on `sentence-transformers` / `umap-learn` / `hdbscan` plus the in-repo `BM25Index`. Recorded so no later wave proposes swapping it in — doing so would replace much of what waves 5–6 restructure, and would be an architecture decision taken before wave 5, not a cleanup. |
 | orchestrator (2026-07-25) | `rank-bm25>=0.2.2` is a declared dependency in `pyproject.toml`, but the project ships its own `BM25Index` (`app/services/search/bm25.py`, rewritten in T05). Verify whether `rank_bm25` is imported anywhere; if not, drop it. Dependency weight matters here because the install already pulls ~2.5 GB of CUDA wheels. Belongs to wave 6 lane Q (**T32**, packaging hygiene) since it owns `pyproject.toml`. |
 | T07 | `tests/test_ready_route.py` is unowned by any wave-2 lane row in the matrix, yet it patches `app.core.lifespan` symbols and exercises the real FastAPI lifespan via `TestClient`, so any task that changes a startup call signature (as T07 did, adding `note_service.seed_tags_from_labels()`) can break it invisibly outside its own gate. Orchestrator authorised T07 to extend `DummyNoteService` with a no-op `seed_tags_from_labels` for this task only (§2.5 ruling: matrix gap, not a cross-lane violation, same basis as T04's `constants.py`). The matrix should assign this file to a lane in a later pass. |
+| T25/T26 (wave-5 review) | `make eval-retrieval` — the literal parity checkpoint for T25 *and* T26 — had been broken since `998d718` (the cache-safety guard): `scripts/eval_retrieval.py` imported `app.search` before `bench.ablation`, so `bench/__init__.py`'s `app.core.config in sys.modules` guard raised and the script exited 2. Both tasks were committed `done` without the checkpoint ever running green — the exact post-wave-4 failure mode ("a claim about a gate accepted in place of its output"). Fixed in the wave-5 barrier: `bench` is imported before any `app.*`, and the per-run `CACHE_DIR` is read from `settings` rather than re-set inside `main()`. Recorded so the lesson sticks: a checkpoint named `make X` is met by running `make X`, not by the target existing. |
+| T26 | A7's lazy-heavy-models goal is only half-met: lifespan no longer parse-and-embeds on boot (the primary win — it SELECTs from the store and memory-maps the vectors), but it still eagerly constructs `RerankerService`, `VerificationService` (NLI deberta) and `GroundingService` at startup, none of which a plain `/api/search` request touches. Making those lazy properties on `app.state` (constructed on first chat/verification request) would drop cold start further. Deferred because it is a behaviour change touching the lifespan wiring every later wave reads, and wave 5's scope discipline explicitly limited it to *where data lives*; belongs to a later wave rather than risk a cold-start regression now. |
+| T26 | `scripts/migrate_to_store.py` was specified but the owner migrated the real cache by hand, so the script was not built. If a migration script is ever wanted (e.g. for another machine's cache), the mapping is lossless and mechanical: legacy Keep filename-keyed ids map to `stable_id("keep", filename)` exactly, and `tags.json`/`excluded_tags.json` are filename-keyed. Not open work — recorded so a future request does not re-derive the mapping. |
 
 ## Verification
 

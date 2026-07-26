@@ -4,10 +4,19 @@ This package is intentionally stdlib-only: no I/O, no third-party deps. It is th
 one shape every downstream layer (importers, store, indexes) speaks.
 """
 
-from .model import Attachment, ChangeSet, Document, SourceDoc, content_hash, stable_id
+from .model import (
+    Attachment,
+    ChangeSet,
+    Document,
+    SourceDoc,
+    attachments_to_api,
+    content_hash,
+    stable_id,
+)
 
 __all__ = [
     "Attachment",
+    "attachments_to_api",
     "ChangeSet",
     "Document",
     "SourceDoc",

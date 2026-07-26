@@ -32,6 +32,23 @@ class Attachment:
     mime: str = ""
 
 
+def attachments_to_api(attachments: "list[Attachment]") -> list[dict]:
+    """Render attachments in the shape the HTTP API and image search speak.
+
+    Two vocabularies exist for one concept and both are load-bearing. The domain and
+    the store use ``path`` / ``mime``. The client (``client/src/types/index.ts``) and
+    :mod:`app.image_processor` use ``filePath`` / ``mimetype``, inherited from the
+    Google Keep export format that predates the domain model.
+
+    Converting here, at the boundary, keeps stored JSON untouched — renaming the
+    dataclass fields would require migrating every persisted document — while giving
+    consumers the keys they actually read. Consumers that receive the raw dataclass
+    instead see ``mimetype`` as ``undefined``, silently drop every image, and that is
+    exactly the bug this function exists to prevent.
+    """
+    return [{"filePath": a.path, "mimetype": a.mime} for a in attachments]
+
+
 @dataclass(frozen=True)
 class SourceDoc:
     """What an :class:`Importer` yields — one normalised note, pre-store.

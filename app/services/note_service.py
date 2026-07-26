@@ -5,7 +5,7 @@ import tempfile
 from typing import Any, Dict, List, Optional, Set
 
 from app.core.config import settings
-from app.domain import Document
+from app.domain import Document, attachments_to_api
 from app.ingest import IngestService
 from app.services.tagging.preprocess import clean_note
 from app.store import SQLiteStore, VectorStore
@@ -147,7 +147,10 @@ class NoteService:
             "created": doc.created_at.isoformat() if doc.created_at else "",
             "edited": doc.edited_at.isoformat() if doc.edited_at else "",
             "labels": list(doc.labels),
-            "attachments": list(doc.attachments) if hasattr(doc, "attachments") else [],
+            # The client filters on attachment.mimetype and builds URLs from
+            # attachment.filePath; handing it the raw dataclass (path/mime) made every
+            # image silently disappear from the note cards.
+            "attachments": attachments_to_api(getattr(doc, "attachments", []) or []),
         }
         if doc.extra:
             for k, v in doc.extra.items():

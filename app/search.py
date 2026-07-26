@@ -9,7 +9,7 @@ from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 
 from app.core.config import settings
-from app.domain import ChangeSet, Document
+from app.domain import ChangeSet, Document, attachments_to_api
 from app.services.search.bm25 import BM25Index
 from app.services.search.constants import RERANK_CANDIDATE_WINDOW
 from app.services.tagging.preprocess import clean_note
@@ -299,7 +299,28 @@ class VibeSearch:
 
         self._rebuild_embeddings_from_store()
         self.bm25_index = BM25Index(self.notes)
+        self._refresh_image_index()
         self._record_index_state()
+
+    def _refresh_image_index(self) -> None:
+        """Process the images of the notes currently indexed, and remap them.
+
+        ``from_model()`` initialises image search before any document is loaded, so the
+        processor is handed an empty list and has nothing to do. Whoever populates
+        ``self.notes`` afterwards has to say so, or image search stays permanently
+        empty — which is precisely what happened after the store cutover: the engine
+        reported ``initialized: true`` with ``images_count: 0``, and the only reason
+        anyone could still search images was a stale ``image_embeddings.npz`` left over
+        from the pre-cutover code path. Deleting the cache made the gap visible.
+
+        ``process_note_images`` is content-cached per path, so calling this after an
+        incremental ``apply()`` embeds only genuinely new images.
+        """
+        if not settings.enable_image_search or self.image_processor is None:
+            return
+        self.image_processor.process_note_images(self.notes)
+        self.image_note_map = {}
+        self._build_image_note_map()
 
     def apply(
         self,
@@ -357,6 +378,7 @@ class VibeSearch:
         # ``unchanged`` is intentionally left as-is (count only, no Documents).
         self._rebuild_embeddings_from_store()
         self.bm25_index = BM25Index(self.notes)
+        self._refresh_image_index()
         self._record_index_state()
 
     def _index_document(self, doc: Document) -> None:
@@ -382,6 +404,11 @@ class VibeSearch:
             "created": doc.created_at.isoformat() if doc.created_at else "",
             "edited": doc.edited_at.isoformat() if doc.edited_at else "",
             "labels": list(doc.labels),
+            # Image search reads note["attachments"][*]["filePath"]/["mimetype"].
+            # Omitting this key made _get_all_image_paths find nothing, so a freshly
+            # built engine reported images_count: 0 while the store held 1,942
+            # documents with attachments.
+            "attachments": attachments_to_api(doc.attachments),
         }
 
     def _rebuild_embeddings_from_store(self) -> None:

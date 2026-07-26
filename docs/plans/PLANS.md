@@ -128,7 +128,7 @@ report it instead of working around it.
 | T35 | 3 T | 1 | Benchmark corpora, scale generator, shared metrics | T4 | 1 d | done (loader fixed in review) |
 | T36 | 3 T | 2 | Signal ablation, tagging correctness, baseline gate | T4 | 1 d | done (rebuilt in review) |
 | T37 | 8 — | 1 | Production-readiness comment sweep + pre-push safety audit | — | ½ d | todo |
-| T39 | 7 U | 1 | Loopback-only posture: CORS, body cap, rate limit | H8 | ½ d | todo |
+| T39 | 7 U | 1 | Loopback-only posture: CORS, body cap, rate limit | H8 | ½ d | done (landed early in `a4588b5`) |
 | T40 | 7 V | 1 | Construct reranker/NLI/grounding models on first use | A7 (completion) | ½ d | todo |
 | T41 | 7 W | 1 | Route every raw exception string through `safe_exc` | P1–P3 (completion) | ½ d | todo |
 | T42 | 7 X | 1 | Delete the legacy whole-corpus embedding cache | A1 (third impl) | ½ d | todo |
@@ -168,8 +168,8 @@ task of that wave lands.
 | 3 | F G R T | T11·T33·T35 → T12·T13·T36 → T14 | done |
 | 4 | H I J K | 4 lanes → T18 → T20 | done |
 | 5 | L1–L6 | T21 → T22·T23 → T24·T25 → T26 | done |
-| 6 | M N O P Q S | 6 lanes → T28 → T38 | todo |
-| 7 | U V W X | 4 lanes, 1 round | todo |
+| 6 | M N O P Q S | round 1 done (T27·T29·T30·T31·T32·T34) → T28 → T38 | round 1 done; T28 + T38 remain |
+| 7 | U V W X | 4 lanes, 1 round | T39 (Lane U) landed early in `a4588b5`; T40·T41·T42 remain |
 | 8 | — | T37 (T43 retired) | todo |
 
 ## Post-wave-4 review (2026-07-25)

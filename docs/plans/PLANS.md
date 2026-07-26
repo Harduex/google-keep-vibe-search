@@ -29,7 +29,10 @@ Wave 5  store & ingestion   T21 SERIAL, then PARALLEL ── 4 agents in 2 round
 Wave 6  unify + quality     PARALLEL ── 6 agents (M tagging unification · N–Q quality · S sessions)
    │                                    then SERIAL T38 (streamed proposals — needs T27/T28 + T30)
    │
-Wave 7  release readiness   SERIAL  ── 1 agent   (comment sweep + pre-push safety audit; must run last)
+Wave 7  deployability       PARALLEL ── 4 agents (U posture · V cold start · W redaction · X legacy path)
+   │                                    one round; write sets disjoint by construction
+Wave 8  release             SERIAL  ── 1 agent   (T37 comment sweep + pre-push audit, then T43
+                                        commit-message rewrite; both must run last, on a quiet tree)
 ```
 
 Waves are hard barriers: Wave *n+1* starts only when every lane in Wave *n* is committed and CI is
@@ -74,8 +77,14 @@ report it instead of working around it.
 | 6 | **Q** ops | `Dockerfile`, `docker-compose.yml`, `pyproject.toml`, `client/Dockerfile` | T32 |
 | 6 | **S** sessions | `app/services/session_service.py`, `app/routes/chat.py`, `tests/test_session_service.py` | T34 |
 |   |   | ↳ **T38 runs alone in round 3**, after every wave-6 lane has landed, so its write set is not listed as a lane row: it spans Lane M (`categorization_service.py`), Lane O (`client/src/hooks/useOrganize.ts`), plus `app/routes/organize.py`, `app/services/proposal_store.py` and `client/src/components/Organize/**` — which no lane owns. Listing those against Lane M would register a false overlap with Lane O while telling a concurrent agent nothing, since by round 3 there is no concurrent agent. The authoritative write set is in T38's spec. | T38 |
-| 7 | — | everything (**comments only**) + `docs/audit/PRE-PUSH-AUDIT.md` (new) | T37 |
-|   |   | ↳ The comments-only restriction is what makes a whole-repo write set safe: T37's checkpoint asserts every changed Python file is **AST-identical** to its parent commit. Mirrors T01, which owned everything for formatting only. |   |
+| 7 | **U** posture | `app/main.py`, `app/core/security.py` (new), `tests/test_security.py` (new), `README.md` | T39 |
+| 7 | **V** cold start | `app/core/lifespan.py`, `tests/test_ready_route.py`, `tests/test_api_integration.py` | T40 |
+| 7 | **W** redaction | `app/core/redact.py`, `app/image_processor.py`, `app/ingest.py`, `app/routes/chat.py`, `app/routes/embeddings.py`, `app/routes/imports.py`, `app/routes/search.py`, `app/routes/tags.py`, `app/services/query_service.py`, `app/services/agent/pydantic_agent.py`, `app/services/tagging/**`, `tests/test_redaction.py` (new) | T41 |
+| 7 | **X** legacy path | `app/search.py`, `tests/test_search_cache.py`, `tests/test_phase1_algorithms.py`, `scripts/eval_retrieval.py`, `scripts/eval_categorization.py` | T42 |
+|   |   | ↳ Two boundaries the specs state explicitly, because both lanes would otherwise reach for the same file: `app/search.py` has `str(e)` sites but belongs to **Lane X** — Lane W reports them instead of editing. And `ChunkingService.load_or_compute_embeddings` is legacy in the same way `app/search.py`'s path is, but its call site is `lifespan.py`, which **Lane V** owns — so Lane X leaves it and records a follow-up. |   |
+| 8 | — | everything (**comments only**) + `docs/audit/PRE-PUSH-AUDIT.md` (new) | T37 |
+| 8 | — | commit **messages** in `origin/master..master` only; **no tree changes** | T43 |
+|   |   | ↳ The comments-only restriction is what makes a whole-repo write set safe: T37's checkpoint asserts every changed Python file is **AST-identical** to its parent commit. Mirrors T01, which owned everything for formatting only. T43's equivalent guard is `git diff backup/pre-t43 HEAD --stat` returning empty. |   |
 
 ---
 
@@ -119,14 +128,31 @@ report it instead of working around it.
 | T34 | 6 S | 1 | Session service hygiene | B14, B16 | ¼ d | todo |
 | T35 | 3 T | 1 | Benchmark corpora, scale generator, shared metrics | T4 | 1 d | done (loader fixed in review) |
 | T36 | 3 T | 2 | Signal ablation, tagging correctness, baseline gate | T4 | 1 d | done (rebuilt in review) |
-| T37 | 7 — | 1 | Production-readiness comment sweep + pre-push safety audit | — | ½ d | todo |
+| T37 | 8 — | 1 | Production-readiness comment sweep + pre-push safety audit | — | ½ d | todo |
+| T39 | 7 U | 1 | Loopback-only posture: CORS, body cap, rate limit | H8 | ½ d | todo |
+| T40 | 7 V | 1 | Construct reranker/NLI/grounding models on first use | A7 (completion) | ½ d | todo |
+| T41 | 7 W | 1 | Route every raw exception string through `safe_exc` | P1–P3 (completion) | ½ d | todo |
+| T42 | 7 X | 1 | Delete the legacy whole-corpus embedding cache | A1 (third impl) | ½ d | todo |
+| T43 | 8 — | 2 | Rewrite the unpushed commit messages for a public reader (serial, after T37) | — | ½ d | todo |
 | T38 | 6 M | 3 | Stream proposals as they are named, actionable mid-run (serial, after T30) | — | 1 d | todo |
 
-**Totals:** 38 tasks · ~21½ developer-days serial · ~8 wall-clock days at the lane parallelism above.
+**Totals:** 43 tasks · ~24 developer-days serial · ~9½ wall-clock days at the lane parallelism above.
+**29 done, 14 remaining** (wave 6: T27–T32, T34, T38 · wave 7: T39–T42 · wave 8: T37, T43).
+
 Every one of the 46 audit findings is owned by exactly one task — verified by the coverage script in
-§ Verification below. **T37 owns no finding**: it was added at the repo owner's request (2026-07-25),
-not derived from the audit, so it does not affect the coverage invariant. **T38 owns no finding
-either**: it is an owner feature request from 2026-07-25, specced in `wave-6-unify-and-quality.md`.
+§ Verification below. **T37, T38 and T43 own no finding**: all three are owner requests (2026-07-25,
+-25 and -26), not derived from the audit, so they do not affect the coverage invariant.
+
+**H8 was owned only nominally until 2026-07-26.** The coverage script counted it as covered because
+the string `H8` appeared in T32's prose, while its substance — no auth, `allow_origins=["*"]` with
+`allow_credentials=True`, no rate limit, no body cap — was addressed by no task. **T39 now owns it.**
+T32 keeps only the port-binding half (exposure); T39 fixes the posture. Recorded because it is the
+coverage invariant's known blind spot: it proves an id is *mentioned*, not that it is *fixed*.
+
+**T40, T41 and T42 complete findings a previous wave part-met** (A7, P1–P3, A1's third
+implementation). Their ids are already claimed by T26, T10 and T27 respectively, so they are listed
+as "(completion)" rather than re-claiming the id — re-claiming would make the invariant's
+one-task-per-finding reading ambiguous.
 
 ## Status
 
@@ -142,7 +168,8 @@ task of that wave lands.
 | 4 | H I J K | 4 lanes → T18 → T20 | done |
 | 5 | L1–L6 | T21 → T22·T23 → T24·T25 → T26 | done |
 | 6 | M N O P Q S | 6 lanes → T28 → T38 | todo |
-| 7 | — | T37 | todo |
+| 7 | U V W X | 4 lanes, 1 round | todo |
+| 8 | — | T37 → T43 | todo |
 
 ## Post-wave-4 review (2026-07-25)
 
@@ -188,6 +215,12 @@ Tasks discovered while executing the plan. Add here instead of building them
 | T07 | `tests/test_ready_route.py` is unowned by any wave-2 lane row in the matrix, yet it patches `app.core.lifespan` symbols and exercises the real FastAPI lifespan via `TestClient`, so any task that changes a startup call signature (as T07 did, adding `note_service.seed_tags_from_labels()`) can break it invisibly outside its own gate. Orchestrator authorised T07 to extend `DummyNoteService` with a no-op `seed_tags_from_labels` for this task only (§2.5 ruling: matrix gap, not a cross-lane violation, same basis as T04's `constants.py`). The matrix should assign this file to a lane in a later pass. |
 | T25/T26 (wave-5 review) | `make eval-retrieval` — the literal parity checkpoint for T25 *and* T26 — had been broken since `998d718` (the cache-safety guard): `scripts/eval_retrieval.py` imported `app.search` before `bench.ablation`, so `bench/__init__.py`'s `app.core.config in sys.modules` guard raised and the script exited 2. Both tasks were committed `done` without the checkpoint ever running green — the exact post-wave-4 failure mode ("a claim about a gate accepted in place of its output"). Fixed in the wave-5 barrier: `bench` is imported before any `app.*`, and the per-run `CACHE_DIR` is read from `settings` rather than re-set inside `main()`. Recorded so the lesson sticks: a checkpoint named `make X` is met by running `make X`, not by the target existing. |
 | T26 | A7's lazy-heavy-models goal is only half-met: lifespan no longer parse-and-embeds on boot (the primary win — it SELECTs from the store and memory-maps the vectors), but it still eagerly constructs `RerankerService`, `VerificationService` (NLI deberta) and `GroundingService` at startup, none of which a plain `/api/search` request touches. Making those lazy properties on `app.state` (constructed on first chat/verification request) would drop cold start further. Deferred because it is a behaviour change touching the lifespan wiring every later wave reads, and wave 5's scope discipline explicitly limited it to *where data lives*; belongs to a later wave rather than risk a cold-start regression now. |
+| driver (pre-wave-6 audit, 2026-07-26) | **`make eval` destroyed the real corpus and nobody owned the file.** `scripts/eval_categorization.py` imported `app.core.config` with no `CACHE_DIR` redirect, so `settings` bound to the real `cache/`; post-T26 `NoteService.load_notes(force_refresh=True)` runs `IngestService` against the real `store.db`, and `compute_change_set` soft-deletes every doc absent from the import — i.e. the whole corpus, twice per eval run. Redirecting `google_keep_path` *was* sufficient isolation when T14 wrote the script and stopped being sufficient when T26 changed `NoteService` into a store façade; the script belongs to no wave-5 or wave-6 lane, so noticing was nobody's job. Fixed by the driver pre-wave (bench-first import + `assert_cache_isolated()`), and `tests/test_cache_safety.py` now asserts the import order for **every** script — the guard previously covered `tests/` and `bench/` but not `scripts/`, which is where the live damage path was. |
+| driver (pre-wave-6 audit) | **`_sanitize_tag_name` silently discards any tag containing an underscore.** `categorization_service.py:96` allows only `[A-Za-zА-Яа-я0-9\s&/-]`, so a real LLM emitting `Home_Improvement` yields `""` and the cluster ends up unnamed. Narrow but real. **T27 owns that file and is rewriting the naming path**, so fix it there — the AGENTS.md finding on full-string validation is the same class of bug. |
+| driver (pre-wave-6 audit) | **T27's `make eval` stability gate was unfalsifiable.** The eval's `CountingFakeLLM` returned `Tag_<hash>`, which the sanitizer above emptied, so both runs assigned `""` to every note and "Primary-tag stability: 100%" was measured over empty strings — a gate that cannot fail, the wave-4 fabricated-baseline failure in a new place. Fixed pre-wave (space instead of underscore). **Remaining caveat for T27:** the name is derived from the prompt hash, so *any* change to clustering or sampling changes every name and reads as 0% stability. It is now a change-detector, not a semantic-stability metric — T27 should expect to re-baseline deliberately rather than treat a drop as a regression. |
+| driver (pre-wave-6 audit) | **A1 is wider than wave 6 can close.** Besides the two tagging pipelines, the legacy `VibeSearch(notes, ...)` constructor and `load_or_compute_embeddings` (whole-corpus hash → `.npz`, `app/search.py:139-208`) still run in parallel with T25's store-backed `build`/`apply`. Live callers: both eval scripts, `tests/test_search_cache.py`, `tests/test_phase1_algorithms.py`. `app/search.py` is owned by **no wave-6 lane**, so by T27's own standard ("the wave is not done while two implementations exist") this one outlives wave 6. Needs its own task. |
+| driver (pre-wave-6 audit) | **Wave-6 matrix gaps, ruled in advance** (§2.5 basis, same as T04/T07): (a) `scripts/eval_categorization.py` + the `Makefile` eval targets were Lane G's in wave 3 and are unowned in wave 6 — taken by the driver in the pre-wave commit; (b) `AGENTS.md` must gain `proposal` in the NDJSON type list for **T38** — granted to T38 for its serial round (was Lane J's in wave 4); (c) T34's B16 also names `entity_service.py`, unowned this wave and freshly restructured by T25 — **T34 reports it, does not edit it**. |
+| driver (2026-07-26) | **The repo is already public** (`github.com/Harduex/google-keep-vibe-search`, visibility PUBLIC, last pushed 2026-07-24), so everything up to `origin/master` = `6dab505` is published; the 57 local commits are not. A full-history leak audit (gitleaks, self-test PASS, all refs + stashes) found **no** secrets, private keys, dumps, or committed cache/note artifacts — `cache/` has been gitignored throughout. One advisory: two already-public commit messages (`53c53a26e`, `2fadb0951`) name five eyeballed search queries, two of them Bulgarian, which hints at corpus topics. Owner decision: leave them — a rewrite of public history does not un-publish, and the disclosure is topic-level, no note text. This does not discharge **T37**, which still audits the wave-1–7 commits before any push. |
 | T26 | `scripts/migrate_to_store.py` was specified but the owner migrated the real cache by hand, so the script was not built. If a migration script is ever wanted (e.g. for another machine's cache), the mapping is lossless and mechanical: legacy Keep filename-keyed ids map to `stable_id("keep", filename)` exactly, and `tags.json`/`excluded_tags.json` are filename-keyed. Not open work — recorded so a future request does not re-derive the mapping. |
 
 ## Verification

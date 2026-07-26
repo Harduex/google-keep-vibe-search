@@ -1,19 +1,26 @@
-# Wave 7 — Release readiness (SERIAL, 1 agent)
+# Wave 8 — Release (SERIAL, 1 agent, two tasks in order)
 
 Not parallel, and deliberately last: T37 sweeps **every** file for comment hygiene and audits **every**
-unpushed commit, so it must observe the finished state of waves 1–6. It is the mirror image of T01 —
+unpushed commit, so it must observe the finished state of waves 1–7. It is the mirror image of T01 —
 that task opened the plan with a mechanical sweep across all files (formatting only); this one closes
 it with a mechanical sweep across all files (comments only) plus the gate that decides whether the
-work is publishable. Total ≈ ½ day.
+work is publishable. **T43 then rewrites the unpushed commit messages** and must run after T37 so it
+can clean T37's own message too. Total ≈ 1 day.
 
-**Added at the repo owner's request (2026-07-25), not derived from an audit finding.** It owns no
-`B*`/`A*`/`T*`/`H*`/`P*` id, so the coverage invariant in `PLANS.md` § Verification is unaffected.
+**Was wave 7 until 2026-07-26**, renumbered when the pre-wave-6 audit turned four unowned follow-ups
+into a real deployability wave (`wave-7-deployability.md`). Nothing about T37 changed; it just moved
+back one place, because a comments-only AST-freeze over the whole repo has to observe the *final*
+code, and wave 7 changes code.
+
+**Added at the repo owner's request (2026-07-25; T43 on 2026-07-26), not derived from an audit
+finding.** Neither task owns a `B*`/`A*`/`T*`/`H*`/`P*` id, so the coverage invariant in
+`PLANS.md` § Verification is unaffected.
 
 ---
 
 ## T37 — Production-readiness comment sweep + pre-push safety audit
 
-**Fixes:** — (owner request). **Depends on:** every task in waves 1–6.
+**Fixes:** — (owner request). **Depends on:** every task in waves 1–7.
 
 **Owns:** every file (**comments only**), plus `docs/audit/PRE-PUSH-AUDIT.md` (new) and its own row in
 `PLANS.md`. The comments-only restriction is what makes a whole-repo write set safe; see **Do not**.
@@ -152,3 +159,95 @@ For `client/src/**`, `tsc -b` plus `vitest` inside `make check` is the equivalen
 State the test counts before and after in the commit body; they must be identical.
 
 **Commit:** `chore(release): strip plan-internal comments and audit history for publish safety`
+
+---
+
+## T43 — Rewrite the unpushed commit messages for a public reader
+
+**Fixes:** — (owner request, 2026-07-26). **Depends on:** T37 — runs **after** it, so it can clean
+T37's own message too. Runs alone on a quiet tree; this rewrites history.
+
+**Owns:** commit messages in `git log origin/master..master` only. **No tree changes whatsoever** —
+that is the checkpoint.
+
+**Why this is safe here, and would not be elsewhere:** all 58 commits in this range are **unpushed**.
+Rewriting them costs nothing — no forks, no clones, no cached SHAs, no CI re-runs. The published
+history (up to `origin/master` = `6dab505`) is **out of scope and must not be touched**; the audit of
+2026-07-26 already cleared it, and rewriting public history does not un-publish anything.
+
+**The situation, measured 2026-07-26** over the 58 commits (47 touching code, 11 docs-only):
+
+| What | Count |
+|---|---|
+| Subject lines carrying plan coordinates (`T38`, `wave-5`, `Lane K`) | 12 of 58 |
+| Body lines referencing a task code `T\d\d` | 104 |
+| Body lines referencing a wave | 38 |
+| Body lines referencing a lane | 29 |
+| Body lines naming `PLANS.md` / `EXECUTION-PROTOCOL.md` / `RESUME.md` | 27 |
+| Body lines mentioning the orchestrator / driver | 10 |
+| Body lines mentioning a checkpoint, or pasting gate output | 13 / 68 |
+
+So ~46 subjects already read fine in public; the noise is concentrated in the bodies.
+
+**Do**
+1. **Keep the engineering, drop the coordinates.** Every commit must still say *what changed and
+   why*. Replace "T24 replaces the hashing scheme" with what the change actually does. Delete
+   "Lane L4", "round 2", "READY FOR GATE", "commit token", barrier and driver language outright — it
+   describes how this plan was executed by agents, which no reader of the repo can act on.
+2. **Keep pasted gate output where it is evidence, compress where it is noise.** A before/after
+   regression proof is genuinely useful in a commit body. A full 30-line pytest summary is not —
+   reduce it to the line that carries information (`328 passed, 1 skipped`). Do not delete evidence
+   that a fix was verified; that is the most valuable thing in these messages.
+3. **Rewrite the 12 offending subjects.** Prefer the conventional-commit form already in use
+   (`fix(scope): …`). `docs(wave-5): finalize barrier documentation…` becomes something a
+   contributor can parse without the plan.
+4. **The 11 docs-only commits** are plan bookkeeping — barrier commits, RESUME refreshes. They cannot
+   be made meaningful to an outside reader because their entire content is plan-internal. **Do not
+   squash or drop them** (that would rewrite the tree, and the plan docs are a legitimate part of
+   this repo's history); just give them honest subjects, e.g.
+   `docs: record implementation-plan progress`.
+5. **Leave the author identity and dates alone.** No `--reset-author`, no date rewriting: that
+   fabricates provenance.
+
+**Mechanics** Use a non-interactive message-only rewrite —
+`git filter-branch --msg-filter` over `origin/master..HEAD`, or `git rebase` with a prepared message
+map. **Take a backup ref first** (`git branch backup/pre-t43`) and keep it until the checkpoint
+passes. Never `git push`, never `--force` anything at a remote.
+
+**The consequence to handle, not discover:** rewriting messages changes **every SHA** in the range.
+`PLANS.md`, `RESUME.md` and the audit docs cite specific SHAs (`58a83af`, `288932d`, `3e07cc7`,
+`e2f66ee`, `998d718`, `c225c8e`, …), and every one of those citations becomes dangling. Either
+re-point them in a **follow-up commit after the rewrite** (they are then stable, since that commit is
+the new tip), or replace them with subject-line references that survive a rewrite. Decide which, do
+it, and say which you chose — leaving 20-odd dangling SHAs in the plan docs is exactly the kind of
+quiet rot this wave exists to prevent.
+
+**Checkpoint**
+```
+# 1. the tree is byte-identical — this is a message-only rewrite
+git diff backup/pre-t43 HEAD --stat        # expect: empty output
+git rev-list --count origin/master..HEAD   # expect: 58, unchanged
+
+# 2. the coordinates are gone from the range
+git log origin/master..HEAD --format='%s%n%b' | grep -icE '\b(T[0-9]{2}|wave[- ][0-9]|lane [A-Z])\b|orchestrator|commit token|READY FOR GATE'
+# expect: 0
+
+# 3. the published history is untouched
+git rev-parse origin/master                # still 6dab505
+git log --format='%H' -1 6dab505           # still reachable, unchanged
+
+# 4. no dangling SHA citations left in the plan docs
+for sha in $(grep -ohE '\b[0-9a-f]{7,40}\b' docs/plans/*.md docs/audit/*.md | sort -u); do
+  git cat-file -e "$sha^{commit}" 2>/dev/null || echo "DANGLING: $sha"
+done
+# expect: no DANGLING lines (or an explicit note saying they were replaced by subject references)
+
+# 5. the gate still passes, unchanged
+GOOGLE_KEEP_PATH=. make check
+```
+Check 1 is the load-bearing one: a message rewrite that alters a single byte of the tree is a
+different task and must be reverted from `backup/pre-t43`.
+
+**Commit:** no new commit for the rewrite itself (it *is* the history). The SHA re-pointing follow-up,
+if you choose that route, commits as
+`docs(plans): re-point commit references after the message rewrite`

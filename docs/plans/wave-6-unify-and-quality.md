@@ -247,6 +247,19 @@ Search / Chat / Organize in both themes are visually unchanged.
    AGENTS.md finding (`.to("cuda")`, `numpy<2`, 2.2.2 breakage) is real and must not be regressed.
 4. Reconcile the Python version: `requires-python >=3.10`, black `target-version=["py38"]`, README says
    "Python 3.9+". Pick 3.10 and make all three agree. Drop `nltk` if T15 left it unused.
+5. **Two dependency items recorded as follow-ups, both landing here** because Lane Q owns
+   `pyproject.toml` and nothing else can fix them:
+   - **`make setup` is broken on a clean machine.** It runs `uv run pre-commit install`, but
+     `pre-commit` is not a declared dependency — it resolves to a global binary if one happens to
+     exist. Declare it in the dev group.
+   - **`rank-bm25>=0.2.2` is dead weight.** The project ships its own `BM25Index`
+     (`app/services/search/bm25.py`, rewritten in T05). Verify nothing imports `rank_bm25`
+     (`grep -rn "rank_bm25" app tests scripts bench`), then drop it. Dependency weight matters when
+     the install already pulls ~2.5 GB of CUDA wheels.
+
+**Scope note on H8:** the CORS/auth/rate-limit posture is **not** this task's. It belongs to **T39**
+(wave 7, Lane U). T32 owns only the *exposure* half — binding published ports to `127.0.0.1` — which
+is why the port change is listed under item 2 above and nothing here touches `app/main.py`.
 
 **Checkpoint**
 ```

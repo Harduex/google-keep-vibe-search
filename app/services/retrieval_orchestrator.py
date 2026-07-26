@@ -3,6 +3,13 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity as sklearn_cosine_similarity
 
+# Private note-dict key under which the orchestrator hands a precomputed vector to
+# VerificationService.detect_conflicts, so the conflict pass does not re-encode notes
+# whose vectors already live in the engine's VectorStore (A8). The key is namespaced
+# and is popped before any note dict is serialized to the client (see detect_conflicts),
+# so it never reaches the NDJSON stream or the prompt.
+STORED_VECTOR_KEY = "__stored_vector__"
+
 
 class RetrievalOrchestrator:
     """Multi-signal retrieval with RRF fusion, reranking, and gap analysis."""
@@ -131,6 +138,13 @@ class RetrievalOrchestrator:
             )
             result = self._apply_scope(result, tags, date_range)
 
+        # A8: attach stored vectors to the notes we are about to hand back, so the
+        # downstream conflict-detection pass can reuse them instead of re-encoding the
+        # same note text. Notes whose vectors are absent from the store (e.g. a bare
+        # test double with no VectorStore) are simply left unannotated, and detect_conflicts
+        # falls back to encoding for them.
+        self._attach_stored_vectors(result)
+
         return result, gap_status
 
     def _apply_scope(
@@ -212,26 +226,102 @@ class RetrievalOrchestrator:
     def _is_duplicate_query(
         self, query: str, previous_queries: List[str], threshold: float = 0.95
     ) -> bool:
-        """Query collapse: skip retrieval if query is near-duplicate of a previous one."""
+        """Query collapse: skip retrieval if query is near-duplicate of a previous one.
+
+        The query and the recent queries are all genuinely new text (the user's own
+        words), so they must be encoded — but only once, in a single batch instead of
+        two separate encode calls.
+        """
         if not previous_queries or not query.strip():
             return False
         model = self.search_service.engine.model
-        q_emb = model.encode([query])
-        prev_embs = model.encode(previous_queries)
+        # One encode call instead of two: query first, then the previous queries.
+        embs = np.asarray(model.encode([query, *previous_queries]))
+        q_emb = embs[:1]
+        prev_embs = embs[1:]
         sims = sklearn_cosine_similarity(q_emb, prev_embs)[0]
         return bool(np.any(sims > threshold))
+
+    def _note_vectors(self, notes: List[Dict[str, Any]]) -> Optional[np.ndarray]:
+        """Return an embedding matrix aligned to ``notes``, reusing stored vectors.
+
+        A8: notes returned from retrieval are already indexed, so their vectors live in
+        the engine's :class:`~app.store.vectors.VectorStore` keyed by ``content_hash``.
+        Reading them by id avoids re-encoding the same note text on every chat message.
+        Only notes whose vector is genuinely missing (no store attached, or an
+        un-indexed id) fall through to ``model.encode`` — and those are batched into a
+        single call.
+
+        Returns ``None`` when there are no notes to embed.
+        """
+        if not notes:
+            return None
+        model = self.search_service.engine.model
+        engine = self.search_service.engine
+        store = getattr(engine, "vector_store", None)
+        id_to_hash = getattr(engine, "_id_to_content_hash", None)
+
+        vectors: List[Optional[np.ndarray]] = [None] * len(notes)
+        # Resolve as many vectors as possible from the store before encoding anything.
+        if store is not None and isinstance(id_to_hash, dict):
+            wanted_ids = [n.get("id") for n in notes]
+            hashes = [id_to_hash.get(nid) if nid is not None else None for nid in wanted_ids]
+            present = {h: v for h, v in store.get([h for h in hashes if h]).items()}
+            for i, h in enumerate(hashes):
+                if h is not None:
+                    vec = present.get(h)
+                    if vec is not None:
+                        vectors[i] = np.asarray(vec, dtype=np.float32)
+
+        # Encode the missing rows in one batch. Use cleaned_text (the same text the
+        # engine embeds and stores) when available so the resulting vector matches the
+        # stored-vector semantics; fall back to the title+content basis used previously.
+        missing_idx = [i for i, v in enumerate(vectors) if v is None]
+        if missing_idx:
+            texts = []
+            for i in missing_idx:
+                n = notes[i]
+                cleaned = n.get("cleaned_text")
+                if cleaned:
+                    texts.append(cleaned)
+                else:
+                    texts.append((n.get("title", "") + " " + n.get("content", ""))[:500])
+            new_vecs = np.asarray(model.encode(texts), dtype=np.float32)
+            for i, vec in zip(missing_idx, new_vecs):
+                vectors[i] = vec
+
+        return np.stack(vectors).astype(np.float32)
+
+    def _attach_stored_vectors(self, notes: List[Dict[str, Any]]) -> None:
+        """Stash each note's vector under :data:`STORED_VECTOR_KEY` for conflict detection.
+
+        Cheap on the hot path: vectors come from the store (a row read out of a memmap),
+        and the notes that reach here are exactly the ones already indexed. detect_conflicts
+        pops the key before the notes are serialized, so it never leaks into the NDJSON
+        stream or the prompt.
+        """
+        if not notes:
+            return
+        vectors = self._note_vectors(notes)
+        if vectors is None:
+            return
+        for note, vec in zip(notes, vectors):
+            note[STORED_VECTOR_KEY] = vec
 
     def _cap_if_saturated(
         self, notes: List[Dict[str, Any]], threshold: float = 0.9, cap: int = 5
     ) -> List[Dict[str, Any]]:
-        """Coverage saturation: if top results are all redundant, cap the list."""
+        """Coverage saturation: if top results are all redundant, cap the list.
+
+        A8: vectors are read from the store (or computed once via :meth:`_note_vectors`)
+        instead of encoding 10 note texts on every chat message.
+        """
         if len(notes) <= cap:
             return notes
-        model = self.search_service.engine.model
-        texts = [(n.get("title", "") + " " + n.get("content", ""))[:500] for n in notes[:10]]
-        if len(texts) < 3:
+        head = notes[:10]
+        if len(head) < 3:
             return notes
-        embs = model.encode(texts)
+        embs = self._note_vectors(head)
         sims = sklearn_cosine_similarity(embs)
         n = len(sims)
         avg_sim = (sims.sum() - n) / (n * (n - 1)) if n > 1 else 0

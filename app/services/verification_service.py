@@ -13,6 +13,17 @@ import numpy as np
 from sentence_transformers import CrossEncoder
 from sklearn.metrics.pairwise import cosine_similarity as sklearn_cosine_similarity
 
+from app.services.retrieval_orchestrator import STORED_VECTOR_KEY
+
+# A8: bounds on detect_conflicts. It is O(N^2) similarity plus one NLI forward pass per
+# pair above the threshold, run on every chat turn. Conflict detection is a quality
+# garnish, not a correctness gate, so on a large context set (the agent loop can collect
+# up to MAX_COLLECTED_NOTES) we skip it entirely rather than spend seconds in the cross-encoder.
+CONFLICT_SHORT_CIRCUIT_NOTES = 25
+# Even on a bounded set, cap how many high-similarity pairs go through the NLI batch so
+# the worst-case forward-pass count stays predictable.
+MAX_CONFLICT_PAIRS = 20
+
 
 class VerificationService:
     def __init__(self, model_name: str = "cross-encoder/nli-deberta-v3-small"):
@@ -148,25 +159,48 @@ class VerificationService:
 
         Returns:
             List of conflict dicts with note indices, titles, and contradiction scores.
+
+        A8: the orchestrator hands each note's already-computed vector in
+        ``note[STORED_VECTOR_KEY]`` (read from the VectorStore, so the same note text is
+        not re-encoded on every chat turn). When that key is absent — a bare call with no
+        orchestrator in front of it, or a unit test double — we fall back to encoding the
+        note text once, preserving the previous contract. The stored-vector key is popped
+        here so it can never reach the NDJSON stream or the prompt.
         """
         if len(notes) < 2:
+            self._strip_stored_vectors(notes)
             return []
 
-        texts = [(n.get("title", "") + " " + n.get("content", ""))[:500] for n in notes]
-        embs = embedding_model.encode(texts)
-        sims = sklearn_cosine_similarity(embs)
+        # Short-circuit on a large context set: the O(N^2) similarity scan plus one NLI
+        # forward pass per high-sim pair is not worth it for a quality garnish, and the
+        # agent loop can hand in up to MAX_COLLECTED_NOTES notes.
+        if len(notes) > CONFLICT_SHORT_CIRCUIT_NOTES:
+            self._strip_stored_vectors(notes)
+            return []
 
-        # Collect high-similarity pairs for NLI check
-        pairs_to_check = []
-        pair_indices = []
+        # Reuse attached stored vectors when every note carries one; otherwise encode the
+        # missing rows in one batch (cleaned_text first, matching what the engine stores).
+        embs = self._note_embeddings(notes, embedding_model)
+        sims = sklearn_cosine_similarity(embs)
+        self._strip_stored_vectors(notes)
+
+        # Collect high-similarity pairs for NLI check, then bound the NLI batch by
+        # similarity so the worst-case forward-pass count stays predictable.
+        candidate_pairs: List[tuple] = []  # (similarity, i, j)
         for i in range(len(notes)):
             for j in range(i + 1, len(notes)):
                 if sims[i][j] > similarity_threshold:
-                    pairs_to_check.append((texts[i], texts[j]))
-                    pair_indices.append((i, j))
+                    candidate_pairs.append((float(sims[i][j]), i, j))
 
-        if not pairs_to_check:
+        if not candidate_pairs:
             return []
+
+        candidate_pairs.sort(reverse=True)
+        candidate_pairs = candidate_pairs[:MAX_CONFLICT_PAIRS]
+
+        texts = [self._note_text(n) for n in notes]
+        pairs_to_check = [(texts[i], texts[j]) for _, i, j in candidate_pairs]
+        pair_indices = [(i, j) for _, i, j in candidate_pairs]
 
         # Batch NLI prediction for efficiency
         all_scores = self.nli_model.predict(pairs_to_check)
@@ -193,3 +227,40 @@ class VerificationService:
                 )
 
         return conflicts
+
+    # ------------------------------------------------------------------ #
+    # A8 helpers — vector reuse + note-text basis
+    # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def _note_text(note: Dict[str, Any]) -> str:
+        """The text whose vector the engine stores (cleaned_text), or the legacy basis."""
+        cleaned = note.get("cleaned_text")
+        if cleaned:
+            return cleaned
+        return (note.get("title", "") + " " + note.get("content", ""))[:500]
+
+    def _note_embeddings(self, notes: List[Dict[str, Any]], embedding_model) -> np.ndarray:
+        """Embedding matrix aligned to ``notes``, reusing stored vectors when attached.
+
+        Notes that arrive with ``STORED_VECTOR_KEY`` set (attached by the retrieval
+        orchestrator) reuse that vector; the rest are encoded once in a single batch.
+        """
+        vectors: List[Optional[np.ndarray]] = [None] * len(notes)
+        for i, note in enumerate(notes):
+            vec = note.get(STORED_VECTOR_KEY)
+            if vec is not None:
+                vectors[i] = np.asarray(vec, dtype=np.float32)
+        missing_idx = [i for i, v in enumerate(vectors) if v is None]
+        if missing_idx:
+            texts = [self._note_text(notes[i]) for i in missing_idx]
+            new_vecs = np.asarray(embedding_model.encode(texts), dtype=np.float32)
+            for i, vec in zip(missing_idx, new_vecs):
+                vectors[i] = vec
+        return np.stack(vectors).astype(np.float32)
+
+    @staticmethod
+    def _strip_stored_vectors(notes: List[Dict[str, Any]]) -> None:
+        """Pop the private stored-vector key so it never serializes to the client/prompt."""
+        for note in notes:
+            note.pop(STORED_VECTOR_KEY, None)

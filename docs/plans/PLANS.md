@@ -124,7 +124,7 @@ report it instead of working around it.
 | T31 | 6 P | 1 | Pick one styling system | A12 | ½ d | done (Option A — Tailwind removed, CSS tokens) |
 | T32 | 6 Q | 1 | Docker/torch/packaging hygiene | H5, H6, H7 | ½ d | done (torch cpu extra, deps cleaned) |
 | T33 | 3 R | 1 | Tests for the two NDJSON stream parsers | T3 | ½ d | done |
-| T34 | 6 S | 1 | Session service hygiene | B14, B16 | ¼ d | todo |
+| T34 | 6 S | 1 | Session service hygiene | B14, B16 | ¼ d | done |
 | T35 | 3 T | 1 | Benchmark corpora, scale generator, shared metrics | T4 | 1 d | done (loader fixed in review) |
 | T36 | 3 T | 2 | Signal ablation, tagging correctness, baseline gate | T4 | 1 d | done (rebuilt in review) |
 | T37 | 8 — | 1 | Production-readiness comment sweep + pre-push safety audit | — | ½ d | todo |
@@ -223,6 +223,8 @@ Tasks discovered while executing the plan. Add here instead of building them
 | driver (pre-wave-6 audit) | **Wave-6 matrix gaps, ruled in advance** (§2.5 basis, same as T04/T07): (a) `scripts/eval_categorization.py` + the `Makefile` eval targets were Lane G's in wave 3 and are unowned in wave 6 — taken by the driver in the pre-wave commit; (b) `AGENTS.md` must gain `proposal` in the NDJSON type list for **T38** — granted to T38 for its serial round (was Lane J's in wave 4); (c) T34's B16 also names `entity_service.py`, unowned this wave and freshly restructured by T25 — **T34 reports it, does not edit it**. |
 | driver (2026-07-26) | **The repo is already public** (`github.com/Harduex/google-keep-vibe-search`, visibility PUBLIC, last pushed 2026-07-24), so everything up to `origin/master` = `6dab505` is published; the 57 local commits are not. A full-history leak audit (gitleaks, self-test PASS, all refs + stashes) found **no** secrets, private keys, dumps, or committed cache/note artifacts — `cache/` has been gitignored throughout. One advisory: two already-public commit messages (`53c53a26e`, `2fadb0951`) name five eyeballed search queries, two of them Bulgarian, which hints at corpus topics. Owner decision: leave them — a rewrite of public history does not un-publish, and the disclosure is topic-level, no note text. This does not discharge **T37**, which still audits the wave-1–7 commits before any push. |
 | T26 | `scripts/migrate_to_store.py` was specified but the owner migrated the real cache by hand, so the script was not built. If a migration script is ever wanted (e.g. for another machine's cache), the mapping is lossless and mechanical: legacy Keep filename-keyed ids map to `stable_id("keep", filename)` exactly, and `tags.json`/`excluded_tags.json` are filename-keyed. Not open work — recorded so a future request does not re-derive the mapping. |
+| T34 | `app/services/entity_service.py:85` `except Exception: return False` in `_is_cache_valid()` swallows everything (corrupt meta vs bug indistinguishable) — same B16 class as the `session_service.py` catch-all T34 just fixed. `entity_service.py` is unowned this wave and freshly restructured by T25, so reported not edited. Recommend: catch `(OSError, json.JSONDecodeError)`, return False; log type via `safe_exc`; let the rest propagate. |
+| T34 | Sessions store citations in messages but the client `loadSession` discards them on reload. Not fixed — needs a client change (Lane O / whoever owns `client/src/hooks/useChat.ts` next). Proposed follow-up. |
 
 ## Verification
 

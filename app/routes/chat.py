@@ -3,8 +3,9 @@ import urllib.request
 from typing import Optional
 
 import litellm
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 from app.core.config import settings
 from app.core.dependencies import get_chat_service, get_session_service
@@ -12,6 +13,20 @@ from app.core.exceptions import SessionNotFound
 from app.models.chat import ChatRequest, ChatResponse
 from app.services.chat_service import ChatService
 from app.services.session_service import SessionService
+
+
+class RenameSessionRequest(BaseModel):
+    """Body model for ``PATCH /api/chat/sessions/{id}``.
+
+    Titles routinely contain ``&``, ``#`` or ``/`` (B14a); a query parameter
+    makes correctness depend on the client's URL-encoding. The body sidesteps
+    that entirely. The old ``?title=`` query parameter is still accepted as a
+    deprecated alias so the client (owned by Lane O this wave, moved in T30)
+    keeps working until it switches over.
+    """
+
+    title: str
+
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -174,10 +189,19 @@ def delete_session(
 @router.patch("/sessions/{session_id}")
 def rename_session(
     session_id: str,
-    title: str,
+    title: Optional[str] = None,
+    body: Optional[RenameSessionRequest] = None,
     session_service: SessionService = Depends(get_session_service),
 ):
-    session = session_service.rename_session(session_id, title)
+    # B14a: prefer the JSON body; accept the legacy ``?title=`` query parameter
+    # as a deprecated alias for backward compatibility (the client moves in T30).
+    new_title = body.title if body is not None else title
+    if new_title is None:
+        raise HTTPException(
+            status_code=422,
+            detail="title is required (send a JSON body or ?title= query param)",
+        )
+    session = session_service.rename_session(session_id, new_title)
     if not session:
         raise SessionNotFound(session_id)
     return session.model_dump()

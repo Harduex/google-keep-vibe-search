@@ -5,8 +5,12 @@ import os
 from unittest.mock import patch
 
 import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
+from app.core.dependencies import get_session_service
 from app.models.chat import ChatMessage, ChatSession
+from app.routes.chat import router as chat_router
 from app.services.session_service import SessionService
 
 
@@ -165,3 +169,177 @@ class TestSessionService:
         sessions = session_service.list_sessions()
         assert len(sessions) == 1
         assert sessions[0].title == "Good Session"
+
+
+# --------------------------------------------------------------------------- #
+# B16 — honest exception handling (regression: the old `except (..., Exception)`
+# caught programming errors and returned None, making a corrupt file and a bug
+# indistinguishable).
+# --------------------------------------------------------------------------- #
+class TestHonestExceptionHandling:
+    def test_load_session_skips_corrupt_json(self, session_service):
+        bad_path = os.path.join(session_service.sessions_dir, "bad.json")
+        with open(bad_path, "w") as f:
+            f.write("not valid json{{{")
+        # Corrupt JSON is an expected failure -> None, not a raise.
+        assert session_service.load_session("bad") is None
+
+    def test_load_session_skips_schema_mismatch(self, session_service, caplog):
+        # A well-formed JSON object that is NOT a valid ChatSession (missing
+        # required fields). This is an expected boundary failure -> None.
+        bad_path = os.path.join(session_service.sessions_dir, "schema.json")
+        with open(bad_path, "w") as f:
+            json.dump({"id": "schema", "title": "no messages/updated_at"}, f)
+        with caplog.at_level("WARNING"):
+            result = session_service.load_session("schema")
+        assert result is None
+        # The exception TYPE is logged (never the message), per the privacy rule.
+        assert any("ValidationError" in r.message for r in caplog.records)
+
+    def test_load_session_propagates_unexpected_errors(self, session_service):
+        # A programming error (AttributeError from a broken __init__) must NOT
+        # be swallowed into None — that is the bug B16 describes. We force an
+        # unexpected exception inside the open/json.load path and assert it
+        # raises rather than turning into a silent None.
+        created = session_service.create_session("real")
+        real_open = open
+
+        def boom(path, *a, **k):
+            if created.id in str(path):
+                raise RuntimeError("simulated programming error")
+            return real_open(path, *a, **k)
+
+        with patch("app.services.session_service.open", side_effect=boom):
+            with pytest.raises(RuntimeError, match="simulated programming error"):
+                session_service.load_session(created.id)
+
+    def test_list_sessions_propagates_unexpected_errors(self, session_service):
+        created = session_service.create_session("real")
+        real_open = open
+
+        def boom(path, *a, **k):
+            if created.id in str(path):
+                raise RuntimeError("simulated programming error")
+            return real_open(path, *a, **k)
+
+        with patch("app.services.session_service.open", side_effect=boom):
+            with pytest.raises(RuntimeError, match="simulated programming error"):
+                session_service.list_sessions()
+
+
+# --------------------------------------------------------------------------- #
+# B14b — cheap listing: the sidebar needs id/title/message_count/updated_at
+# only, so list_sessions must NOT decode message bodies.
+# --------------------------------------------------------------------------- #
+class TestCheapListing:
+    def test_message_count_from_streamed_array(self, session_service):
+        session = session_service.create_session("With Messages")
+        session.messages = [ChatMessage(role="user", content=f"msg {i}") for i in range(5)]
+        session_service.save_session(session)
+        [summary] = session_service.list_sessions()
+        assert summary.message_count == 5
+
+    def test_list_sessions_does_not_decode_message_bodies(self, session_service):
+        """The messages array must be counted, not materialised.
+
+        We assert this directly: spy on json.load and confirm it is never
+        called on the session file during list_sessions (the streaming reader
+        uses raw_decode + a bracket counter instead).
+        """
+        session = session_service.create_session("Spy Me")
+        session.messages = [ChatMessage(role="user", content="secret body")]
+        session_service.save_session(session)
+
+        with patch(
+            "app.services.session_service.json.load",
+            wraps=json.load,
+        ) as spy:
+            sessions = session_service.list_sessions()
+        spy.assert_not_called()
+        assert len(sessions) == 1
+        assert sessions[0].message_count == 1
+
+    def test_list_sessions_skips_value_objects_inside_messages(self, session_service):
+        """Nested objects/arrays in message bodies (e.g. citations) must be
+        skipped without being decoded, and not break the message count."""
+        # Hand-write a session whose messages carry nested citation objects,
+        # so we prove the bracket-skip walks past them correctly.
+        path = os.path.join(session_service.sessions_dir, "nested.json")
+        body = {
+            "id": "nested",
+            "title": "Nested",
+            "messages": [
+                {"role": "user", "content": "q", "citations": [{"a": [1, 2, {"b": 3}]}]},
+                {"role": "assistant", "content": "a"},
+            ],
+            "relevant_note_ids": ["x"],
+            "created_at": "2024-01-01T00:00:00+00:00",
+            "updated_at": "2024-01-02T00:00:00+00:00",
+        }
+        with open(path, "w") as f:
+            json.dump(body, f)
+
+        [summary] = session_service.list_sessions()
+        assert summary.id == "nested"
+        assert summary.title == "Nested"
+        assert summary.message_count == 2
+        assert summary.updated_at == "2024-01-02T00:00:00+00:00"
+
+
+# --------------------------------------------------------------------------- #
+# B14a — body-based rename, query param kept as a deprecated alias.
+# --------------------------------------------------------------------------- #
+@pytest.fixture
+def app_with_router(session_service):
+    app = FastAPI()
+    app.include_router(chat_router)
+    app.dependency_overrides[get_session_service] = lambda: session_service
+    return app
+
+
+@pytest.fixture
+def client(app_with_router):
+    return TestClient(app_with_router)
+
+
+class TestRenameRouteContract:
+    def test_body_renamed_roundtrips_special_chars(self, client, session_service):
+        created = session_service.create_session("Original")
+        tricky = 'A & B # C / D ? E " \\"'
+        resp = client.patch(
+            f"/api/chat/sessions/{created.id}",
+            json={"title": tricky},
+        )
+        assert resp.status_code == 200, resp.text
+        loaded = session_service.load_session(created.id)
+        assert loaded.title == tricky
+
+    def test_query_param_still_accepted_as_alias(self, client, session_service):
+        created = session_service.create_session("Original")
+        resp = client.patch(
+            f"/api/chat/sessions/{created.id}",
+            params={"title": "From Query"},
+        )
+        assert resp.status_code == 200, resp.text
+        loaded = session_service.load_session(created.id)
+        assert loaded.title == "From Query"
+
+    def test_body_preferred_over_query(self, client, session_service):
+        created = session_service.create_session("Original")
+        resp = client.patch(
+            f"/api/chat/sessions/{created.id}?title=from-query",
+            json={"title": "from-body"},
+        )
+        assert resp.status_code == 200
+        loaded = session_service.load_session(created.id)
+        assert loaded.title == "from-body"
+
+    def test_missing_title_is_422(self, client, session_service):
+        created = session_service.create_session("Original")
+        # No body, no query param.
+        resp = client.patch(f"/api/chat/sessions/{created.id}")
+        assert resp.status_code == 422
+
+    def test_rename_unknown_session_is_404(self, client):
+        resp = client.patch("/api/chat/sessions/nope", json={"title": "x"})
+        assert resp.status_code == 404

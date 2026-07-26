@@ -1,27 +1,49 @@
-@import 'tailwindcss';
+/*
+ * Design-token layer.
+ *
+ * The base palette (`--primary-color`, `--bg-color`, `--card-bg`, the `--note-*`
+ * swatches, …) and its dark-theme override live in App.css; this file owns the
+ * semantic accent / text tokens that were previously inlined as raw hex values
+ * across the component stylesheets. Defining them once here lets every sheet
+ * reference `var(--accent-green)` instead of repeating `#0f9d58` fourteen times.
+ *
+ * These values are intentionally not theme-aware: every site that used the raw
+ * hex got the same constant in both themes, so the token does too. Changing a
+ * value here is the single place to retune the accent palette.
+ */
+:root {
+  /* Accent palette — status / category colours used across components. */
+  --accent-green: #0f9d58;
+  --accent-red: #ea4335;
+  --accent-blue: #4285f4;
+  --accent-yellow: #f9ab00;
+  --accent-purple: #ab47bc;
 
-@theme {
-  /* Map app CSS variables to Tailwind theme tokens */
-  --color-primary: var(--primary-color);
-  --color-primary-dark: var(--primary-dark);
-  --color-secondary: var(--secondary-color);
-  --color-surface: var(--card-bg);
-  --color-surface-alt: var(--light-bg);
-  --color-border: var(--border-color);
-  --color-input: var(--input-bg);
-  --color-text: var(--text-color);
-  --color-bg: var(--bg-color);
+  /* Sibling status hues. These are distinct from the accent palette above:
+   * `--accent-green` (#0f9d58) is the Google Keep green used for success /
+   * approval; `--status-ok` (#34a853) is the slightly brighter Google green
+   * used for the chat context-progress "normal" bar and the copy-confirmation
+   * flash. `--accent-red` (#ea4335) is the soft red used for category
+   * annotations; `--status-error` (#d93025) is the harder red used for error
+   * banners and the stop-button. */
+  --status-ok: #34a853;
+  --status-error: #d93025;
 
-  /* Google Keep note colors */
-  --color-note-red: var(--note-red);
-  --color-note-orange: var(--note-orange);
-  --color-note-yellow: var(--note-yellow);
-  --color-note-green: var(--note-green);
-  --color-note-teal: var(--note-teal);
-  --color-note-blue: var(--note-blue);
-  --color-note-purple: var(--note-purple);
-  --color-note-brown: var(--note-brown);
-  --color-note-gray: var(--note-gray);
+  /* Secondary text. `--text-secondary` is the muted grey used for captions,
+   * meta text and inactive affordances; `--text-tertiary` is the fainter grey
+   * used for placeholder/disabled copy. (Chat/styles.css defines its own
+   * `--text-muted` locally — left untouched.) */
+  --text-secondary: #5f6368;
+  --text-tertiary: #9aa0a6;
+
+  /* Refinement-highlight pair. Both tones appear together — the lighter
+   * `--highlight-bg` fills the matched run and the darker `--highlight-border`
+   * sits under it as a 2px rule to indicate a nested match. */
+  --highlight-bg: #ffcc80;
+  --highlight-border: #ff9800;
+
+  /* Link / focus accent (Google blue, distinct from --accent-blue). */
+  --link-color: #1a73e8;
 }
 
 :root {

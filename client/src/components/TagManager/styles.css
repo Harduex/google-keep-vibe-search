@@ -244,7 +244,7 @@
 }
 
 .export-tag-button:hover {
-  color: #4285f4;
+  color: var(--accent-blue);
   background: rgba(66, 133, 244, 0.1);
 }
 

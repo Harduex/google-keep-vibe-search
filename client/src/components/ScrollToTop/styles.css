@@ -47,7 +47,7 @@
 .scroll-to-top button:hover {
   transform: translateY(-4px) scale(1.05);
   box-shadow: 0 6px 15px rgba(0, 0, 0, 0.25);
-  background-color: #f9ab00;
+  background-color: var(--accent-yellow);
 }
 
 .scroll-to-top .material-icons {

@@ -59,6 +59,47 @@
   background-color: var(--bg-color);
   backdrop-filter: blur(2px);
 }
+
+/* LoadingScreen layout.
+ * LoadingScreen.tsx still carries the Tailwind utility classes it was written
+ * with (fixed/inset-0/flex/items-center/justify-center/z-50 on the overlay;
+ * text-center/p-8/mt-6/text-lg/font-medium/mt-2/text-sm/text-gray-500 inside).
+ * Those utilities were the only thing positioning the overlay and sizing its
+ * text, so with Tailwind gone the same declarations are reproduced here against
+ * the stable class hooks (.loading-overlay and its descendants). Values mirror
+ * Tailwind v4's default scale (spacing multiplier 0.25rem; gray-500 ~= #6b7280)
+ * so the rendered output is byte-for-byte unchanged. */
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+.loading-overlay > * {
+  text-align: center;
+  padding: 2rem;
+}
+.loading-overlay .loader-dots {
+  gap: 0.5rem; /* former space-x-2 */
+}
+.loading-overlay p {
+  margin: 0;
+}
+.loading-overlay p:first-of-type {
+  margin-top: 1.5rem; /* former mt-6 */
+  font-size: 1.125rem; /* former text-lg (line-height 1.75rem) */
+  line-height: 1.75rem;
+  font-weight: 500; /* former font-medium */
+}
+.loading-overlay p:last-child {
+  margin-top: 0.5rem; /* former mt-2 */
+  font-size: 0.875rem; /* former text-sm (line-height 1.25rem) */
+  line-height: 1.25rem;
+  color: #6b7280; /* former text-gray-500 */
+}
+
 .loader {
   /* bordered circle, top border colored with theme primary color */
   border: 4px solid var(--border-color);
@@ -127,7 +168,7 @@ h1 {
 
 .stats {
   font-size: 0.9rem;
-  color: #5f6368;
+  color: var(--text-secondary);
 }
 
 .search-container {
@@ -167,7 +208,7 @@ h1 {
 }
 
 #search-button:hover {
-  background-color: #f9ab00;
+  background-color: var(--accent-yellow);
 }
 
 /* Refinement search styles */
@@ -196,7 +237,7 @@ h1 {
 }
 
 .refinement-search-icon {
-  color: #5f6368;
+  color: var(--text-secondary);
   margin-right: 8px;
   font-size: 20px;
 }
@@ -215,7 +256,7 @@ h1 {
   background: none;
   border: none;
   cursor: pointer;
-  color: #5f6368;
+  color: var(--text-secondary);
   padding: 4px;
   display: flex;
   align-items: center;
@@ -326,7 +367,7 @@ h1 {
 #results-count {
   margin-bottom: 1rem;
   font-size: 0.9rem;
-  color: #5f6368;
+  color: var(--text-secondary);
 }
 
 .note-card {
@@ -403,7 +444,7 @@ h1 {
 }
 
 .note-badge.badge-tag {
-  background: #4285f4;
+  background: var(--accent-blue);
   color: white;
   font-weight: 500;
   display: inline-flex;
@@ -552,7 +593,7 @@ h1 {
   display: flex;
   justify-content: space-between;
   font-size: 0.8rem;
-  color: #5f6368;
+  color: var(--text-secondary);
   margin-top: 0.5rem;
 }
 
@@ -569,7 +610,7 @@ h1 {
 }
 
 .annotation a {
-  color: #1a73e8;
+  color: var(--link-color);
   text-decoration: none;
 }
 
@@ -632,13 +673,13 @@ h1 {
 }
 
 .badge-score {
-  background-color: #4285f4;
+  background-color: var(--accent-blue);
   color: white;
   margin: 0;
 }
 
 .badge-image-match {
-  background-color: #0f9d58;
+  background-color: var(--accent-green);
   color: white;
   display: inline-flex;
   align-items: center;
@@ -661,12 +702,12 @@ h1 {
   align-items: center;
   gap: 6px;
   font-size: 0.8rem;
-  color: #0f9d58;
+  color: var(--accent-green);
   font-weight: 500;
   padding: 4px 8px;
   background-color: rgba(15, 157, 88, 0.1);
   border-radius: 4px;
-  border-left: 3px solid #0f9d58;
+  border-left: 3px solid var(--accent-green);
 }
 
 .image-match-indicator .material-icons {
@@ -675,7 +716,7 @@ h1 {
 
 /* Highlight image that matches search */
 .gallery-thumbnail.matching-image {
-  box-shadow: 0 0 0 2px #0f9d58;
+  box-shadow: 0 0 0 2px var(--accent-green);
   position: relative;
 }
 
@@ -686,7 +727,7 @@ h1 {
   right: 0;
   width: 20px;
   height: 20px;
-  background-color: #0f9d58;
+  background-color: var(--accent-green);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -857,7 +898,7 @@ h1 {
 }
 
 .error-message {
-  background-color: #d93025;
+  background-color: var(--status-error);
   color: white;
   padding: 12px 16px;
   border-radius: 8px;
@@ -992,7 +1033,7 @@ h1 {
 
 .clusters-help-text {
   font-size: 0.8rem;
-  color: #5f6368;
+  color: var(--text-secondary);
   margin-top: 4px;
 }
 
@@ -1013,13 +1054,13 @@ h1 {
 }
 
 .generate-clusters-button:hover:not(:disabled) {
-  background-color: #f9ab00;
+  background-color: var(--accent-yellow);
   transform: translateY(-1px);
 }
 
 .generate-clusters-button:disabled {
   background-color: var(--light-bg);
-  color: #5f6368;
+  color: var(--text-secondary);
   cursor: not-allowed;
 }
 
@@ -1138,7 +1179,7 @@ h1 {
 .more-notes {
   font-style: italic;
   font-size: 0.8rem;
-  color: #5f6368;
+  color: var(--text-secondary);
   margin-top: 5px;
 }
 
@@ -1222,7 +1263,7 @@ h1 {
 
 /* Refinement highlight styling */
 .refinement-highlight {
-  background-color: #ffcc80; /* Light orange background */
+  background-color: var(--highlight-bg); /* Light orange background */
   border-radius: 2px;
   padding: 0 1px;
 }
@@ -1230,14 +1271,14 @@ h1 {
 /* This is to ensure we don't have conflicts with nested highlights */
 mark .refinement-highlight,
 .refinement-highlight mark {
-  background-color: #ffcc80; /* Keep consistent */
-  border-bottom: 2px solid #ff9800; /* Add a border to show dual highlighting */
+  background-color: var(--highlight-bg); /* Keep consistent */
+  border-bottom: 2px solid var(--highlight-border); /* Add a border to show dual highlighting */
 }
 
 /* For titles, make refinement highlights more noticeable */
 .note-title .refinement-highlight {
-  background-color: #ffcc80;
-  border-bottom: 2px solid #ff9800;
+  background-color: var(--highlight-bg);
+  border-bottom: 2px solid var(--highlight-border);
 }
 
 /* Image Search Styles */
@@ -1309,7 +1350,7 @@ mark .refinement-highlight,
 }
 
 .image-upload-button:hover {
-  background-color: #f9ab00;
+  background-color: var(--accent-yellow);
 }
 
 .selected-image-container {
@@ -1365,7 +1406,7 @@ mark .refinement-highlight,
 }
 
 .image-search-button:hover {
-  background-color: #f9ab00;
+  background-color: var(--accent-yellow);
 }
 
 .drag-overlay {

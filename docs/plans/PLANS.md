@@ -121,7 +121,7 @@ report it instead of working around it.
 | T28 | 6 M | 2 | Wire granularity through; one UMAP pass | B4 | ¼ d | todo |
 | T29 | 6 N | 1 | Reuse stored vectors on the chat hot path | A8 | ½ d | todo |
 | T30 | 6 O | 1 | Client data layer (cache + dedupe + invalidation) | A11 | ½ d | todo |
-| T31 | 6 P | 1 | Pick one styling system | A12 | ½ d | todo |
+| T31 | 6 P | 1 | Pick one styling system | A12 | ½ d | done (Option A — Tailwind removed, CSS tokens) |
 | T32 | 6 Q | 1 | Docker/torch/packaging hygiene | H5, H6, H7 | ½ d | todo |
 | T33 | 3 R | 1 | Tests for the two NDJSON stream parsers | T3 | ½ d | done |
 | T34 | 6 S | 1 | Session service hygiene | B14, B16 | ¼ d | todo |

@@ -163,15 +163,15 @@
 }
 
 .context-progress-fill.normal {
-  background: #34a853;
+  background: var(--status-ok);
 }
 
 .context-progress-fill.warning {
-  background: #fbbc04;
+  background: var(--primary-color);
 }
 
 .context-progress-fill.danger {
-  background: #ea4335;
+  background: var(--accent-red);
 }
 
 .context-remaining {
@@ -227,7 +227,7 @@
 }
 
 .stop-button:hover {
-  background-color: #d93025;
+  background-color: var(--status-error);
   transform: translateY(-1px);
   box-shadow: 0 4px 10px rgba(234, 67, 53, 0.4);
 }
@@ -486,7 +486,7 @@
 }
 
 .session-action-btn.delete:hover {
-  color: #ea4335;
+  color: var(--accent-red);
   background: rgba(234, 67, 53, 0.12);
 }
 
@@ -687,7 +687,7 @@
 .copy-message-btn.copied {
   opacity: 1;
   transform: scale(1);
-  color: #34a853;
+  color: var(--status-ok);
   pointer-events: none;
 }
 
@@ -818,7 +818,7 @@
 }
 
 .markdown-link {
-  color: #1a73e8;
+  color: var(--link-color);
   text-decoration: none;
   font-weight: 500;
 }

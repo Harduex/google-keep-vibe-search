@@ -11,7 +11,7 @@
 
 .all-notes-count {
   font-size: 0.9rem;
-  color: #5f6368;
+  color: var(--text-secondary);
 }
 
 .tag-filter-status {

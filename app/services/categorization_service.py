@@ -1089,8 +1089,8 @@ class CategorizationService:
                         )
                     )
 
-                    # Layer dashboard proposals (B6 gray-zone merges, B7 review
-                    # queue) on top of the classic tag proposals. Additive and
+                    # Layer dashboard proposals (gray-zone merges, review queue)
+                    # on top of the classic tag proposals. Additive and
                     # guarded: any failure just means no extra proposals.
                     extra_proposals: List[Dict[str, Any]] = []
                     try:
@@ -1227,7 +1227,7 @@ class CategorizationService:
                 best_score = float(sims[best_j])
                 if best_score >= catch_all_threshold:
                     # Low-confidence match: queue for dashboard review instead of
-                    # auto-applying (B7). Handled here so it is neither auto-tagged
+                    # auto-applying. Handled here so it is neither auto-tagged
                     # nor dropped into Uncategorized.
                     review_items.append(
                         {

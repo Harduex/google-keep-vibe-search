@@ -3,7 +3,7 @@
 **Paste this file's contents to a fresh agent to resume the plan.** It is written for someone with
 none of the originating conversation's context.
 
-**Last updated:** 2026-07-26 (second refresh) — **Wave 5 barrier committed (`288932d`); a pre-wave-6
+**Last updated:** 2026-07-26 (second refresh) — **Wave 5 barrier committed (`828331a`); a pre-wave-6
 driver commit then fixed a data-destroying `make eval`.** **Resume by dispatching Wave 6 round 1**
 (T27 · T29 · T30 · T31 · T32 · T34) — see Next steps. Owner decisions already taken: **T31 takes
 Option A** (remove the dead Tailwind, extract CSS tokens), and **T32 is cleared to run
@@ -44,9 +44,9 @@ migration script not built). Both lessons apply to how wave 6 is gated.
 
 ### Wave 5 complete — barrier closed 2026-07-26
 
-- **Round 1 — T21 (`e2f66ee`), Round 2 — T22 (`90966b9`) ∥ T23 (`2a8e10f`):** committed in prior
+- **Round 1 — T21 (`9a9317e`), Round 2 — T22 (`a4be5c8`) ∥ T23 (`d4a1f67`):** committed in prior
   session, verified green. See git history for detail.
-- **Round 3 — T24 (`c225c8e`) ∥ T25 (`594bf30`):** both committed.
+- **Round 3 — T24 (`62c05ac`) ∥ T25 (`2394746`):** both committed.
   - **T24** — `app/ingest.py` (diff/upsert, one writer transaction, vectors keyed by
     `content_hash`), `app/routes/imports.py` + `app/models/imports.py` (`POST /api/imports` with
     `dry_run`, `GET /api/imports`, NDJSON stream variant). `tests/test_ingest.py` carries the 7
@@ -56,7 +56,7 @@ migration script not built). Both lessons apply to how wave 6 is gated.
     `build`/`apply` on `chunking_service.py` and `entity_service.py`. Vector I/O routes through
     `store/vectors.py`; `search()` no longer mutates the shared note dicts (A6). Parity gate
     `make eval-retrieval` is green (see below).
-- **Round 4 — T26 (`3e07cc7`):** lifespan boots from the store (SELECT + mmap, no parse-and-embed);
+- **Round 4 — T26 (`dc82112`):** lifespan boots from the store (SELECT + mmap, no parse-and-embed);
   `NoteService` is a thin read/tag façade; `app/services/cache_service.py` and `app/parser.py`
   deleted. **Owner migrated the real cache by hand, so `scripts/migrate_to_store.py` was not built**
   (recorded in § Proposed follow-ups — the mapping is lossless and mechanical if ever needed).
@@ -65,7 +65,7 @@ migration script not built). Both lessons apply to how wave 6 is gated.
 
 ### Wave-5 review findings (recorded in `PLANS.md` § Proposed follow-ups)
 
-- **`make eval-retrieval` had been broken since `998d718`** — `scripts/eval_retrieval.py` imported
+- **`make eval-retrieval` had been broken since `fa27fb8`** — `scripts/eval_retrieval.py` imported
   `app.search` before `bench.ablation`, tripping `bench/__init__.py`'s import-order guard, so the
   T25 *and* T26 parity checkpoint exited 2 and had never run green. **Fixed in the barrier commit**
   (bench imported first; `CACHE_DIR` read from `settings` instead of re-set in `main()`). This is
@@ -123,7 +123,7 @@ peak VRAM 519 MB. `cache/` was **not** recreated by the run — isolation confir
 is stronger evidence than the static import-order guard. Read the stability caveat in `PLANS.md`
 § Proposed follow-ups before treating a drop as a regression.
 
-**Earlier, wave-5 barrier gate (`288932d`), exit 0**: 325 pytest passed, 1 skipped, 95.9 s. The count
+**Earlier, wave-5 barrier gate (`828331a`), exit 0**: 325 pytest passed, 1 skipped, 95.9 s. The count
 dropped from 337 (Round 2) to 325 because T26 deleted `tests/test_parser.py` and
 `tests/test_cache_service.py` (their subjects, `app/parser.py` and `app/services/cache_service.py`,
 were deleted in the same commit) — net wave-5 additions are still positive: T22 +32, T23 +35,
@@ -131,7 +131,7 @@ T24 +~20, T25 +7, minus the two deleted files.
 
 **T25/T26 parity gate — `make eval-retrieval`, exit 0** (5.5–6.6 s). Fixture-corpus baseline:
 `dense_only` R@1 0.607 / R@5 0.687 / R@10 0.833 / MRR 0.683. This is the gate that had been broken
-since `998d718` and was fixed in this barrier — see § Wave-5 review findings.
+since `fa27fb8` and was fixed in this barrier — see § Wave-5 review findings.
 
 PLANS.md invariants, re-run at the barrier: `overlaps: 0`, `unowned: none` (the coverage script
 handles findings the plan split into lettered parts, e.g. B3 → B3a/B3b).

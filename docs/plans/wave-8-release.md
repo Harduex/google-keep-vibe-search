@@ -215,8 +215,8 @@ map. **Take a backup ref first** (`git branch backup/pre-t43`) and keep it until
 passes. Never `git push`, never `--force` anything at a remote.
 
 **The consequence to handle, not discover:** rewriting messages changes **every SHA** in the range.
-`PLANS.md`, `RESUME.md` and the audit docs cite specific SHAs (`58a83af`, `288932d`, `3e07cc7`,
-`e2f66ee`, `998d718`, `c225c8e`, …), and every one of those citations becomes dangling. Either
+`PLANS.md`, `RESUME.md` and the audit docs cite specific SHAs, and every one of those citations
+becomes dangling — as happened once already when the housekeeping commits were distributed. Either
 re-point them in a **follow-up commit after the rewrite** (they are then stable, since that commit is
 the new tip), or replace them with subject-line references that survive a rewrite. Decide which, do
 it, and say which you chose — leaving 20-odd dangling SHAs in the plan docs is exactly the kind of

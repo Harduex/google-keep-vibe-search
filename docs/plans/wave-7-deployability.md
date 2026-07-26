@@ -86,7 +86,7 @@ mean "search works", which it will, since search's own model is loaded eagerly b
 `tests/test_api_integration.py::test_wired_app_loads_no_real_models` asserts every model in the
 wired app is a stub. Lazy construction means those attributes no longer exist at boot, so the test
 as written can pass **vacuously** — which is the failure mode that already bit this project once
-(`3fabfdb` un-stubbed the NLI model and passed on a warm HF cache). Rewrite it to *touch each lazy
+(`9f34e54` un-stubbed the NLI model and passed on a warm HF cache). Rewrite it to *touch each lazy
 property* and assert what comes back is a stub. Weakening it to "the attribute is absent" is a
 regression disguised as a fix.
 
@@ -166,7 +166,7 @@ This is the same finding as A1 — two implementations of one thing, the newer o
 reachable — and by T27's own standard ("the wave is not done while two implementations exist") it
 should not survive the plan. It is also a standing hazard: `force_refresh=True` on that path writes
 into whatever `settings.resolved_cache_dir` happens to be, which is exactly how `make eval` came to
-be able to destroy the real corpus (fixed in `58a83af`, but the write path is still there).
+be able to destroy the real corpus (since fixed, but the write path is still there).
 
 **Do** Delete `load_or_compute_embeddings`, `_save_embeddings_to_cache`, `_load_embeddings_from_cache`,
 `_is_cache_valid`, `_compute_notes_hash` and the `force_refresh` constructor parameter. Migrate the

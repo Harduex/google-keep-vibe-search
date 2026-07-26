@@ -1,8 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
-
 import { API_ROUTES } from '@/const';
 
-import { useError } from './useError';
+import { useCachedQuery } from './useCachedQuery';
 
 export interface EmbeddingPoint {
   id: string;
@@ -20,34 +18,13 @@ interface UseEmbeddingsResult {
   refetch: () => Promise<void>;
 }
 
+interface EmbeddingsResponse {
+  embeddings?: EmbeddingPoint[];
+}
+
 export const useEmbeddings = (): UseEmbeddingsResult => {
-  const [embeddings, setEmbeddings] = useState<EmbeddingPoint[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const { error, handleError, clearError } = useError();
-
-  const fetchEmbeddings = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      clearError();
-
-      const response = await fetch(API_ROUTES.EMBEDDINGS);
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      setEmbeddings(data.embeddings || []);
-    } catch (err) {
-      handleError(err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [handleError, clearError]);
-
-  useEffect(() => {
-    fetchEmbeddings();
-  }, [fetchEmbeddings]);
-
-  return { embeddings, isLoading, error, refetch: fetchEmbeddings };
+  const { data, isLoading, error, refetch } = useCachedQuery<EmbeddingsResponse>(
+    API_ROUTES.EMBEDDINGS,
+  );
+  return { embeddings: data?.embeddings ?? [], isLoading, error, refetch };
 };

@@ -1,8 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
-
 import { API_ROUTES } from '@/const';
-import { useError } from '@/hooks/useError';
 import { Note } from '@/types';
+
+import { useCachedQuery } from './useCachedQuery';
 
 interface UseAllNotesResult {
   notes: Note[];
@@ -11,34 +10,13 @@ interface UseAllNotesResult {
   refetch: () => Promise<void>;
 }
 
+interface AllNotesResponse {
+  notes?: Note[];
+}
+
 export const useAllNotes = (): UseAllNotesResult => {
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const { error, handleError, clearError } = useError();
-
-  const fetchNotes = useCallback(async (): Promise<void> => {
-    try {
-      setIsLoading(true);
-      clearError();
-      const response = await fetch(`${API_ROUTES.ALL_NOTES}`);
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      setNotes(data.notes || []);
-    } catch (err) {
-      handleError(err);
-      setNotes([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [clearError, handleError]);
-
-  useEffect(() => {
-    fetchNotes();
-  }, [fetchNotes]);
-
-  return { notes, isLoading, error, refetch: fetchNotes };
+  const { data, isLoading, error, refetch } = useCachedQuery<AllNotesResponse>(
+    API_ROUTES.ALL_NOTES,
+  );
+  return { notes: data?.notes ?? [], isLoading, error, refetch };
 };

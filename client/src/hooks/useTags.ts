@@ -1,211 +1,126 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
 
 import { API_ROUTES } from '@/const';
-import { Tag, TagsResponse, ExcludedTagsResponse } from '@/types';
+import { TagsResponse, ExcludedTagsResponse } from '@/types';
 
+import { ApiError, QUERY_KEYS, fetchJson, invalidate } from './dataLayer';
+import { useCachedQuery } from './useCachedQuery';
+
+/**
+ * Tags hook.
+ *
+ * Reads (`/api/tags`, `/api/tags/excluded`) are served from the shared cache
+ * (see `dataLayer.ts`), so every component that mounts this hook shares one
+ * request per endpoint instead of each firing its own. Mutations are uncached
+ * POSTs; on success they invalidate the relevant cache keys, which refetches
+ * the reads — replacing the old `await fetchTags()` callback chain.
+ *
+ * `onNotesChanged` is retained for callers that need to re-run an *uncached*
+ * side-effect when note-tag membership changes — today only `Results` passes
+ * it, to re-POST the active search. Cached reads (e.g. `useAllNotes`) refresh
+ * automatically via `invalidate(QUERY_KEYS.NOTES)` and do not need it.
+ */
 export const useTags = (onNotesChanged?: () => void) => {
-  const [tags, setTags] = useState<Tag[]>([]);
-  const [excludedTags, setExcludedTags] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const tagsQuery = useCachedQuery<TagsResponse>(API_ROUTES.TAGS);
+  const excludedQuery = useCachedQuery<ExcludedTagsResponse>(API_ROUTES.EXCLUDED_TAGS);
+  const isLoading = tagsQuery.isLoading || excludedQuery.isLoading;
+  const error = tagsQuery.error ?? excludedQuery.error;
 
-  const fetchTags = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const response = await fetch(API_ROUTES.TAGS);
-      if (!response.ok) {
-        throw new Error('Failed to fetch tags');
-      }
-      const data: TagsResponse = await response.json();
-      setTags(data.tags);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  const fetchExcludedTags = useCallback(async () => {
-    try {
-      const response = await fetch(API_ROUTES.EXCLUDED_TAGS);
-      if (!response.ok) {
-        throw new Error('Failed to fetch excluded tags');
-      }
-      const data: ExcludedTagsResponse = await response.json();
-      setExcludedTags(data.excluded_tags);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-    }
-  }, []);
-
-  const tagNotes = useCallback(
-    async (noteIds: string[], tagName: string) => {
+  /** POST a mutation, mapping `ApiError` to the legacy string message. */
+  const mutate = useCallback(
+    async (
+      url: string,
+      body: unknown,
+      method: 'POST' | 'DELETE' = 'POST',
+    ): Promise<{ ok: true } | { ok: false; error: string }> => {
       try {
-        setIsLoading(true);
-        const response = await fetch(API_ROUTES.TAG_NOTES, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            note_ids: noteIds,
-            tag_name: tagName,
-          }),
+        await fetchJson(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
         });
-
-        if (!response.ok) {
-          throw new Error('Failed to tag notes');
-        }
-
-        // Refresh tags after successful tagging
-        await fetchTags();
-        setError(null);
+        return { ok: true };
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
-      } finally {
-        setIsLoading(false);
+        if (err instanceof ApiError) {
+          return { ok: false, error: err.message };
+        }
+        return {
+          ok: false,
+          error: err instanceof Error ? err.message : 'An error occurred',
+        };
       }
     },
-    [fetchTags],
+    [],
   );
 
-  const updateExcludedTags = useCallback(async (newExcludedTags: string[]) => {
-    try {
-      setIsLoading(true);
-      const response = await fetch(API_ROUTES.EXCLUDED_TAGS, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          excluded_tags: newExcludedTags,
-        }),
-      });
+  /** Invalidate the caches touched by a note-tag membership change, then run
+   *  the caller's uncached escape hatch (re-running a POST search). */
+  const afterNotesChanged = useCallback(() => {
+    invalidate(QUERY_KEYS.TAGS);
+    invalidate(QUERY_KEYS.NOTES);
+    invalidate(QUERY_KEYS.ALL_NOTES);
+    onNotesChanged?.();
+  }, [onNotesChanged]);
 
-      if (!response.ok) {
-        throw new Error('Failed to update excluded tags');
-      }
-
-      setExcludedTags(newExcludedTags);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  const removeTagFromNote = useCallback(
-    async (noteId: string, tagName: string) => {
-      try {
-        setIsLoading(true);
-        const response = await fetch(
-          `${API_ROUTES.REMOVE_TAG}/${noteId}/tag?tag_name=${encodeURIComponent(tagName)}`,
-          {
-            method: 'DELETE',
-          },
-        );
-
-        if (!response.ok) {
-          throw new Error('Failed to remove tag');
-        }
-
-        // Refresh tags after successful removal
-        await fetchTags();
-
-        // Notify that notes have changed if callback is provided
-        if (onNotesChanged) {
-          onNotesChanged();
-        }
-
-        setError(null);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
-      } finally {
-        setIsLoading(false);
+  const tagNotes = useCallback(
+    async (noteIds: string[], tagName: string): Promise<void> => {
+      const res = await mutate(API_ROUTES.TAG_NOTES, { note_ids: noteIds, tag_name: tagName });
+      if (res.ok) {
+        invalidate(QUERY_KEYS.TAGS);
+        invalidate(QUERY_KEYS.NOTES);
+        invalidate(QUERY_KEYS.ALL_NOTES);
       }
     },
-    [fetchTags, onNotesChanged],
+    [mutate],
+  );
+
+  const updateExcludedTags = useCallback(
+    async (newExcludedTags: string[]): Promise<void> => {
+      const res = await mutate(API_ROUTES.EXCLUDED_TAGS, { excluded_tags: newExcludedTags });
+      if (res.ok) {
+        invalidate(QUERY_KEYS.EXCLUDED_TAGS);
+      }
+    },
+    [mutate],
+  );
+
+  const removeTagFromNote = useCallback(
+    async (noteId: string, tagName: string): Promise<void> => {
+      const res = await mutate(
+        `${API_ROUTES.REMOVE_TAG}/${noteId}/tag?tag_name=${encodeURIComponent(tagName)}`,
+        {},
+        'DELETE',
+      );
+      if (res.ok) {
+        afterNotesChanged();
+      }
+    },
+    [mutate, afterNotesChanged],
   );
 
   const removeTagFromAllNotes = useCallback(
-    async (tagName: string) => {
-      try {
-        setIsLoading(true);
-        const response = await fetch(API_ROUTES.REMOVE_TAG_FROM_ALL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            tag_name: tagName,
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to remove tag from all notes');
-        }
-
-        // Refresh tags after successful removal
-        await fetchTags();
-
-        // Notify that notes have changed if callback is provided
-        if (onNotesChanged) {
-          onNotesChanged();
-        }
-
-        setError(null);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
-      } finally {
-        setIsLoading(false);
+    async (tagName: string): Promise<void> => {
+      const res = await mutate(API_ROUTES.REMOVE_TAG_FROM_ALL, { tag_name: tagName });
+      if (res.ok) {
+        afterNotesChanged();
       }
     },
-    [fetchTags, onNotesChanged],
+    [mutate, afterNotesChanged],
   );
 
   const renameTag = useCallback(
-    async (oldName: string, newName: string) => {
-      try {
-        setIsLoading(true);
-        const response = await fetch(API_ROUTES.RENAME_TAG, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ old_name: oldName, new_name: newName }),
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to rename tag');
-        }
-
-        await fetchTags();
-
-        if (onNotesChanged) {
-          onNotesChanged();
-        }
-
-        setError(null);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
-      } finally {
-        setIsLoading(false);
+    async (oldName: string, newName: string): Promise<void> => {
+      const res = await mutate(API_ROUTES.RENAME_TAG, { old_name: oldName, new_name: newName });
+      if (res.ok) {
+        afterNotesChanged();
       }
     },
-    [fetchTags, onNotesChanged],
+    [mutate, afterNotesChanged],
   );
 
-  useEffect(() => {
-    fetchTags();
-    fetchExcludedTags();
-  }, [fetchTags, fetchExcludedTags]);
-
   return {
-    tags,
-    excludedTags,
+    tags: tagsQuery.data?.tags ?? [],
+    excludedTags: excludedQuery.data?.excluded_tags ?? [],
     isLoading,
     error,
     tagNotes,
@@ -213,7 +128,7 @@ export const useTags = (onNotesChanged?: () => void) => {
     removeTagFromNote,
     removeTagFromAllNotes,
     renameTag,
-    refetchTags: fetchTags,
-    refetchExcludedTags: fetchExcludedTags,
+    refetchTags: tagsQuery.refetch,
+    refetchExcludedTags: excludedQuery.refetch,
   };
 };

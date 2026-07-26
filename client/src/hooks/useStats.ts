@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
-
 import { API_ROUTES } from '@/const';
-import { useError } from '@/hooks/useError';
+
+import { useCachedQuery } from './useCachedQuery';
 
 interface StatsResponse {
   total_notes: number;
@@ -21,34 +20,9 @@ interface UseStatsResult {
 }
 
 export const useStats = (enabled = true): UseStatsResult => {
-  const [stats, setStats] = useState<StatsResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const { error, handleError, clearError } = useError();
-
-  const fetchStats = useCallback(async (): Promise<void> => {
-    try {
-      setIsLoading(true);
-      clearError();
-      const response = await fetch(API_ROUTES.STATS);
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      setStats(data);
-    } catch (err) {
-      handleError(err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [clearError, handleError]);
-
-  useEffect(() => {
-    if (enabled) {
-      fetchStats();
-    }
-  }, [fetchStats, enabled]);
-
-  return { stats, isLoading, error, refetchStats: fetchStats };
+  // `key` is `null` when disabled so the cache is never read or written — that
+  // matches the previous behaviour of not fetching until the backend is ready.
+  const key = enabled ? API_ROUTES.STATS : null;
+  const { data, isLoading, error, refetch } = useCachedQuery<StatsResponse>(key);
+  return { stats: data ?? null, isLoading, error, refetchStats: refetch };
 };

@@ -118,7 +118,7 @@ report it instead of working around it.
 | T25 | 5 L5 | 3 | Indexes gain `build(all)` / `apply(ChangeSet)` | A4 | 1 d | done |
 | T26 | 5 L6 | 4 | Cutover: lifespan on store, migration, drop `cache_service` (serial) | A3, A7 | 1 d | done (migration owner-handled; A7 lazy-models deferred — see follow-ups) |
 | T27 | 6 M | 1 | Merge the two tagging pipelines into one | A1 | 1½ d | done |
-| T28 | 6 M | 2 | Wire granularity through; one UMAP pass | B4 | ¼ d | todo |
+| T28 | 6 M | 2 | Wire granularity through; one UMAP pass | B4 | ¼ d | done |
 | T29 | 6 N | 1 | Reuse stored vectors on the chat hot path | A8 | ½ d | done |
 | T30 | 6 O | 1 | Client data layer (cache + dedupe + invalidation) | A11 | ½ d | done (in-house dataLayer, no new dep) |
 | T31 | 6 P | 1 | Pick one styling system | A12 | ½ d | done (Option A — Tailwind removed, CSS tokens) |

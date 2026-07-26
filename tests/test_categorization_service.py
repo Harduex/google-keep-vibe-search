@@ -1,12 +1,15 @@
 import json
 import math
 from pathlib import Path
+from unittest import mock
 
+import numpy as np
 import pytest
 
 import app.services.categorization_service as cat_mod
 from app.models.label import Label, LabelVocabulary
 from app.services.categorization_service import CategorizationService
+from app.services.tagging.cluster import reduce_embeddings
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -422,3 +425,112 @@ def test_tf_idf_keyword_extraction():
     assert any(
         w in ["baking", "recipe", "flour", "sugar", "cooking"] for w in keywords_by_cluster[1]
     )
+
+
+# --------------------------------------------------------------------------
+# T28 / B4 — one UMAP pass per categorize run, granularity honoured
+# --------------------------------------------------------------------------
+
+
+class _DeterministicLLM:
+    """Stub LLM that routes every call without touching a provider.
+
+    Returns empty classifications / no merges for the prefix and
+    consolidation prompts, and a fixed tag for the naming tool-call, so a
+    full ``categorize`` run completes deterministically with no network.
+    """
+
+    def __init__(self):
+        self.call_count = 0
+
+    async def complete(self, *args, **kwargs):
+        self.call_count += 1
+        return '{"classifications": []}'
+
+    async def complete_with_tools(self, *args, **kwargs):
+        self.call_count += 1
+
+        class MockFunction:
+            arguments = json.dumps({"tag": "Topic"})
+
+        class MockToolCall:
+            function = MockFunction()
+
+        return {"content": "Topic", "tool_calls": [MockToolCall()]}
+
+
+class _StubEngine:
+    """Embedding stub: encode() returns a zero vector of the right width."""
+
+    class _Model:
+        def encode(self, texts):
+            return np.zeros((len(texts), 384), dtype=np.float32)
+
+    model = _Model()
+
+
+class _StubSearchForCategorize:
+    """Minimal SearchService surface used by ``CategorizationService.categorize``.
+
+    Carries precomputed embeddings / notes / note_indices and a stub engine
+    so the prototype-vector builder does not call a real model.
+    """
+
+    def __init__(self, embeddings, notes, note_indices):
+        self.embeddings = embeddings
+        self.notes = notes
+        self.note_indices = note_indices
+        self.engine = _StubEngine()
+
+
+@pytest.mark.asyncio
+async def test_categorize_fits_umap_exactly_once_per_run(monkeypatch):
+    """B4 checkpoint: a full ``categorize`` run must fit UMAP exactly once.
+
+    Before T28 the service fit UMAP once for the reduced-space centroids/MMR
+    and a second time inside ``cluster_notes`` (which also ignored the
+    granularity-derived sizing). The merged pipeline now reduces once via
+    ``reduce_embeddings`` and reuses that array for HDBSCAN. This spies on
+    ``reduce_embeddings`` in the categorization_service namespace and on
+    ``umap.UMAP`` to assert both are exercised exactly once per run.
+    """
+    # Two tight 20-vec blobs so HDBSCAN forms >= 1 cluster at broad sizing
+    # (min_cluster_size = max(15, ...) at n=40 -> 15, just under a blob).
+    rng = np.random.RandomState(3)
+    blob_a = (rng.randn(20, 384) + 5.0).astype(np.float32)
+    blob_b = (rng.randn(20, 384) - 5.0).astype(np.float32)
+    embeddings = np.vstack([blob_a, blob_b])
+    notes = [{"id": f"note_{i}.json", "title": "", "content": ""} for i in range(40)]
+    note_indices = list(range(40))
+
+    service = CategorizationService(
+        search_service=_StubSearchForCategorize(embeddings, notes, note_indices),
+        note_service=None,
+        llm=_DeterministicLLM(),
+    )
+
+    reduce_spy = mock.Mock(wraps=reduce_embeddings)
+    monkeypatch.setattr(cat_mod, "reduce_embeddings", reduce_spy)
+
+    import umap as _umap
+
+    umap_ctor_spy = mock.Mock(wraps=_umap.UMAP)
+    monkeypatch.setattr("app.services.tagging.cluster.umap.UMAP", umap_ctor_spy)
+
+    frames = []
+    async for line in service.categorize(granularity="broad"):
+        data = json.loads(line)
+        frames.append(data)
+        if data.get("type") in ("done", "error"):
+            break
+
+    assert frames and frames[-1]["type"] in (
+        "done",
+        "error",
+    ), f"categorize did not terminate cleanly; last frame={frames[-1] if frames else None}"
+    assert (
+        reduce_spy.call_count == 1
+    ), f"reduce_embeddings called {reduce_spy.call_count} times during one run; expected exactly 1"
+    assert (
+        umap_ctor_spy.call_count == 1
+    ), f"umap.UMAP constructed {umap_ctor_spy.call_count} times during one run; expected exactly 1"

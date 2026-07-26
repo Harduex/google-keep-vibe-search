@@ -16,7 +16,7 @@ from app.services.llm_client import LLMClient
 from app.services.note_service import NoteService
 from app.services.search_service import SearchService
 from app.services.tagging.assign import assign_tags_to_notes, compute_assignment_stats
-from app.services.tagging.cluster import cluster_notes, compute_centroids
+from app.services.tagging.cluster import cluster_notes, compute_centroids, reduce_embeddings
 from app.services.tagging.constants import NOISE_RESCUE_SIMILARITY
 from app.services.tagging.dashboard_stream import (
     auto_merge_info,
@@ -730,16 +730,17 @@ class CategorizationService:
                 }
             )
 
-            import umap
-
-            reducer = umap.UMAP(
+            # One UMAP pass per run (B4). The previous code fit UMAP here for
+            # the reduced-space centroids/MMR and then fit it *again* inside
+            # ``cluster_notes``, which ignored the granularity-derived sizing
+            # and used ``tagging/constants.py`` defaults — making the
+            # Granularity selector inert. The single reduction is now reused
+            # for HDBSCAN, the reduced-space centroids and the MMR fallback.
+            reduced = reduce_embeddings(
+                embeddings,
                 n_components=umap_components,
                 n_neighbors=umap_neighbors,
-                min_dist=0.0,
-                metric="cosine",
-                random_state=42,
             )
-            reduced = reducer.fit_transform(embeddings)
             print("          └─ UMAP reduction complete")
 
             yield self._line(
@@ -763,7 +764,17 @@ class CategorizationService:
                 }
             )
 
-            labels, probabilities = cluster_notes(embeddings)
+            # Granularity is honoured here (B4): the sizing params computed
+            # from the user's choice flow into HDBSCAN, and the UMAP
+            # reduction above is reused instead of being refit inside.
+            labels, probabilities = cluster_notes(
+                embeddings,
+                reduced=reduced,
+                umap_components=umap_components,
+                umap_neighbors=umap_neighbors,
+                min_cluster_size=min_cluster_size,
+                min_samples=min_samples,
+            )
 
             yield self._line(
                 {

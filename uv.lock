@@ -2,10 +2,19 @@ version = 1
 revision = 3
 requires-python = ">=3.10"
 resolution-markers = [
-    "python_full_version >= '3.12'",
-    "python_full_version == '3.11.*'",
-    "python_full_version < '3.11'",
+    "python_full_version >= '3.11' and extra != 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu'",
+    "python_full_version < '3.11' and extra != 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu'",
+    "(python_full_version >= '3.12' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (python_full_version >= '3.11' and platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (python_full_version >= '3.11' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (python_full_version >= '3.11' and sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu')",
+    "(python_full_version < '3.11' and platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (python_full_version < '3.11' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (python_full_version < '3.11' and sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu')",
+    "(python_full_version == '3.11.*' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (python_full_version >= '3.11' and sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu')",
+    "(python_full_version < '3.11' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (python_full_version < '3.11' and sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu')",
+    "python_full_version >= '3.11' and extra != 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu'",
+    "python_full_version < '3.11' and extra != 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu'",
 ]
+conflicts = [[
+    { package = "google-keep-vibe-search", group = "cpu" },
+    { package = "google-keep-vibe-search", group = "gpu" },
+]]
 
 [[package]]
 name = "aiohappyeyeballs"
@@ -23,12 +32,12 @@ source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohappyeyeballs" },
     { name = "aiosignal" },
-    { name = "async-timeout", marker = "python_full_version < '3.11'" },
+    { name = "async-timeout", marker = "python_full_version < '3.11' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
     { name = "attrs" },
     { name = "frozenlist" },
     { name = "multidict" },
     { name = "propcache" },
-    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
+    { name = "typing-extensions", marker = "python_full_version < '3.13' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
     { name = "yarl" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/1d/cc/58f26f118d8099f84e009ce560b9148a3f803e63fa8473b57feb67241875/aiohttp-3.14.2.tar.gz", hash = "sha256:f96821eb2ae2f12b0dfa799eafbf221f5621a9220b457b4744a269a63a5f3a6c", size = 7969860, upload-time = "2026-07-20T19:53:26.881Z" }
@@ -159,7 +168,7 @@ version = "1.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "frozenlist" },
-    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
+    { name = "typing-extensions", marker = "python_full_version < '3.13' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/61/62/06741b579156360248d1ec624842ad0edf697050bbaf7c3e46394e106ad1/aiosignal-1.4.0.tar.gz", hash = "sha256:f47eecd9468083c2029cc99945502cb7708b082c232f9aca65da147157b251c7", size = 25007, upload-time = "2025-07-03T22:54:43.528Z" }
 wheels = [
@@ -189,9 +198,9 @@ name = "anyio"
 version = "4.14.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "exceptiongroup", marker = "python_full_version < '3.11'" },
+    { name = "exceptiongroup", marker = "python_full_version < '3.11' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
     { name = "idna" },
-    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
+    { name = "typing-extensions", marker = "python_full_version < '3.13' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/61/cc/a381afa6efea9f496eff839d4a6a1aed3bfafc7b3ab4b0d1b243a12573dd/anyio-4.14.2.tar.gz", hash = "sha256:cfa139f3ed1a23ee8f88a145ddb5ac7605b8bbfd8592baacd7ce3d8bb4313c7f", size = 260176, upload-time = "2026-07-12T20:29:07.082Z" }
 wheels = [
@@ -235,7 +244,7 @@ dependencies = [
     { name = "packaging" },
     { name = "pathspec" },
     { name = "platformdirs" },
-    { name = "tomli", marker = "python_full_version < '3.11'" },
+    { name = "tomli", marker = "python_full_version < '3.11' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/e9/20/29d7a6614606785923edf9e8ec3ff630231992cc2fabc02eacb0d475372e/black-23.7.0.tar.gz", hash = "sha256:022a582720b0d9480ed82576c920a8c1dde97cc38ff11d8d8859b3bd6ca9eedb", size = 586177, upload-time = "2023-07-11T00:21:22.399Z" }
 wheels = [
@@ -314,6 +323,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/a3/c2/24167ea9858356b47a87a50d39908bfdb72ceeefe0041586e704e5376b3a/certifi-2026.7.22.tar.gz", hash = "sha256:741e2c3b351ddf169a738da9f2c048608ff7f2c5cc02f1ebc6b118bb090d5d55", size = 138112, upload-time = "2026-07-22T03:35:12.644Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/0b/a7/71ac2cff56fec219ed242bb11b8efb69fcc4bec75db06fb7bfe35de520e6/certifi-2026.7.22-py3-none-any.whl", hash = "sha256:62f22742b58a1a33014a2b6b706588a8d7e2a88ae7bd1a6ebe8c992928483775", size = 136983, upload-time = "2026-07-22T03:35:11.276Z" },
+]
+
+[[package]]
+name = "cfgv"
+version = "3.5.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/4e/b5/721b8799b04bf9afe054a3899c6cf4e880fcf8563cc71c15610242490a0c/cfgv-3.5.0.tar.gz", hash = "sha256:d5b1034354820651caa73ede66a6294d6e95c1b00acc5e9b098e917404669132", size = 7334, upload-time = "2025-11-19T20:55:51.612Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/db/3c/33bac158f8ab7f89b2e59426d5fe2e4f63f7ed25df84c036890172b412b5/cfgv-3.5.0-py2.py3-none-any.whl", hash = "sha256:a8dc6b26ad22ff227d2634a65cb388215ce6cc96bbcc5cfde7641ae87e8dacc0", size = 7445, upload-time = "2025-11-19T20:55:50.744Z" },
 ]
 
 [[package]]
@@ -408,7 +426,7 @@ name = "click"
 version = "8.4.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32'" },
+    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/76/d4/81420972a676e8ffea40450d8c8c92943e7218a78fe9b64359836cc9876b/click-8.4.2.tar.gz", hash = "sha256:9a6cea6e60b17ebe0a44c5cc636d94f09bd66142c1cd7d8b4cd731c4917a15f6", size = 338000, upload-time = "2026-06-24T17:45:15.148Z" }
 wheels = [
@@ -423,8 +441,14 @@ dependencies = [
     { name = "ftfy" },
     { name = "packaging" },
     { name = "regex" },
-    { name = "torch" },
-    { name = "torchvision" },
+    { name = "torch", version = "2.1.2", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(python_full_version < '3.12' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (python_full_version >= '3.12' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_machine != 'aarch64' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_python_implementation != 'CPython' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "torch", version = "2.1.2", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (extra != 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "torch", version = "2.1.2+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(python_full_version >= '3.12' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (python_full_version < '3.12' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "torch", version = "2.1.2+cu121", source = { registry = "https://download.pytorch.org/whl/cu121" }, marker = "extra == 'group-23-google-keep-vibe-search-gpu'" },
+    { name = "torchvision", version = "0.16.2", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(python_full_version < '3.12' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (python_full_version >= '3.12' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_machine != 'aarch64' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_python_implementation != 'CPython' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "torchvision", version = "0.16.2", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (extra != 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "torchvision", version = "0.16.2+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(python_full_version >= '3.12' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (python_full_version < '3.12' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "torchvision", version = "0.16.2+cu121", source = { registry = "https://download.pytorch.org/whl/cu121" }, marker = "extra == 'group-23-google-keep-vibe-search-gpu'" },
     { name = "tqdm" },
 ]
 
@@ -433,7 +457,7 @@ name = "cloudpathlib"
 version = "0.24.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
+    { name = "typing-extensions", marker = "python_full_version < '3.11' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/06/19/58bc6b5d7d0f81c7209b05445af477e147c486552f96665a5912211839b9/cloudpathlib-0.24.0.tar.gz", hash = "sha256:c521a984e77b47e656fe78e20a7e3e260e0ab45fc69e33ac01094227c979e34a", size = 53600, upload-time = "2026-04-30T00:54:43.265Z" }
 wheels = [
@@ -454,7 +478,7 @@ name = "confection"
 version = "1.3.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
+    { name = "typing-extensions", marker = "python_full_version < '3.11' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/ca/65/efd0fe8a936fc8ca2978cb7b82581fb20d901c6039e746a808f746b7647b/confection-1.3.3.tar.gz", hash = "sha256:f0f6810d567ff73993fe74d218ca5e1ffb6a44fb03f391257fc5d033546cbfaa", size = 54895, upload-time = "2026-03-24T18:45:24.331Z" }
 wheels = [
@@ -526,12 +550,12 @@ wheels = [
 ]
 
 [[package]]
-name = "defusedxml"
-version = "0.7.1"
+name = "distlib"
+version = "0.4.3"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/0f/d5/c66da9b79e5bdb124974bfe172b4daf3c984ebd9c2a06e2b8a4dc7331c72/defusedxml-0.7.1.tar.gz", hash = "sha256:1bb3032db185915b62d7c6209c5a8792be6a32ab2fedacc84e01b52c51aa3e69", size = 75520, upload-time = "2021-03-08T10:59:26.269Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c9/02/bd72be9134d25ed783ecbbc38a539ffaefbf90c78418c7fb7229600dbac7/distlib-0.4.3.tar.gz", hash = "sha256:f152097224a0ae24be5a0f6bae1b9359af82133bce63f98a95f86cae1aede9ed", size = 615141, upload-time = "2026-06-12T08:04:52.847Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/07/6c/aa3f2f849e01cb6a001cd8554a88d4c77c5c1a31c95bdf1cf9301e6d9ef4/defusedxml-0.7.1-py2.py3-none-any.whl", hash = "sha256:a352e7e428770286cc899e2542b6cdaedb2b4953ff269a210103ec58f6198a61", size = 25604, upload-time = "2021-03-08T10:59:24.45Z" },
+    { url = "https://files.pythonhosted.org/packages/02/08/9c41fb51ab5b43eb21674aff13df270e8ba6c4b29c8624e328dc7a9482af/distlib-0.4.3-py2.py3-none-any.whl", hash = "sha256:4b0ce306c966eb73bc3a7b6abad017c556dadd92c44701562cd528ac7fde4d5b", size = 470628, upload-time = "2026-06-12T08:04:50.506Z" },
 ]
 
 [[package]]
@@ -548,7 +572,7 @@ name = "exceptiongroup"
 version = "1.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions" },
+    { name = "typing-extensions", marker = "python_full_version < '3.11' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/50/79/66800aadf48771f6b62f7eb014e352e5d06856655206165d775e675a02c9/exceptiongroup-1.3.1.tar.gz", hash = "sha256:8b412432c6055b0b7d14c310000ae93352ed6754f70fa8f7c34141f91c4e3219", size = 30371, upload-time = "2025-11-21T23:01:54.787Z" }
 wheels = [
@@ -812,9 +836,8 @@ dependencies = [
     { name = "jellyfish" },
     { name = "jinja2" },
     { name = "litellm" },
-    { name = "networkx", version = "3.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "networkx", version = "3.6.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-    { name = "nltk" },
+    { name = "networkx", version = "3.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "networkx", version = "3.6.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
     { name = "numpy" },
     { name = "pillow" },
     { name = "pydantic" },
@@ -822,7 +845,6 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "python-dotenv" },
     { name = "python-multipart" },
-    { name = "rank-bm25" },
     { name = "regex" },
     { name = "scikit-learn" },
     { name = "sentence-transformers" },
@@ -830,8 +852,6 @@ dependencies = [
     { name = "starlette" },
     { name = "tbb" },
     { name = "tokenizers" },
-    { name = "torch" },
-    { name = "torchvision" },
     { name = "tqdm" },
     { name = "transformers" },
     { name = "umap-learn" },
@@ -839,11 +859,22 @@ dependencies = [
 ]
 
 [package.dev-dependencies]
+cpu = [
+    { name = "torch", version = "2.1.2", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(python_full_version < '3.12' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (python_full_version >= '3.12' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_machine != 'aarch64' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_python_implementation != 'CPython' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "torch", version = "2.1.2+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(python_full_version >= '3.12' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (python_full_version < '3.12' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "torchvision", version = "0.16.2", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(python_full_version < '3.12' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (python_full_version >= '3.12' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_machine != 'aarch64' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_python_implementation != 'CPython' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "torchvision", version = "0.16.2+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(python_full_version >= '3.12' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (python_full_version < '3.12' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+]
 dev = [
     { name = "black" },
     { name = "isort" },
+    { name = "pre-commit" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
+]
+gpu = [
+    { name = "torch", version = "2.1.2+cu121", source = { registry = "https://download.pytorch.org/whl/cu121" } },
+    { name = "torchvision", version = "0.16.2+cu121", source = { registry = "https://download.pytorch.org/whl/cu121" } },
 ]
 
 [package.metadata]
@@ -858,7 +889,6 @@ requires-dist = [
     { name = "jinja2", specifier = "==3.1.2" },
     { name = "litellm", specifier = ">=1.40" },
     { name = "networkx" },
-    { name = "nltk", specifier = ">=3.8.1" },
     { name = "numpy", specifier = "==1.25.2" },
     { name = "pillow", specifier = "==10.0.0" },
     { name = "pydantic" },
@@ -866,7 +896,6 @@ requires-dist = [
     { name = "pydantic-settings", specifier = ">=2.0.0" },
     { name = "python-dotenv", specifier = "==1.0.0" },
     { name = "python-multipart", specifier = "==0.0.6" },
-    { name = "rank-bm25", specifier = ">=0.2.2" },
     { name = "regex", specifier = "==2023.8.8" },
     { name = "scikit-learn", specifier = "==1.3.0" },
     { name = "sentence-transformers", specifier = ">=2.6,<3.0" },
@@ -874,8 +903,6 @@ requires-dist = [
     { name = "starlette", specifier = "==0.52.1" },
     { name = "tbb", specifier = ">=2021.6.0" },
     { name = "tokenizers", specifier = ">=0.14" },
-    { name = "torch", specifier = "==2.1.2+cu121", index = "https://download.pytorch.org/whl/cu121" },
-    { name = "torchvision", specifier = "==0.16.2+cu121", index = "https://download.pytorch.org/whl/cu121" },
     { name = "tqdm" },
     { name = "transformers", specifier = ">=4.36,<4.44" },
     { name = "umap-learn", specifier = ">=0.5.5" },
@@ -883,11 +910,20 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
+cpu = [
+    { name = "torch", specifier = "==2.1.2", index = "https://download.pytorch.org/whl/cpu", conflict = { package = "google-keep-vibe-search", group = "cpu" } },
+    { name = "torchvision", specifier = "==0.16.2", index = "https://download.pytorch.org/whl/cpu", conflict = { package = "google-keep-vibe-search", group = "cpu" } },
+]
 dev = [
     { name = "black", specifier = "==23.7.0" },
     { name = "isort", specifier = "==5.12.0" },
+    { name = "pre-commit", specifier = ">=3.6.0" },
     { name = "pytest", specifier = ">=7.4.0" },
     { name = "pytest-asyncio", specifier = ">=0.21.1" },
+]
+gpu = [
+    { name = "torch", specifier = "==2.1.2+cu121", index = "https://download.pytorch.org/whl/cu121", conflict = { package = "google-keep-vibe-search", group = "gpu" } },
+    { name = "torchvision", specifier = "==0.16.2+cu121", index = "https://download.pytorch.org/whl/cu121", conflict = { package = "google-keep-vibe-search", group = "gpu" } },
 ]
 
 [[package]]
@@ -916,8 +952,8 @@ dependencies = [
     { name = "joblib" },
     { name = "numpy" },
     { name = "scikit-learn" },
-    { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "scipy", version = "1.16.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "scipy", version = "1.16.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/c1/84/6b010387b795f774e1ec695df3c8660c15abd041783647d5e7e4076bfc6b/hdbscan-0.8.40.tar.gz", hash = "sha256:c9e383ff17beee0591075ff65d524bda5b5a35dfb01d218245a7ba30c8d48a17", size = 6904096, upload-time = "2024-11-18T16:14:05.384Z" }
 wheels = [
@@ -1009,7 +1045,7 @@ dependencies = [
     { name = "httpcore2" },
     { name = "idna" },
     { name = "truststore" },
-    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
+    { name = "typing-extensions", marker = "python_full_version < '3.13' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/92/18/b79756b348664b13253a5811230daa1f33b3f0e86df4409b26199f5e9c3e/httpx2-2.9.0.tar.gz", hash = "sha256:85e33a04e7b0ad24044a62affa916140f363f19ba38e15fbc7e6aba1f1fb2775", size = 95340, upload-time = "2026-07-23T14:09:51.094Z" }
 wheels = [
@@ -1023,7 +1059,7 @@ source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "filelock" },
     { name = "fsspec" },
-    { name = "hf-xet", marker = "platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'arm64' or platform_machine == 'x86_64'" },
+    { name = "hf-xet", marker = "platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'arm64' or platform_machine == 'x86_64' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
     { name = "packaging" },
     { name = "pyyaml" },
     { name = "requests" },
@@ -1033,6 +1069,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/7c/b7/8cb61d2eece5fb05a83271da168186721c450eb74e3c31f7ef3169fa475b/huggingface_hub-0.36.2.tar.gz", hash = "sha256:1934304d2fb224f8afa3b87007d58501acfda9215b334eed53072dd5e815ff7a", size = 649782, upload-time = "2026-02-06T09:24:13.098Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a8/af/48ac8483240de756d2438c380746e7130d1c6f75802ef22f3c6d49982787/huggingface_hub-0.36.2-py3-none-any.whl", hash = "sha256:48f0c8eac16145dfce371e9d2d7772854a4f591bcb56c9cf548accf531d54270", size = 566395, upload-time = "2026-02-06T09:24:11.133Z" },
+]
+
+[[package]]
+name = "identify"
+version = "2.6.19"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/52/63/51723b5f116cc04b061cb6f5a561790abf249d25931d515cd375e063e0f4/identify-2.6.19.tar.gz", hash = "sha256:6be5020c38fcb07da56c53733538a3081ea5aa70d36a156f83044bfbf9173842", size = 99567, upload-time = "2026-04-17T18:39:50.265Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/94/84/d9273cd09688070a6523c4aee4663a8538721b2b755c4962aafae0011e72/identify-2.6.19-py2.py3-none-any.whl", hash = "sha256:20e6a87f786f768c092a721ad107fc9df0eb89347be9396cadf3f4abbd1fb78a", size = 99397, upload-time = "2026-04-17T18:39:49.221Z" },
 ]
 
 [[package]]
@@ -1276,8 +1321,8 @@ dependencies = [
     { name = "attrs" },
     { name = "jsonschema-specifications" },
     { name = "referencing" },
-    { name = "rpds-py", version = "0.30.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "rpds-py", version = "2026.6.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "rpds-py", version = "0.30.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "rpds-py", version = "2026.6.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/b3/fc/e067678238fa451312d4c62bf6e6cf5ec56375422aee02f9cb5f909b3047/jsonschema-4.26.0.tar.gz", hash = "sha256:0c26707e2efad8aa1bfc5b7ce170f3fccc2e4918ff85989ba9ffa9facb2be326", size = 366583, upload-time = "2026-01-07T13:41:07.246Z" }
 wheels = [
@@ -1480,7 +1525,7 @@ name = "multidict"
 version = "6.7.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
+    { name = "typing-extensions", marker = "python_full_version < '3.11' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/1a/c2/c2d94cbe6ac1753f3fc980da97b3d930efe1da3af3c9f5125354436c073d/multidict-6.7.1.tar.gz", hash = "sha256:ec6652a1bee61c53a3e5776b6049172c53b6aaba34f18c9ad04f82712bac623d", size = 102010, upload-time = "2026-01-26T02:46:45.979Z" }
 wheels = [
@@ -1691,7 +1736,10 @@ name = "networkx"
 version = "3.4.2"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version < '3.11'",
+    "python_full_version < '3.11' and extra != 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu'",
+    "(python_full_version < '3.11' and platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (python_full_version < '3.11' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (python_full_version < '3.11' and sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu')",
+    "(python_full_version < '3.11' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (python_full_version < '3.11' and sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu')",
+    "python_full_version < '3.11' and extra != 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/fd/1d/06475e1cd5264c0b870ea2cc6fdb3e37177c1e565c43f56ff17a10e3937f/networkx-3.4.2.tar.gz", hash = "sha256:307c3669428c5362aab27c8a1260aa8f47c4e91d3891f48be0141738d8d053e1", size = 2151368, upload-time = "2024-10-21T12:39:38.695Z" }
 wheels = [
@@ -1703,8 +1751,10 @@ name = "networkx"
 version = "3.6.1"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.12'",
-    "python_full_version == '3.11.*'",
+    "python_full_version >= '3.11' and extra != 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu'",
+    "(python_full_version >= '3.12' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (python_full_version >= '3.11' and platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (python_full_version >= '3.11' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (python_full_version >= '3.11' and sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu')",
+    "(python_full_version == '3.11.*' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (python_full_version >= '3.11' and sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu')",
+    "python_full_version >= '3.11' and extra != 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/6a/51/63fe664f3908c97be9d2e4f1158eb633317598cfa6e1fc14af5383f17512/networkx-3.6.1.tar.gz", hash = "sha256:26b7c357accc0c8cde558ad486283728b65b6a95d85ee1cd66bafab4c8168509", size = 2517025, upload-time = "2025-12-08T17:02:39.908Z" }
 wheels = [
@@ -1712,19 +1762,12 @@ wheels = [
 ]
 
 [[package]]
-name = "nltk"
-version = "3.10.0"
+name = "nodeenv"
+version = "1.10.0"
 source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "click" },
-    { name = "defusedxml" },
-    { name = "joblib" },
-    { name = "regex" },
-    { name = "tqdm" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/96/02/df4f105b28a7c16b0e41423bc09cf0f1b8a305df4ef0b10ca74a2e4c648c/nltk-3.10.0.tar.gz", hash = "sha256:4fbac1d98203cbcd1b5d94a2877fb822300072d80604a5e7fae49d2c5f84e8c1", size = 3089244, upload-time = "2026-07-08T02:39:13.562Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/24/bf/d1bda4f6168e0b2e9e5958945e01910052158313224ada5ce1fb2e1113b8/nodeenv-1.10.0.tar.gz", hash = "sha256:996c191ad80897d076bdfba80a41994c2b47c68e224c542b48feba42ba00f8bb", size = 55611, upload-time = "2025-12-20T14:08:54.006Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6e/89/a0b0f35e2820d6a99d75ea1c11977ee6d5c9e6658eceb45b0c7620881faa/nltk-3.10.0-py3-none-any.whl", hash = "sha256:54ff84d4916d3ef127e8953bee0023f6a6b320b75d634a19e06ef056d3d244bf", size = 1716144, upload-time = "2026-07-08T02:39:09.753Z" },
+    { url = "https://files.pythonhosted.org/packages/88/b2/d0896bdcdc8d28a7fc5717c305f1a861c26e18c05047949fb371034d98bd/nodeenv-1.10.0-py2.py3-none-any.whl", hash = "sha256:5bb13e3eed2923615535339b3c620e76779af4cb4c6a90deccc9e36b274d3827", size = 23438, upload-time = "2025-12-20T14:08:52.782Z" },
 ]
 
 [[package]]
@@ -1783,6 +1826,124 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/cd/fe/e900cb2ebafae04b7570081cefc65b6fdd9e202b9b353572506cea5cafdf/numpy-1.25.2-cp311-cp311-musllinux_1_1_x86_64.whl", hash = "sha256:bb33d5a1cf360304754913a350edda36d5b8c5331a8237268c48f91253c3a364", size = 18072378, upload-time = "2023-07-31T14:55:39.551Z" },
     { url = "https://files.pythonhosted.org/packages/5c/e4/990c6cb09f2cd1a3f53bcc4e489dad903faa01b058b625d84bb62d2e9391/numpy-1.25.2-cp311-cp311-win32.whl", hash = "sha256:5883c06bb92f2e6c8181df7b39971a5fb436288db58b5a1c3967702d4278691d", size = 12654351, upload-time = "2023-07-31T14:56:10.623Z" },
     { url = "https://files.pythonhosted.org/packages/72/b2/02770e60c4e2f7e158d923ab0dea4e9f146a2dbf267fec6d8dc61d475689/numpy-1.25.2-cp311-cp311-win_amd64.whl", hash = "sha256:5c97325a0ba6f9d041feb9390924614b60b99209a71a69c876f71052521d42a4", size = 15546748, upload-time = "2023-07-31T14:57:13.015Z" },
+]
+
+[[package]]
+name = "nvidia-cublas-cu12"
+version = "12.1.3.1"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/37/6d/121efd7382d5b0284239f4ab1fc1590d86d34ed4a4a2fdb13b30ca8e5740/nvidia_cublas_cu12-12.1.3.1-py3-none-manylinux1_x86_64.whl", hash = "sha256:ee53ccca76a6fc08fb9701aa95b6ceb242cdaab118c3bb152af4e579af792728", size = 410594774, upload-time = "2023-04-19T15:50:03.519Z" },
+    { url = "https://files.pythonhosted.org/packages/c5/ef/32a375b74bea706c93deea5613552f7c9104f961b21df423f5887eca713b/nvidia_cublas_cu12-12.1.3.1-py3-none-win_amd64.whl", hash = "sha256:2b964d60e8cf11b5e1073d179d85fa340c120e99b3067558f3cf98dd69d02906", size = 439918445, upload-time = "2023-04-19T15:56:13.346Z" },
+]
+
+[[package]]
+name = "nvidia-cuda-cupti-cu12"
+version = "12.1.105"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7e/00/6b218edd739ecfc60524e585ba8e6b00554dd908de2c9c66c1af3e44e18d/nvidia_cuda_cupti_cu12-12.1.105-py3-none-manylinux1_x86_64.whl", hash = "sha256:e54fde3983165c624cb79254ae9818a456eb6e87a7fd4d56a2352c24ee542d7e", size = 14109015, upload-time = "2023-04-19T15:47:32.502Z" },
+    { url = "https://files.pythonhosted.org/packages/d0/56/0021e32ea2848c24242f6b56790bd0ccc8bf99f973ca790569c6ca028107/nvidia_cuda_cupti_cu12-12.1.105-py3-none-win_amd64.whl", hash = "sha256:bea8236d13a0ac7190bd2919c3e8e6ce1e402104276e6f9694479e48bb0eb2a4", size = 10154340, upload-time = "2023-04-19T15:53:33.563Z" },
+]
+
+[[package]]
+name = "nvidia-cuda-nvrtc-cu12"
+version = "12.1.105"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b6/9f/c64c03f49d6fbc56196664d05dba14e3a561038a81a638eeb47f4d4cfd48/nvidia_cuda_nvrtc_cu12-12.1.105-py3-none-manylinux1_x86_64.whl", hash = "sha256:339b385f50c309763ca65456ec75e17bbefcbbf2893f462cb8b90584cd27a1c2", size = 23671734, upload-time = "2023-04-19T15:48:32.42Z" },
+    { url = "https://files.pythonhosted.org/packages/ad/1d/f76987c4f454eb86e0b9a0e4f57c3bf1ac1d13ad13cd1a4da4eb0e0c0ce9/nvidia_cuda_nvrtc_cu12-12.1.105-py3-none-win_amd64.whl", hash = "sha256:0a98a522d9ff138b96c010a65e145dc1b4850e9ecb75a0172371793752fd46ed", size = 19331863, upload-time = "2023-04-19T15:54:34.603Z" },
+]
+
+[[package]]
+name = "nvidia-cuda-runtime-cu12"
+version = "12.1.105"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/eb/d5/c68b1d2cdfcc59e72e8a5949a37ddb22ae6cade80cd4a57a84d4c8b55472/nvidia_cuda_runtime_cu12-12.1.105-py3-none-manylinux1_x86_64.whl", hash = "sha256:6e258468ddf5796e25f1dc591a31029fa317d97a0a94ed93468fc86301d61e40", size = 823596, upload-time = "2023-04-19T15:47:22.471Z" },
+    { url = "https://files.pythonhosted.org/packages/9f/e2/7a2b4b5064af56ea8ea2d8b2776c0f2960d95c88716138806121ae52a9c9/nvidia_cuda_runtime_cu12-12.1.105-py3-none-win_amd64.whl", hash = "sha256:dfb46ef84d73fababab44cf03e3b83f80700d27ca300e537f85f636fac474344", size = 821226, upload-time = "2023-04-19T15:53:23.082Z" },
+]
+
+[[package]]
+name = "nvidia-cudnn-cu12"
+version = "8.9.2.26"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "nvidia-cublas-cu12", marker = "(extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (extra != 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu')" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ff/74/a2e2be7fb83aaedec84f391f082cf765dfb635e7caa9b49065f73e4835d8/nvidia_cudnn_cu12-8.9.2.26-py3-none-manylinux1_x86_64.whl", hash = "sha256:5ccb288774fdfb07a7e7025ffec286971c06d8d7b4fb162525334616d7629ff9", size = 731725872, upload-time = "2023-06-01T19:24:57.328Z" },
+]
+
+[[package]]
+name = "nvidia-cufft-cu12"
+version = "11.0.2.54"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/86/94/eb540db023ce1d162e7bea9f8f5aa781d57c65aed513c33ee9a5123ead4d/nvidia_cufft_cu12-11.0.2.54-py3-none-manylinux1_x86_64.whl", hash = "sha256:794e3948a1aa71fd817c3775866943936774d1c14e7628c74f6f7417224cdf56", size = 121635161, upload-time = "2023-04-19T15:50:46Z" },
+    { url = "https://files.pythonhosted.org/packages/f7/57/7927a3aa0e19927dfed30256d1c854caf991655d847a4e7c01fe87e3d4ac/nvidia_cufft_cu12-11.0.2.54-py3-none-win_amd64.whl", hash = "sha256:d9ac353f78ff89951da4af698f80870b1534ed69993f10a4cf1d96f21357e253", size = 121344196, upload-time = "2023-04-19T15:56:59.562Z" },
+]
+
+[[package]]
+name = "nvidia-curand-cu12"
+version = "10.3.2.106"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/44/31/4890b1c9abc496303412947fc7dcea3d14861720642b49e8ceed89636705/nvidia_curand_cu12-10.3.2.106-py3-none-manylinux1_x86_64.whl", hash = "sha256:9d264c5036dde4e64f1de8c50ae753237c12e0b1348738169cd0f8a536c0e1e0", size = 56467784, upload-time = "2023-04-19T15:51:04.804Z" },
+    { url = "https://files.pythonhosted.org/packages/5c/97/4c9c7c79efcdf5b70374241d48cf03b94ef6707fd18ea0c0f53684931d0b/nvidia_curand_cu12-10.3.2.106-py3-none-win_amd64.whl", hash = "sha256:75b6b0c574c0037839121317e17fd01f8a69fd2ef8e25853d826fec30bdba74a", size = 55995813, upload-time = "2023-04-19T15:57:16.676Z" },
+]
+
+[[package]]
+name = "nvidia-cusolver-cu12"
+version = "11.4.5.107"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "nvidia-cublas-cu12", marker = "(extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (extra != 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "nvidia-cusparse-cu12", marker = "(extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (extra != 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "nvidia-nvjitlink-cu12", marker = "(extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (extra != 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu')" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/bc/1d/8de1e5c67099015c834315e333911273a8c6aaba78923dd1d1e25fc5f217/nvidia_cusolver_cu12-11.4.5.107-py3-none-manylinux1_x86_64.whl", hash = "sha256:8a7ec542f0412294b15072fa7dab71d31334014a69f953004ea7a118206fe0dd", size = 124161928, upload-time = "2023-04-19T15:51:25.781Z" },
+    { url = "https://files.pythonhosted.org/packages/b8/80/8fca0bf819122a631c3976b6fc517c1b10741b643b94046bd8dd451522c5/nvidia_cusolver_cu12-11.4.5.107-py3-none-win_amd64.whl", hash = "sha256:74e0c3a24c78612192a74fcd90dd117f1cf21dea4822e66d89e8ea80e3cd2da5", size = 121643081, upload-time = "2023-04-19T15:57:43.035Z" },
+]
+
+[[package]]
+name = "nvidia-cusparse-cu12"
+version = "12.1.0.106"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "nvidia-nvjitlink-cu12", marker = "(extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (extra != 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu')" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/65/5b/cfaeebf25cd9fdec14338ccb16f6b2c4c7fa9163aefcf057d86b9cc248bb/nvidia_cusparse_cu12-12.1.0.106-py3-none-manylinux1_x86_64.whl", hash = "sha256:f3b50f42cf363f86ab21f720998517a659a48131e8d538dc02f8768237bd884c", size = 195958278, upload-time = "2023-04-19T15:51:49.939Z" },
+    { url = "https://files.pythonhosted.org/packages/0f/95/48fdbba24c93614d1ecd35bc6bdc6087bd17cbacc3abc4b05a9c2a1ca232/nvidia_cusparse_cu12-12.1.0.106-py3-none-win_amd64.whl", hash = "sha256:b798237e81b9719373e8fae8d4f091b70a0cf09d9d85c95a557e11df2d8e9a5a", size = 195414588, upload-time = "2023-04-19T15:58:08.389Z" },
+]
+
+[[package]]
+name = "nvidia-nccl-cu12"
+version = "2.18.1"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a4/05/23f8f38eec3d28e4915725b233c24d8f1a33cb6540a882f7b54be1befa02/nvidia_nccl_cu12-2.18.1-py3-none-manylinux1_x86_64.whl", hash = "sha256:1a6c4acefcbebfa6de320f412bf7866de856e786e0462326ba1bac40de0b5e71", size = 209797524, upload-time = "2023-05-04T23:15:49.653Z" },
+]
+
+[[package]]
+name = "nvidia-nvjitlink-cu12"
+version = "12.9.86"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/46/0c/c75bbfb967457a0b7670b8ad267bfc4fffdf341c074e0a80db06c24ccfd4/nvidia_nvjitlink_cu12-12.9.86-py3-none-manylinux2010_x86_64.manylinux_2_12_x86_64.whl", hash = "sha256:e3f1171dbdc83c5932a45f0f4c99180a70de9bd2718c1ab77d14104f6d7147f9", size = 39748338, upload-time = "2025-06-05T20:10:25.613Z" },
+    { url = "https://files.pythonhosted.org/packages/97/bc/2dcba8e70cf3115b400fef54f213bcd6715a3195eba000f8330f11e40c45/nvidia_nvjitlink_cu12-12.9.86-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:994a05ef08ef4b0b299829cde613a424382aff7efb08a7172c1fa616cc3af2ca", size = 39514880, upload-time = "2025-06-05T20:10:04.89Z" },
+    { url = "https://files.pythonhosted.org/packages/dd/7e/2eecb277d8a98184d881fb98a738363fd4f14577a4d2d7f8264266e82623/nvidia_nvjitlink_cu12-12.9.86-py3-none-win_amd64.whl", hash = "sha256:cc6fcec260ca843c10e34c936921a1c426b351753587fdd638e8cff7b16bb9db", size = 35584936, upload-time = "2025-06-05T20:16:08.525Z" },
+]
+
+[[package]]
+name = "nvidia-nvtx-cu12"
+version = "12.1.105"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/da/d3/8057f0587683ed2fcd4dbfbdfdfa807b9160b809976099d36b8f60d08f03/nvidia_nvtx_cu12-12.1.105-py3-none-manylinux1_x86_64.whl", hash = "sha256:dc21cf308ca5691e7c04d962e213f8a4aa9bbfa23d95412f452254c2caeb09e5", size = 99138, upload-time = "2023-04-19T15:48:43.556Z" },
+    { url = "https://files.pythonhosted.org/packages/b8/d7/bd7cb2d95ac6ac6e8d05bfa96cdce69619f1ef2808e072919044c2d47a8c/nvidia_nvtx_cu12-12.1.105-py3-none-win_amd64.whl", hash = "sha256:65f4d98982b31b60026e0e6de73fbdfc09d08a96f4656dd3665ca616a11e1e82", size = 66307, upload-time = "2023-04-19T15:54:45.736Z" },
 ]
 
 [[package]]
@@ -1891,6 +2052,22 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/f9/e2/3e91f31a7d2b083fe6ef3fa267035b518369d9511ffab804f839851d2779/pluggy-1.6.0.tar.gz", hash = "sha256:7dcc130b76258d33b90f61b658791dede3486c3e6bfb003ee5c9bfb396dd22f3", size = 69412, upload-time = "2025-05-15T12:30:07.975Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/54/20/4d324d65cc6d9205fabedc306948156824eb9f0ee1633355a8f7ec5c66bf/pluggy-1.6.0-py3-none-any.whl", hash = "sha256:e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746", size = 20538, upload-time = "2025-05-15T12:30:06.134Z" },
+]
+
+[[package]]
+name = "pre-commit"
+version = "4.6.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cfgv" },
+    { name = "identify" },
+    { name = "nodeenv" },
+    { name = "pyyaml" },
+    { name = "virtualenv" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/25/3a/ddb78f32a0814e66b18a099377a106a2dcdce92d86a034d69d65df9b256e/pre_commit-4.6.1.tar.gz", hash = "sha256:03e809865c7d178b9979d06c761fcbfe6808fdaded8581a745bb110e52050421", size = 198646, upload-time = "2026-07-21T20:56:58.225Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fb/49/bc925106abcdac498074f2cbe6137e94e09f418dd2b7775df5b577dc0313/pre_commit-4.6.1-py2.py3-none-any.whl", hash = "sha256:0e3b2942510d1fb34eec167a3ec57331bf8442122f1153a9fb8b58f5c49b2717", size = 226186, upload-time = "2026-07-21T20:56:57.064Z" },
 ]
 
 [[package]]
@@ -2101,7 +2278,7 @@ name = "pydantic-ai-slim"
 version = "2.16.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "exceptiongroup", marker = "python_full_version < '3.11'" },
+    { name = "exceptiongroup", marker = "python_full_version < '3.11' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
     { name = "genai-prices" },
     { name = "griffelib" },
     { name = "httpx" },
@@ -2284,8 +2461,8 @@ dependencies = [
     { name = "llvmlite" },
     { name = "numba" },
     { name = "scikit-learn" },
-    { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "scipy", version = "1.16.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "scipy", version = "1.16.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/4a/fb/7f58c397fb31666756457ee2ac4c0289ef2daad57f4ae4be8dec12f80b03/pynndescent-0.6.0.tar.gz", hash = "sha256:7ffde0fb5b400741e055a9f7d377e3702e02250616834231f6c209e39aac24f5", size = 2992987, upload-time = "2026-01-08T21:29:58.943Z" }
 wheels = [
@@ -2297,13 +2474,13 @@ name = "pytest"
 version = "9.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32'" },
-    { name = "exceptiongroup", marker = "python_full_version < '3.11'" },
+    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "exceptiongroup", marker = "python_full_version < '3.11' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
     { name = "iniconfig" },
     { name = "packaging" },
     { name = "pluggy" },
     { name = "pygments" },
-    { name = "tomli", marker = "python_full_version < '3.11'" },
+    { name = "tomli", marker = "python_full_version < '3.11' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/e4/47/b9efed96c114afcfa3c9d3fe98a76a1d14c74a9e266d397cf6eb64be5e01/pytest-9.1.1.tar.gz", hash = "sha256:1088fbde8f2b49d95a549a195707afa7a76a3ce9bcadc26b6d71f0ffda5fe313", size = 1636369, upload-time = "2026-06-19T10:58:32.857Z" }
 wheels = [
@@ -2315,13 +2492,26 @@ name = "pytest-asyncio"
 version = "1.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "backports-asyncio-runner", marker = "python_full_version < '3.11'" },
+    { name = "backports-asyncio-runner", marker = "python_full_version < '3.11' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
     { name = "pytest" },
-    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
+    { name = "typing-extensions", marker = "python_full_version < '3.13' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/43/7c/d36d04db312ecf4298932ef77e6e4a9e8ad017906e24e34f0b0c361a2473/pytest_asyncio-1.4.0.tar.gz", hash = "sha256:c6c0d2259945122819f171a32ecea2c349ead889ee28176caaf492143424be42", size = 58514, upload-time = "2026-05-26T09:56:04.083Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/03/e2/08a497ef684b88559c9cc5f4ad53a37e7b99e727094a86d6ea32536d5d3c/pytest_asyncio-1.4.0-py3-none-any.whl", hash = "sha256:933ca923a23075a87fb7070c0ec272a6848489824d887c85c812670932835aa1", size = 16930, upload-time = "2026-05-26T09:56:02.576Z" },
+]
+
+[[package]]
+name = "python-discovery"
+version = "1.5.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "filelock" },
+    { name = "platformdirs" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f1/51/276f964496a5714ab9f320896195639086881c2b39c03b5ad13de84acbb8/python_discovery-1.5.0.tar.gz", hash = "sha256:3e014c6327154d3dda27939a9a0dc9c5c000439f1906d3f303b48f984bd2ecef", size = 72483, upload-time = "2026-07-21T13:14:14.641Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c7/7b/14882602ddee241d7984a742fcb423cb4a30fb0d6efc546ac3129fba475a/python_discovery-1.5.0-py3-none-any.whl", hash = "sha256:70c4fc61b4e7404e44f01d6fc44a715c4d685ca6cea83d295922f05891877c98", size = 34205, upload-time = "2026-07-21T13:14:13.398Z" },
 ]
 
 [[package]]
@@ -2407,26 +2597,14 @@ wheels = [
 ]
 
 [[package]]
-name = "rank-bm25"
-version = "0.2.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "numpy" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/fc/0a/f9579384aa017d8b4c15613f86954b92a95a93d641cc849182467cf0bb3b/rank_bm25-0.2.2.tar.gz", hash = "sha256:096ccef76f8188563419aaf384a02f0ea459503fdf77901378d4fd9d87e5e51d", size = 8347, upload-time = "2022-02-16T12:10:52.196Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/2a/21/f691fb2613100a62b3fa91e9988c991e9ca5b89ea31c0d3152a3210344f9/rank_bm25-0.2.2-py3-none-any.whl", hash = "sha256:7bd4a95571adadfc271746fa146a4bcfd89c0cf731e49c3d1ad863290adbe8ae", size = 8584, upload-time = "2022-02-16T12:10:50.626Z" },
-]
-
-[[package]]
 name = "referencing"
 version = "0.37.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "attrs" },
-    { name = "rpds-py", version = "0.30.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "rpds-py", version = "2026.6.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
+    { name = "rpds-py", version = "0.30.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "rpds-py", version = "2026.6.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "typing-extensions", marker = "python_full_version < '3.13' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/22/f5/df4e9027acead3ecc63e50fe1e36aca1523e1719559c499951bb4b53188f/referencing-0.37.0.tar.gz", hash = "sha256:44aefc3142c5b842538163acb373e24cce6632bd54bdb01b21ad5863489f50d8", size = 78036, upload-time = "2025-10-13T15:30:48.871Z" }
 wheels = [
@@ -2503,7 +2681,10 @@ name = "rpds-py"
 version = "0.30.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version < '3.11'",
+    "python_full_version < '3.11' and extra != 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu'",
+    "(python_full_version < '3.11' and platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (python_full_version < '3.11' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (python_full_version < '3.11' and sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu')",
+    "(python_full_version < '3.11' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (python_full_version < '3.11' and sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu')",
+    "python_full_version < '3.11' and extra != 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/20/af/3f2f423103f1113b36230496629986e0ef7e199d2aa8392452b484b38ced/rpds_py-0.30.0.tar.gz", hash = "sha256:dd8ff7cf90014af0c0f787eea34794ebf6415242ee1d6fa91eaba725cc441e84", size = 69469, upload-time = "2025-11-30T20:24:38.837Z" }
 wheels = [
@@ -2628,8 +2809,10 @@ name = "rpds-py"
 version = "2026.6.3"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.12'",
-    "python_full_version == '3.11.*'",
+    "python_full_version >= '3.11' and extra != 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu'",
+    "(python_full_version >= '3.12' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (python_full_version >= '3.11' and platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (python_full_version >= '3.11' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (python_full_version >= '3.11' and sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu')",
+    "(python_full_version == '3.11.*' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (python_full_version >= '3.11' and sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu')",
+    "python_full_version >= '3.11' and extra != 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/aa/2a/9618a122aeb2a169a28b03889a2995fe297588964333d4a7d67bdf46e147/rpds_py-2026.6.3.tar.gz", hash = "sha256:1cebd1337c242e4ec2293e541f712b2da849b29f48f0c293684b71c0632625d4", size = 64051, upload-time = "2026-06-30T07:17:53.009Z" }
 wheels = [
@@ -2781,8 +2964,8 @@ source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "joblib" },
     { name = "numpy" },
-    { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "scipy", version = "1.16.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "scipy", version = "1.16.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
     { name = "threadpoolctl" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/72/cd/4761675df1b3dd93072c89697278f3ed3dc004a60c034cd2603c43ff64b5/scikit-learn-1.3.0.tar.gz", hash = "sha256:8be549886f5eda46436b6e555b0e4873b4f10aa21c07df45c4bc1735afbccd7a", size = 7483039, upload-time = "2023-06-30T07:56:11.725Z" }
@@ -2804,10 +2987,13 @@ name = "scipy"
 version = "1.15.3"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version < '3.11'",
+    "python_full_version < '3.11' and extra != 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu'",
+    "(python_full_version < '3.11' and platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (python_full_version < '3.11' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (python_full_version < '3.11' and sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu')",
+    "(python_full_version < '3.11' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (python_full_version < '3.11' and sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu')",
+    "python_full_version < '3.11' and extra != 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu'",
 ]
 dependencies = [
-    { name = "numpy" },
+    { name = "numpy", marker = "python_full_version < '3.11' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/0f/37/6964b830433e654ec7485e45a00fc9a27cf868d622838f6b6d9c5ec0d532/scipy-1.15.3.tar.gz", hash = "sha256:eae3cf522bc7df64b42cad3925c876e1b0b6c35c1337c93e12c0f366f55b0eaf", size = 59419214, upload-time = "2025-05-08T16:13:05.955Z" }
 wheels = [
@@ -2863,11 +3049,13 @@ name = "scipy"
 version = "1.16.3"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.12'",
-    "python_full_version == '3.11.*'",
+    "python_full_version >= '3.11' and extra != 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu'",
+    "(python_full_version >= '3.12' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (python_full_version >= '3.11' and platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (python_full_version >= '3.11' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (python_full_version >= '3.11' and sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu')",
+    "(python_full_version == '3.11.*' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (python_full_version >= '3.11' and sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu')",
+    "python_full_version >= '3.11' and extra != 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu'",
 ]
 dependencies = [
-    { name = "numpy" },
+    { name = "numpy", marker = "python_full_version >= '3.11' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/0a/ca/d8ace4f98322d01abcd52d381134344bf7b431eba7ed8b42bdea5a3c2ac9/scipy-1.16.3.tar.gz", hash = "sha256:01e87659402762f43bd2fee13370553a17ada367d42e7487800bf2916535aecb", size = 30597883, upload-time = "2025-10-28T17:38:54.068Z" }
 wheels = [
@@ -2942,9 +3130,12 @@ dependencies = [
     { name = "numpy" },
     { name = "pillow" },
     { name = "scikit-learn" },
-    { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "scipy", version = "1.16.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-    { name = "torch" },
+    { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "scipy", version = "1.16.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "torch", version = "2.1.2", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(python_full_version < '3.12' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (python_full_version >= '3.12' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_machine != 'aarch64' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_python_implementation != 'CPython' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "torch", version = "2.1.2", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (extra != 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "torch", version = "2.1.2+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(python_full_version >= '3.12' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (python_full_version < '3.12' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "torch", version = "2.1.2+cu121", source = { registry = "https://download.pytorch.org/whl/cu121" }, marker = "extra == 'group-23-google-keep-vibe-search-gpu'" },
     { name = "tqdm" },
     { name = "transformers" },
 ]
@@ -3133,7 +3324,7 @@ version = "0.52.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
-    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
+    { name = "typing-extensions", marker = "python_full_version < '3.13' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/c4/68/79977123bb7be889ad680d79a40f339082c1978b5cfcf62c2d8d196873ac/starlette-0.52.1.tar.gz", hash = "sha256:834edd1b0a23167694292e94f597773bc3f89f362be6effee198165a35d62933", size = 2653702, upload-time = "2026-01-18T13:34:11.062Z" }
 wheels = [
@@ -3414,17 +3605,113 @@ wheels = [
 
 [[package]]
 name = "torch"
+version = "2.1.2"
+source = { registry = "https://download.pytorch.org/whl/cpu" }
+resolution-markers = [
+    "(python_full_version == '3.11.*' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or (python_full_version >= '3.11' and sys_platform == 'darwin')",
+    "(python_full_version < '3.11' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or (python_full_version < '3.11' and sys_platform == 'darwin')",
+]
+dependencies = [
+    { name = "filelock", marker = "(python_full_version < '3.12' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (python_full_version >= '3.12' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_machine != 'aarch64' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_python_implementation != 'CPython' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "fsspec", marker = "(python_full_version < '3.12' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (python_full_version >= '3.12' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_machine != 'aarch64' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_python_implementation != 'CPython' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "jinja2", marker = "(python_full_version < '3.12' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (python_full_version >= '3.12' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_machine != 'aarch64' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_python_implementation != 'CPython' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "networkx", version = "3.4.2", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (python_full_version < '3.11' and sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu') or (python_full_version >= '3.11' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "networkx", version = "3.6.1", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version == '3.11.*' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (python_full_version >= '3.11' and sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu') or (python_full_version != '3.11.*' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "sympy", marker = "(python_full_version < '3.12' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (python_full_version >= '3.12' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_machine != 'aarch64' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_python_implementation != 'CPython' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "typing-extensions", marker = "(python_full_version < '3.12' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (python_full_version >= '3.12' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_machine != 'aarch64' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_python_implementation != 'CPython' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+]
+wheels = [
+    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.1.2-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:bef6996c27d8f6e92ea4e13a772d89611da0e103b48790de78131e308cf73076", upload-time = "2024-01-29T18:33:30Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.1.2-cp310-none-macosx_10_9_x86_64.whl", hash = "sha256:d9b535cad0df3d13997dbe8bd68ac33e0e3ae5377639c9881948e40794a61403", upload-time = "2024-01-29T18:33:34Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.1.2-cp310-none-macosx_11_0_arm64.whl", hash = "sha256:f9a55d55af02826ebfbadf4e9b682f0f27766bc33df8236b48d28d705587868f", upload-time = "2024-01-29T18:33:42Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.1.2-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:8f32ce591616a30304f37a7d5ea80b69ca9e1b94bba7f308184bf616fdaea155", upload-time = "2024-01-29T18:33:46Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.1.2-cp311-none-macosx_10_9_x86_64.whl", hash = "sha256:76d37967c31c99548ad2c4d3f2cf191db48476f2e69b35a0937137116da356a1", upload-time = "2024-01-29T18:33:50Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.1.2-cp311-none-macosx_11_0_arm64.whl", hash = "sha256:e2d83f07b4aac983453ea5bf8f9aa9dacf2278a8d31247f5d9037f37befc60e4", upload-time = "2024-01-29T18:33:57Z" },
+]
+
+[[package]]
+name = "torch"
+version = "2.1.2"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version >= '3.11'",
+    "python_full_version < '3.11'",
+]
+dependencies = [
+    { name = "filelock", marker = "(extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (extra != 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "fsspec", marker = "(extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (extra != 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "jinja2", marker = "(extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (extra != 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "networkx", version = "3.4.2", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra != 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "networkx", version = "3.6.1", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.11' and extra != 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "nvidia-cublas-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "nvidia-cuda-cupti-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "nvidia-cuda-nvrtc-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "nvidia-cuda-runtime-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "nvidia-cudnn-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "nvidia-cufft-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "nvidia-curand-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "nvidia-cusolver-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "nvidia-cusparse-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "nvidia-nccl-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "nvidia-nvtx-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "sympy", marker = "(extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (extra != 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "triton", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu') or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "typing-extensions", marker = "(extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (extra != 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu')" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/03/f1/13137340776dd5d5bcfd2574c9c6dfcc7618285035cd77240496e5c1a79b/torch-2.1.2-cp310-cp310-manylinux1_x86_64.whl", hash = "sha256:3a871edd6c02dae77ad810335c0833391c1a4ce49af21ea8cf0f6a5d2096eea8", size = 670178687, upload-time = "2023-12-14T21:46:00.348Z" },
+    { url = "https://files.pythonhosted.org/packages/ca/dc/7817c6a2ff8f4f74255c7a11b285e5dff04f2a72f538fda647842ef87829/torch-2.1.2-cp310-cp310-manylinux2014_aarch64.whl", hash = "sha256:bef6996c27d8f6e92ea4e13a772d89611da0e103b48790de78131e308cf73076", size = 84139460, upload-time = "2023-12-14T21:48:31.773Z" },
+    { url = "https://files.pythonhosted.org/packages/16/bf/2ba0f0f7c07b9a14c027e181e44c58824e13f7352607ed32db18321599a2/torch-2.1.2-cp310-cp310-win_amd64.whl", hash = "sha256:0e13034fd5fb323cbbc29e56d0637a3791e50dd589616f40c79adfa36a5a35a1", size = 192322127, upload-time = "2023-12-14T21:48:14.92Z" },
+    { url = "https://files.pythonhosted.org/packages/a3/40/649c233606c2c7be8f90e452ebf5cf1db229127ac552b6b5260d0826e611/torch-2.1.2-cp310-none-macosx_10_9_x86_64.whl", hash = "sha256:d9b535cad0df3d13997dbe8bd68ac33e0e3ae5377639c9881948e40794a61403", size = 146996411, upload-time = "2023-12-14T21:48:42.748Z" },
+    { url = "https://files.pythonhosted.org/packages/e3/43/ea958505875b22961e1277587f66b79f9e1f9d97d7998850ed089ae0d0bd/torch-2.1.2-cp310-none-macosx_11_0_arm64.whl", hash = "sha256:f9a55d55af02826ebfbadf4e9b682f0f27766bc33df8236b48d28d705587868f", size = 59569021, upload-time = "2023-12-14T21:49:11.957Z" },
+    { url = "https://files.pythonhosted.org/packages/da/6a/7fb9d82db4568834ff6d4df2fe3b143de4ed65a3f8f93e7daed703626cb6/torch-2.1.2-cp311-cp311-manylinux1_x86_64.whl", hash = "sha256:a6ebbe517097ef289cc7952783588c72de071d4b15ce0f8b285093f0916b1162", size = 670210421, upload-time = "2023-12-14T21:48:56.191Z" },
+    { url = "https://files.pythonhosted.org/packages/25/6b/5837c3458aa1f4b22ba39d5ee22c8bdd498df320ec1ccc9039d27de41246/torch-2.1.2-cp311-cp311-manylinux2014_aarch64.whl", hash = "sha256:8f32ce591616a30304f37a7d5ea80b69ca9e1b94bba7f308184bf616fdaea155", size = 84149869, upload-time = "2023-12-14T21:48:26.587Z" },
+    { url = "https://files.pythonhosted.org/packages/e4/ae/2ad8820045b6631965750435f28583e80905b8273d57cf026163b51323ee/torch-2.1.2-cp311-cp311-win_amd64.whl", hash = "sha256:e0ee6cf90c8970e05760f898d58f9ac65821c37ffe8b04269ec787aa70962b69", size = 192324585, upload-time = "2023-12-14T21:48:00.722Z" },
+    { url = "https://files.pythonhosted.org/packages/dd/a0/6dd8662895ddaffb0ac689037451f93a73e9030d07b1b5965e3e3071f873/torch-2.1.2-cp311-none-macosx_10_9_x86_64.whl", hash = "sha256:76d37967c31c99548ad2c4d3f2cf191db48476f2e69b35a0937137116da356a1", size = 146707942, upload-time = "2023-12-14T21:48:07.812Z" },
+    { url = "https://files.pythonhosted.org/packages/1e/86/477ec85bf1f122931f00a2f3889ed9322c091497415a563291ffc119dacc/torch-2.1.2-cp311-none-macosx_11_0_arm64.whl", hash = "sha256:e2d83f07b4aac983453ea5bf8f9aa9dacf2278a8d31247f5d9037f37befc60e4", size = 59576825, upload-time = "2023-12-14T21:48:21.805Z" },
+]
+
+[[package]]
+name = "torch"
+version = "2.1.2+cpu"
+source = { registry = "https://download.pytorch.org/whl/cpu" }
+resolution-markers = [
+    "(python_full_version >= '3.12' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or (python_full_version >= '3.11' and platform_machine != 'aarch64' and sys_platform == 'linux') or (python_full_version >= '3.11' and platform_python_implementation != 'CPython' and sys_platform == 'linux') or (python_full_version >= '3.11' and sys_platform != 'darwin' and sys_platform != 'linux')",
+    "(python_full_version < '3.11' and platform_machine != 'aarch64' and sys_platform == 'linux') or (python_full_version < '3.11' and platform_python_implementation != 'CPython' and sys_platform == 'linux') or (python_full_version < '3.11' and sys_platform != 'darwin' and sys_platform != 'linux')",
+]
+dependencies = [
+    { name = "filelock", marker = "(python_full_version >= '3.12' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (python_full_version < '3.12' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "fsspec", marker = "(python_full_version >= '3.12' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (python_full_version < '3.12' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "jinja2", marker = "(python_full_version >= '3.12' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (python_full_version < '3.12' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "networkx", version = "3.4.2", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (python_full_version >= '3.11' and platform_machine != 'aarch64' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (python_full_version < '3.11' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (python_full_version >= '3.11' and platform_python_implementation != 'CPython' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (python_full_version < '3.11' and sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (python_full_version >= '3.11' and sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "networkx", version = "3.6.1", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.12' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (python_full_version >= '3.11' and platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (python_full_version < '3.11' and platform_machine != 'aarch64' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (python_full_version >= '3.11' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (python_full_version < '3.11' and platform_python_implementation != 'CPython' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (python_full_version >= '3.11' and sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (python_full_version < '3.11' and sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "sympy", marker = "(python_full_version >= '3.12' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (python_full_version < '3.12' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "typing-extensions", marker = "(python_full_version >= '3.12' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (python_full_version < '3.12' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+]
+wheels = [
+    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.1.2%2Bcpu-cp310-cp310-linux_x86_64.whl", hash = "sha256:bf3ca897f8c7c218dd6c4b1cc5eec57b4f4e71106b0b8120e92f5fdaf4acf6cd", upload-time = "2024-01-29T18:32:13Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.1.2%2Bcpu-cp310-cp310-win_amd64.whl", hash = "sha256:679458a652006bc5b9d3972f046ae299039dcc63f465ac623b439cbc27a3645c", upload-time = "2024-01-29T18:32:21Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.1.2%2Bcpu-cp311-cp311-linux_x86_64.whl", hash = "sha256:6acac7871cca2b72f00b60496dd7d59d7d8247721f374705b8f9c6b9aeea482a", upload-time = "2024-01-29T18:32:32Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.1.2%2Bcpu-cp311-cp311-win_amd64.whl", hash = "sha256:d7ed25db586afef2c022eb143471c6742088decbe05ed1f879fac770e67df189", upload-time = "2024-01-29T18:32:42Z" },
+]
+
+[[package]]
+name = "torch"
 version = "2.1.2+cu121"
 source = { registry = "https://download.pytorch.org/whl/cu121" }
+resolution-markers = [
+    "python_full_version >= '3.11'",
+    "python_full_version < '3.11'",
+]
 dependencies = [
-    { name = "filelock" },
-    { name = "fsspec" },
-    { name = "jinja2" },
-    { name = "networkx", version = "3.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "networkx", version = "3.6.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-    { name = "sympy" },
-    { name = "triton", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
-    { name = "typing-extensions" },
+    { name = "filelock", marker = "extra == 'group-23-google-keep-vibe-search-gpu'" },
+    { name = "fsspec", marker = "extra == 'group-23-google-keep-vibe-search-gpu'" },
+    { name = "jinja2", marker = "extra == 'group-23-google-keep-vibe-search-gpu'" },
+    { name = "networkx", version = "3.4.2", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra == 'group-23-google-keep-vibe-search-gpu') or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "networkx", version = "3.6.1", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.11' and extra == 'group-23-google-keep-vibe-search-gpu') or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "sympy", marker = "extra == 'group-23-google-keep-vibe-search-gpu'" },
+    { name = "triton", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_machine != 'x86_64' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "typing-extensions", marker = "extra == 'group-23-google-keep-vibe-search-gpu'" },
 ]
 wheels = [
     { url = "https://download-r2.pytorch.org/whl/cu121/torch-2.1.2%2Bcu121-cp310-cp310-linux_x86_64.whl", hash = "sha256:b2184b7729ef3b9b10065c074a37c1e603fd99f91e38376e25cb7ed6e1d54696", upload-time = "2024-01-29T19:13:07Z" },
@@ -3435,13 +3722,88 @@ wheels = [
 
 [[package]]
 name = "torchvision"
+version = "0.16.2"
+source = { registry = "https://download.pytorch.org/whl/cpu" }
+resolution-markers = [
+    "(python_full_version == '3.11.*' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or (python_full_version >= '3.11' and sys_platform == 'darwin')",
+    "(python_full_version < '3.11' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or (python_full_version < '3.11' and sys_platform == 'darwin')",
+]
+dependencies = [
+    { name = "numpy", marker = "(python_full_version < '3.12' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (python_full_version >= '3.12' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_machine != 'aarch64' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_python_implementation != 'CPython' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "pillow", marker = "(python_full_version < '3.12' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (python_full_version >= '3.12' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_machine != 'aarch64' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_python_implementation != 'CPython' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "requests", marker = "(python_full_version < '3.12' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (python_full_version >= '3.12' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_machine != 'aarch64' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_python_implementation != 'CPython' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "torch", version = "2.1.2", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(python_full_version < '3.12' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (python_full_version >= '3.12' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_machine != 'aarch64' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_python_implementation != 'CPython' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+]
+wheels = [
+    { url = "https://download-r2.pytorch.org/whl/torchvision-0.16.2-cp310-cp310-linux_aarch64.whl", hash = "sha256:96c7583700112a410bdc4e1e4f118c429dab49c29c9a31a2cc3579bc9b08b19d", upload-time = "2024-01-30T03:20:51Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torchvision-0.16.2-cp310-cp310-macosx_10_13_x86_64.whl", hash = "sha256:bc86f2800cb2c0c1a09c581409cdd6bff66e62f103dc83fc63f73346264c3756", upload-time = "2024-01-29T18:37:29Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torchvision-0.16.2-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:b024bd412df6d3a007dcebf311a894eb3c5c21e1af80d12be382bbcb097a7c3a", upload-time = "2024-01-29T18:37:29Z" },
+    { url = "https://download-r2.pytorch.org/whl/torchvision-0.16.2-cp311-cp311-linux_aarch64.whl", hash = "sha256:e130b08cc9b3cc73a6c59d6edf032394a322f9579bfd21d14bc2e1d0999aa758", upload-time = "2024-01-30T03:20:52Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torchvision-0.16.2-cp311-cp311-macosx_10_13_x86_64.whl", hash = "sha256:67b1aaf8b8cb02ce75dd445f291a27c8036a502f8c0aa76e28c37a0faac2e153", upload-time = "2024-01-29T18:37:30Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torchvision-0.16.2-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:bef30d03e1d1c629761f4dca51d3b7d8a0dc0acce6f4068ab2a1634e8e7b64e0", upload-time = "2024-01-29T18:37:30Z" },
+]
+
+[[package]]
+name = "torchvision"
+version = "0.16.2"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version >= '3.11'",
+    "python_full_version < '3.11'",
+]
+dependencies = [
+    { name = "numpy", marker = "(extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (extra != 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "pillow", marker = "(extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (extra != 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "requests", marker = "(extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (extra != 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "torch", version = "2.1.2", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (extra != 'group-23-google-keep-vibe-search-cpu' and extra != 'group-23-google-keep-vibe-search-gpu')" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/05/3c/687b31e39de3a220d4ba4db403819d9d2dfbecf5e77f6509ff377ccf7de2/torchvision-0.16.2-cp310-cp310-macosx_10_13_x86_64.whl", hash = "sha256:bc86f2800cb2c0c1a09c581409cdd6bff66e62f103dc83fc63f73346264c3756", size = 1588780, upload-time = "2023-12-14T21:50:12.421Z" },
+    { url = "https://files.pythonhosted.org/packages/16/25/186bc3ab670eec24d7fe799f5e5b096bc1a456bc88fa85decae78dc2f20c/torchvision-0.16.2-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:b024bd412df6d3a007dcebf311a894eb3c5c21e1af80d12be382bbcb097a7c3a", size = 1500185, upload-time = "2023-12-14T21:50:09.437Z" },
+    { url = "https://files.pythonhosted.org/packages/da/ae/76bd3682465730dea7be21f36a8160a911a470de6f26228904f222e7fefe/torchvision-0.16.2-cp310-cp310-manylinux1_x86_64.whl", hash = "sha256:e89f10f3c8351972b6e3fda95bc3e479ea8dbfc9dfcfd2c32902dbad4ba5cfc5", size = 6796195, upload-time = "2023-12-14T21:49:59.255Z" },
+    { url = "https://files.pythonhosted.org/packages/54/78/7350fe2e9e4979d754f0a87191bd0cdc120c2fcfb163a036ca2c70276c54/torchvision-0.16.2-cp310-cp310-manylinux2014_aarch64.whl", hash = "sha256:96c7583700112a410bdc4e1e4f118c429dab49c29c9a31a2cc3579bc9b08b19d", size = 13959335, upload-time = "2023-12-14T21:49:42.066Z" },
+    { url = "https://files.pythonhosted.org/packages/f7/27/c0faba9135bf3f110810e7e7896233c92edb92827ef824649f08d24adebd/torchvision-0.16.2-cp310-cp310-win_amd64.whl", hash = "sha256:9f4032ebb3277fb07ff6a9b818d50a547fb8fcd89d958cfd9e773322454bb688", size = 1137934, upload-time = "2023-12-14T21:50:10.924Z" },
+    { url = "https://files.pythonhosted.org/packages/3b/0a/59f82c490e82c3f3671deb374b1d53e3285ff91b76cae46f99b5b3c3e2d7/torchvision-0.16.2-cp311-cp311-macosx_10_13_x86_64.whl", hash = "sha256:67b1aaf8b8cb02ce75dd445f291a27c8036a502f8c0aa76e28c37a0faac2e153", size = 1588786, upload-time = "2023-12-14T21:50:07.811Z" },
+    { url = "https://files.pythonhosted.org/packages/ef/a2/f16cac894c4c71585b3411707502ed8d607945fb4a695857621565bd728d/torchvision-0.16.2-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:bef30d03e1d1c629761f4dca51d3b7d8a0dc0acce6f4068ab2a1634e8e7b64e0", size = 1500181, upload-time = "2023-12-14T21:50:05.916Z" },
+    { url = "https://files.pythonhosted.org/packages/6e/c8/cf445dcf86daf1aed298061ad14b8d335fa594596aeaa6b951231328ffd1/torchvision-0.16.2-cp311-cp311-manylinux1_x86_64.whl", hash = "sha256:e59cc7b2bd1ab5c0ce4ae382e4e37be8f1c174e8b5de2f6a23c170de9ae28495", size = 6795927, upload-time = "2023-12-14T21:50:01.511Z" },
+    { url = "https://files.pythonhosted.org/packages/fa/2b/3177a4e6f0f190a036ec1c64866cf92442919fdfe4a4ee0cccc137e50dfd/torchvision-0.16.2-cp311-cp311-manylinux2014_aarch64.whl", hash = "sha256:e130b08cc9b3cc73a6c59d6edf032394a322f9579bfd21d14bc2e1d0999aa758", size = 13959338, upload-time = "2023-12-14T21:49:54.95Z" },
+    { url = "https://files.pythonhosted.org/packages/f9/e6/3c821e7417acd82df89e39f09156ce80d58817b5b4b1ac5453b522bc5dd4/torchvision-0.16.2-cp311-cp311-win_amd64.whl", hash = "sha256:8692ab1e48807e9604046a6f4beeb67b523294cee1b00828654bb0df2cfce2b2", size = 1137940, upload-time = "2023-12-14T21:50:04.039Z" },
+]
+
+[[package]]
+name = "torchvision"
+version = "0.16.2+cpu"
+source = { registry = "https://download.pytorch.org/whl/cpu" }
+resolution-markers = [
+    "(python_full_version >= '3.12' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or (python_full_version >= '3.11' and platform_machine != 'aarch64' and sys_platform == 'linux') or (python_full_version >= '3.11' and platform_python_implementation != 'CPython' and sys_platform == 'linux') or (python_full_version >= '3.11' and sys_platform != 'darwin' and sys_platform != 'linux')",
+    "(python_full_version < '3.11' and platform_machine != 'aarch64' and sys_platform == 'linux') or (python_full_version < '3.11' and platform_python_implementation != 'CPython' and sys_platform == 'linux') or (python_full_version < '3.11' and sys_platform != 'darwin' and sys_platform != 'linux')",
+]
+dependencies = [
+    { name = "numpy", marker = "(python_full_version >= '3.12' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (python_full_version < '3.12' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "pillow", marker = "(python_full_version >= '3.12' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (python_full_version < '3.12' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "requests", marker = "(python_full_version >= '3.12' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (python_full_version < '3.12' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "torch", version = "2.1.2+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(python_full_version >= '3.12' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (python_full_version < '3.12' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu') or (platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'group-23-google-keep-vibe-search-cpu') or (sys_platform == 'darwin' and extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+]
+wheels = [
+    { url = "https://download-r2.pytorch.org/whl/cpu/torchvision-0.16.2%2Bcpu-cp310-cp310-linux_x86_64.whl", hash = "sha256:63347ff53ee460c63db285ea1566692f2d88a71f43d287596ab2f1880e285d5d", upload-time = "2024-01-29T18:37:25Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torchvision-0.16.2%2Bcpu-cp310-cp310-win_amd64.whl", hash = "sha256:bf245686cd46a108a76e0ce5dd9993baac465019ca9fb6610b2d947ed2aff381", upload-time = "2024-01-29T18:37:25Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torchvision-0.16.2%2Bcpu-cp311-cp311-linux_x86_64.whl", hash = "sha256:a51be39563743c5a4c176e2317c71149f5ee1818d3872b342d656d03b97d3b9d", upload-time = "2024-01-29T18:37:26Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torchvision-0.16.2%2Bcpu-cp311-cp311-win_amd64.whl", hash = "sha256:32a84b015f63a5335f1c761bff78d66fbaab8a0b041e3500ff494c8828efb899", upload-time = "2024-01-29T18:37:27Z" },
+]
+
+[[package]]
+name = "torchvision"
 version = "0.16.2+cu121"
 source = { registry = "https://download.pytorch.org/whl/cu121" }
+resolution-markers = [
+    "python_full_version >= '3.11'",
+    "python_full_version < '3.11'",
+]
 dependencies = [
-    { name = "numpy" },
-    { name = "pillow" },
-    { name = "requests" },
-    { name = "torch" },
+    { name = "numpy", marker = "extra == 'group-23-google-keep-vibe-search-gpu'" },
+    { name = "pillow", marker = "extra == 'group-23-google-keep-vibe-search-gpu'" },
+    { name = "requests", marker = "extra == 'group-23-google-keep-vibe-search-gpu'" },
+    { name = "torch", version = "2.1.2+cu121", source = { registry = "https://download.pytorch.org/whl/cu121" }, marker = "extra == 'group-23-google-keep-vibe-search-gpu'" },
 ]
 wheels = [
     { url = "https://download-r2.pytorch.org/whl/cu121/torchvision-0.16.2%2Bcu121-cp310-cp310-linux_x86_64.whl", hash = "sha256:baa7970c6b5437312e5dd0bd0f2571a20b786c3e285bafd6ed3e4f62a5c3c76e", upload-time = "2024-01-29T19:36:40Z" },
@@ -3455,7 +3817,7 @@ name = "tqdm"
 version = "4.69.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32'" },
+    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/8c/69/40407dfc835517f058b603dbf37a6df094d8582b015a51eddc988febbcb7/tqdm-4.69.0.tar.gz", hash = "sha256:700c5e85dcd5f009dd6222588a29180a193a748247a5d855b4d67db93d79a53b", size = 792569, upload-time = "2026-07-17T18:09:06.2Z" }
 wheels = [
@@ -3488,7 +3850,7 @@ name = "triton"
 version = "2.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "filelock" },
+    { name = "filelock", marker = "extra == 'group-23-google-keep-vibe-search-gpu' or extra != 'group-23-google-keep-vibe-search-cpu'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/4d/22/91a8af421c8a8902dde76e6ef3db01b258af16c53d81e8c0d0dc13900a9e/triton-2.1.0-0-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:66439923a30d5d48399b08a9eae10370f6c261a5ec864a64983bae63152d39d7", size = 89215103, upload-time = "2023-09-01T07:26:13.625Z" },
@@ -3510,7 +3872,7 @@ version = "0.27.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "annotated-doc" },
-    { name = "colorama", marker = "sys_platform == 'win32'" },
+    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
     { name = "rich" },
     { name = "shellingham" },
 ]
@@ -3549,8 +3911,8 @@ dependencies = [
     { name = "numpy" },
     { name = "pynndescent" },
     { name = "scikit-learn" },
-    { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "scipy", version = "1.16.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+    { name = "scipy", version = "1.16.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
     { name = "tqdm" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/6f/d4/9ed627905f7993349671283b3c5bf2d9f543ef79229fa1c7e01324eb900c/umap-learn-0.5.7.tar.gz", hash = "sha256:b2a97973e4c6ffcebf241100a8de589a4c84126a832ab40f296c6d9fcc5eb19e", size = 92680, upload-time = "2024-10-28T18:05:57.093Z" }
@@ -3574,7 +3936,7 @@ source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
     { name = "h11" },
-    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
+    { name = "typing-extensions", marker = "python_full_version < '3.11' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/4c/b3/aa7eb8367959623eef0527f876e371f1ac5770a3b31d3d6db34337b795e6/uvicorn-0.23.2.tar.gz", hash = "sha256:4d3cc12d7727ba72b64d12d3cc7743124074c0a69f7b201512fc50c3e3f1569a", size = 40034, upload-time = "2023-07-31T06:49:24.98Z" }
 wheels = [
@@ -3582,11 +3944,27 @@ wheels = [
 ]
 
 [[package]]
+name = "virtualenv"
+version = "21.7.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "distlib" },
+    { name = "filelock" },
+    { name = "platformdirs" },
+    { name = "python-discovery" },
+    { name = "typing-extensions", marker = "python_full_version < '3.11' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/fe/25/e367a7229b0914772ca8d81b41fde012d9feda68523b52644a571bb21ce8/virtualenv-21.7.0.tar.gz", hash = "sha256:7f9519b9432ff11b6e1a3e94061664efc2ff99ea21780e3cf4f6bd0a5da8b37c", size = 5527510, upload-time = "2026-07-21T13:12:14.109Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a5/7a/ae29312b1e88a22e81f5d21fc11526d2a114089776c2550d2b205b6c2a47/virtualenv-21.7.0-py3-none-any.whl", hash = "sha256:a8370c1c5530fbabf955e40b8fbbc68a431648b10f9433faa587db30a06e51dd", size = 5507078, upload-time = "2026-07-21T13:12:12.136Z" },
+]
+
+[[package]]
 name = "wasabi"
 version = "1.1.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32'" },
+    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'group-23-google-keep-vibe-search-cpu' and extra == 'group-23-google-keep-vibe-search-gpu')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/ac/f9/054e6e2f1071e963b5e746b48d1e3727470b2a490834d18ad92364929db3/wasabi-1.1.3.tar.gz", hash = "sha256:4bb3008f003809db0c3e28b4daf20906ea871a2bb43f9914197d540f4f2e0878", size = 30391, upload-time = "2024-05-31T16:56:18.99Z" }
 wheels = [

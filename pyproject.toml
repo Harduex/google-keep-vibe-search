@@ -2,9 +2,14 @@
 name = "google-keep-vibe-search"
 version = "0.1.0"
 requires-python = ">=3.10"
+# torch/torchvision are intentionally NOT in this flat list. They have two
+# mutually exclusive install profiles — CUDA (cu121, the default, ~2.5 GB of
+# wheels) and CPU — which cannot both be resolved at once. They live in the
+# `gpu` and `cpu` dependency-groups below, with `[tool.uv.conflicts]` declaring
+# the two groups mutually exclusive. `gpu` is a default group, so a plain
+# `uv sync` still installs the cu121 wheels this project has always shipped;
+# see the "Install paths" note below for the CPU alternative.
 dependencies = [
-    "torch==2.1.2+cu121",
-    "torchvision==0.16.2+cu121",
     "fastapi==0.135.0",
     "starlette==0.52.1",
     "uvicorn==0.23.2",
@@ -19,7 +24,6 @@ dependencies = [
     "python-dotenv==1.0.0",
     "pydantic-settings>=2.0.0",
     "pydantic",
-    "nltk>=3.8.1",
     "httpx>=0.24.1",
     "ftfy==6.1.3",
     "regex==2023.8.8",
@@ -27,7 +31,6 @@ dependencies = [
     "clip @ git+https://github.com/openai/CLIP.git",
     "umap-learn>=0.5.5",
     "hdbscan>=0.8.33",
-    "rank-bm25>=0.2.2",
     "spacy>=3.0",
     "jellyfish",
     "networkx",
@@ -37,12 +40,46 @@ dependencies = [
     "tqdm"
 ]
 
+# Install paths (T32):
+#   • GPU (default):  uv sync                            -> cu121 wheels, via the `pytorch` index.
+#   • CPU only:       uv sync --no-group gpu --group cpu -> CPU wheels, via the `pytorch-cpu` index.
+# The cu121 pin is the default on purpose: the app calls .to("cuda"), pins numpy<2,
+# and torch 2.2.2 breaks SentenceTransformer's device handling (see AGENTS.md).
+# Do not regress those by making CPU the default. The two groups conflict
+# ([tool.uv.conflicts] below), so `uv sync --all-groups` is intentionally not
+# valid — pick exactly one of {gpu, cpu}.
 [dependency-groups]
 dev = [
     "black==23.7.0",
     "isort==5.12.0",
+    "pre-commit>=3.6.0",
     "pytest>=7.4.0",
     "pytest-asyncio>=0.21.1"
+]
+# Default torch profile: CUDA 12.1 wheels from download.pytorch.org/whl/cu121.
+gpu = [
+    "torch==2.1.2+cu121",
+    "torchvision==0.16.2+cu121",
+]
+# Alternative torch profile for machines without an NVIDIA GPU: CPU wheels from
+# download.pytorch.org/whl/cpu. Activate with `uv sync --no-group gpu --group cpu`,
+# which keeps the flat `dependencies` above and only swaps the torch source
+# (verified: no nvidia-*-cu12 wheels are pulled in this mode).
+cpu = [
+    "torch==2.1.2",
+    "torchvision==0.16.2",
+]
+
+[tool.uv]
+default-groups = ["dev", "gpu"]
+# The two torch profiles are mutually exclusive: cu121 wheels and CPU wheels
+# provide the same packages and cannot coexist in one environment. Each entry
+# in the outer array is a set of (group, ...) members that cannot all be on.
+conflicts = [
+    [
+        { group = "gpu" },
+        { group = "cpu" }
+    ]
 ]
 
 [[tool.uv.index]]
@@ -50,13 +87,24 @@ name = "pytorch"
 url = "https://download.pytorch.org/whl/cu121"
 explicit = true
 
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
 [tool.uv.sources]
-torch = { index = "pytorch" }
-torchvision = { index = "pytorch" }
+torch = [
+    { group = "gpu", index = "pytorch" },
+    { group = "cpu", index = "pytorch-cpu" }
+]
+torchvision = [
+    { group = "gpu", index = "pytorch" },
+    { group = "cpu", index = "pytorch-cpu" }
+]
 
 [tool.black]
 line-length = 100
-target-version = ["py38"]
+target-version = ["py310"]
 include = '\.pyi?$'
 
 [tool.isort]

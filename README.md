@@ -22,7 +22,7 @@ A semantic search and AI chat assistant for your Google Keep notes export. Searc
 
 ### Prerequisites
 
-- Python 3.9+
+- Python 3.10+
 - Node.js 18+
 - A [Google Takeout](https://takeout.google.com/) export with Keep selected
 - An LLM endpoint (Ollama recommended for local use)

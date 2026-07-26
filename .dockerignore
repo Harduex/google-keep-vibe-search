@@ -1,0 +1,26 @@
+# Real note data — must never enter an image layer.
+cache/
+cache.bak*
+cache-*/
+
+# Secrets: configuration is passed at runtime via env_file, not copied in.
+.env
+.env.*
+!.env.example
+
+# Build and dev artefacts that bloat the context or shadow the container's own installs.
+.venv/
+__pycache__/
+*.pyc
+client/node_modules/
+client/dist/
+node_modules/
+.git/
+.github/
+.pytest_cache/
+.ruff_cache/
+bench/.run/
+bench/corpora/
+docs/
+tests/
+*.log

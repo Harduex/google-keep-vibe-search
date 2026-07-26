@@ -1,19 +1,29 @@
-version: '3.8'
+# `version:` is obsolete in Compose v2 and emits a warning; the schema is inferred.
 
 services:
   backend:
     build: .
     container_name: keep-vibe-backend
+    # Bound to loopback deliberately: there is no authentication and no per-user data
+    # model, so the API must not be reachable from another machine. See
+    # app/core/security.py for the full posture. Publishing on all interfaces was the
+    # wrong default for an app with this design.
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
+    # Runtime configuration, so secrets stay out of the image layers. Requires a .env
+    # beside this file; copy .env.example and fill it in.
+    env_file:
+      - .env
     environment:
+      # 0.0.0.0 binds inside the container only — the published port above is what
+      # decides reachability from the host.
       - HOST=0.0.0.0
       - PORT=8000
-      # You'll need to set this path to match your Docker volume
       - GOOGLE_KEEP_PATH=/data/Keep
     volumes:
-      - ./app:/app/app  # For live code reloading
-      - ./cache:/app/cache  # Persist cache between runs
+      # Cache holds the SQLite store and the vector index: persisting it is what makes
+      # a restart fast instead of a full re-embed.
+      - ./cache:/app/cache
       - ${GOOGLE_KEEP_PATH:-~/Takeout/Keep}:/data/Keep:ro  # Mount Keep data as read-only
     restart: unless-stopped
 
@@ -21,7 +31,7 @@ services:
     build: ./client
     container_name: keep-vibe-frontend
     ports:
-      - "80:80"
+      - "127.0.0.1:80:80"
     depends_on:
       - backend
     restart: unless-stopped

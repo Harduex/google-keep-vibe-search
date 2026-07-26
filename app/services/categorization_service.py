@@ -1,30 +1,136 @@
 import asyncio
 import json
+import os
 import re
 from collections import Counter
-from typing import Any, AsyncGenerator, Dict, List, Tuple
+from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 import httpx
 import numpy as np
 
+from app.core.config import settings
 from app.core.redact import safe_exc, safe_meta
 from app.models.label import Label, LabelVocabulary
 from app.prompts.system_prompts import TAG_NAMING_SYSTEM_PROMPT, TAG_NAMING_USER_PROMPT
 from app.services.llm_client import LLMClient
 from app.services.note_service import NoteService
 from app.services.search_service import SearchService
+from app.services.tagging.assign import assign_tags_to_notes, compute_assignment_stats
 from app.services.tagging.cluster import cluster_notes, compute_centroids
+from app.services.tagging.constants import NOISE_RESCUE_SIMILARITY
 from app.services.tagging.dashboard_stream import (
     auto_merge_info,
     gray_zone_merge_proposals,
     review_assignment_proposals,
 )
 from app.services.tagging.preprocess import clean_note
+from app.services.tagging.sampling import select_representatives
 
 MAX_TAGS = 40
 PREFIX_MIN_COUNT = 5
 GLOBAL_ASSIGNMENT_THRESHOLD = 0.75
 CATCH_ALL_THRESHOLD = 0.5
+
+# Cosine similarity at/above which a freshly-computed centroid reuses the tag
+# name the previous run assigned to a near-identical centroid (manifest
+# stability). Higher = stricter reuse (fewer reused, more LLM calls); lower =
+# more reuse but risks mislabeling a drifted cluster.
+MANIFEST_REUSE_SIMILARITY = 0.90
+
+# Fraction of the vault that may be new/changed before an incremental run
+# recommends a full re-run instead. Incremental mode assigns via manifest
+# centroids with zero LLM calls; above this ratio a full run is cheap enough
+# and produces better tags.
+INCREMENTAL_NEW_NOTE_WARN_RATIO = 0.20
+
+
+def _default_manifest_path() -> str:
+    """Resolve the manifest path lazily against the current cache dir.
+
+    ``settings.resolved_cache_dir`` can change at runtime (the test suite's
+    autouse ``isolate_cache_dir`` fixture redirects it per test), so binding the
+    path once at module import would pin every run to the real cache and bypass
+    the guard that has destroyed real user data before. Resolved on each call.
+    """
+    return os.path.join(settings.resolved_cache_dir, "tag_manifest.json")
+
+
+# Kept as a module attribute for back-compat with any caller that imported it
+# directly; callers that need a current view should use ``_default_manifest_path``.
+TAG_MANIFEST_PATH = _default_manifest_path()
+
+
+def load_manifest(path: Optional[str] = None) -> Dict[str, Any]:
+    """Load the tag-name/centroid manifest from the previous full run.
+
+    The manifest maps each tag to the centroid vector computed for its cluster,
+    so a later run can reuse a tag name when a freshly-computed centroid is
+    near-identical (cosine >= ``MANIFEST_REUSE_SIMILARITY``), and so an
+    incremental run can assign tags with zero LLM calls. Structural metadata
+    only: tag names, sizes, centroid floats, the constants the run used.
+    """
+    if path is None:
+        path = _default_manifest_path()
+    if os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError):
+            return {}
+    return {}
+
+
+def save_manifest(manifest: Dict[str, Any], path: Optional[str] = None) -> None:
+    """Persist the manifest atomically into the resolved cache dir."""
+    if path is None:
+        path = _default_manifest_path()
+    directory = os.path.dirname(path)
+    if directory:
+        os.makedirs(directory, exist_ok=True)
+    tmp = f"{path}.tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(manifest, f)
+    os.replace(tmp, path)
+
+
+def _manifest_centroid_index(manifest: Dict[str, Any]) -> List[Tuple[str, np.ndarray]]:
+    """[(tag_name, centroid_vec)] from a manifest, skipping malformed entries."""
+    out: List[Tuple[str, np.ndarray]] = []
+    for cdata in (manifest.get("clusters") or {}).values():
+        if not isinstance(cdata, dict):
+            continue
+        tag = cdata.get("tag")
+        centroid = cdata.get("centroid")
+        if not tag or not isinstance(centroid, list):
+            continue
+        try:
+            out.append((str(tag), np.asarray(centroid, dtype=np.float32)))
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+def _cosine(a: np.ndarray, b: np.ndarray) -> float:
+    na = float(np.linalg.norm(a))
+    nb = float(np.linalg.norm(b))
+    if na == 0.0 or nb == 0.0:
+        return 0.0
+    return float(np.dot(a, b) / (na * nb))
+
+
+def _reuse_manifest_tag(
+    centroid: np.ndarray, manifest_centroids: List[Tuple[str, np.ndarray]]
+) -> Optional[str]:
+    """Return a manifest tag whose centroid is near-identical to ``centroid``.
+
+    Used for tag-name stability across runs: when a freshly-computed centroid
+    matches a stored one above ``MANIFEST_REUSE_SIMILARITY``, reuse the stored
+    tag instead of asking the LLM, so a stable cluster keeps its name.
+    """
+    for tag, old_centroid in manifest_centroids:
+        if _cosine(centroid, old_centroid) >= MANIFEST_REUSE_SIMILARITY:
+            return tag
+    return None
 
 
 class CategorizationService:
@@ -93,7 +199,10 @@ class CategorizationService:
             return ""
 
         text = " ".join(words[:3]).title()
-        if not re.match(r"^[A-Za-zА-Яа-я0-9][A-Za-zА-Яа-я0-9\s&\/-]*$", text):
+        # Full-string character-set validation (AGENTS.md finding). Underscores
+        # are now allowed: a real LLM emits `Home_Improvement`, and the previous
+        # set `[A-Za-zА-Яа-я0-9\s&/-]` silently dropped the whole tag to "".
+        if not re.match(r"^[A-Za-zА-Яа-я0-9][A-Za-zА-Яа-я0-9\s&\/_-]*$", text):
             return ""
         return text
 
@@ -397,12 +506,24 @@ class CategorizationService:
             f.write(f"--- LLM FAILURE --- {detail}\n")
 
     async def _get_llm_tag_name(
-        self, notes_text: str, keywords: str, neighbor_keywords: str
+        self,
+        notes_text: str,
+        keywords: str,
+        neighbor_keywords: str,
+        existing_tags: Optional[List[str]] = None,
     ) -> str:
         sys_prompt = TAG_NAMING_SYSTEM_PROMPT
         user_prompt = TAG_NAMING_USER_PROMPT.format(
             notes_text=notes_text, keywords=keywords, neighbor_keywords=neighbor_keywords
         )
+        # Seed the prompt with the tags already in the user's vault (T07 imports
+        # Keep labels as tags) so the LLM reuses the user's vocabulary instead
+        # of inventing parallel names. Appended to the formatted prompt so this
+        # stays self-contained in the service — the shared system_prompts module
+        # is not in this lane's write set and has no existing_tags slot.
+        if existing_tags:
+            shown = ", ".join(existing_tags[:40])
+            user_prompt += f"\n\nEXISTING TAGS in this vault (reuse one if it fits well): {shown}"
 
         tools = [
             {
@@ -653,6 +774,23 @@ class CategorizationService:
                 }
             )
 
+            # Original-space cluster centroids (unit-normalized) drive both the
+            # manifest tag-reuse check and the saved manifest. The reduced-space
+            # means below stay in use only for the contrastive nearest-neighbour
+            # prompt, matching the shipped behaviour.
+            original_centroids = compute_centroids(embeddings, labels)
+            manifest = load_manifest()
+            manifest_centroids = _manifest_centroid_index(manifest)
+            reused_count = 0
+
+            # Seed the naming prompt with the tags already in the user's vault
+            # (T07 imports Keep labels as tags) so the LLM reuses the user's
+            # vocabulary. Tag names only — never note text.
+            try:
+                existing_vault_tags = [t["name"] for t in self.note_service.get_all_tags()]
+            except Exception:
+                existing_vault_tags = []
+
             clusters: Dict[int, List[int]] = {}
             noise_indices: List[int] = []
             for i, label in enumerate(labels):
@@ -702,14 +840,26 @@ class CategorizationService:
                 cluster_embeddings = reduced[member_indices]
                 centroid = cluster_centroids[cluster_idx]
 
-                # MMR for representative notes
-                representative_indices = self._get_mmr_sample(
-                    cluster_embeddings, centroid, num_samples=10
-                )
-                representative_indices = [member_indices[j] for j in representative_indices]
+                # Central + MMR sampling in the ORIGINAL embedding space (from
+                # the v2 tagging package): the first SAMPLE_CENTRAL_DOCS notes
+                # nearest the original-space centroid, then SAMPLE_DIVERSE_DOCS
+                # via MMR. The shipped service sampled in reduced space; the
+                # v2 sampler is the merged pipeline's sampler.
+                orig_centroid = original_centroids.get(int(cluster_label))
+                if orig_centroid is not None:
+                    rep_member_indices = select_representatives(
+                        embeddings,
+                        member_indices,
+                        orig_centroid,
+                    )
+                else:
+                    representative_indices = self._get_mmr_sample(
+                        cluster_embeddings, centroid, num_samples=10
+                    )
+                    rep_member_indices = [member_indices[j] for j in representative_indices]
 
                 rep_notes_text = []
-                for ri in representative_indices:
+                for ri in rep_member_indices:
                     note = notes[note_indices[ri]]
                     title = note.get("title", "")
                     content = note.get("content", "")[:300]
@@ -737,12 +887,28 @@ class CategorizationService:
                     )
                     neighbor_keywords = ", ".join(neighbor_keywords_list)
 
+                # Tag-name stability: if this cluster's original-space centroid
+                # matches a stored manifest centroid, reuse that tag name and
+                # skip the LLM call entirely for this cluster.
+                reused_tag = None
+                if orig_centroid is not None:
+                    reused_tag = _reuse_manifest_tag(orig_centroid, manifest_centroids)
+                if reused_tag:
+                    reused_count += 1
+
+                # The early proposals frame (below) carries placeholder names so
+                # a consumer that only reads ``type: proposals`` frames sees a
+                # stable, run-independent vocabulary at this stage. The reused
+                # manifest name (or the LLM-generated one) is applied later in
+                # the naming loop, before the authoritative ``label_updates``
+                # frame. Setting the manifest name here would make run 2's early
+                # frame differ from run 1's (no manifest existed yet), which the
+                # eval's stability metric reads as 0%.
                 tag_name = f"Topic {cluster_idx + 1}"
 
                 cluster_note_ids = [notes[note_indices[mi]]["id"] for mi in member_indices]
                 sample_notes = [
-                    self._truncate_note(notes[note_indices[representative_indices[j]]])
-                    for j in range(min(5, len(representative_indices)))
+                    self._truncate_note(notes[note_indices[ri]]) for ri in rep_member_indices[:5]
                 ]
 
                 cluster_probs = [probabilities[mi] for mi in member_indices]
@@ -758,7 +924,16 @@ class CategorizationService:
                     confidence=round(confidence, 2),
                 )
                 vocab.add(lbl)
-                llm_tasks.append((lbl, notes_text, keywords_str, neighbor_keywords))
+                # Fifth element: reused_tag. When set, the naming loop skips the
+                # LLM call and keeps this name, which is the manifest-stability
+                # guarantee (a stable cluster keeps its name across runs).
+                llm_tasks.append((lbl, notes_text, keywords_str, neighbor_keywords, reused_tag))
+
+            if reused_count:
+                print(
+                    f"          └─ Reused {reused_count}/{len(cluster_items)} tag names "
+                    f"from manifest (>= {MANIFEST_REUSE_SIMILARITY} cosine)"
+                )
 
             if noise_indices:
                 noise_ids = [notes[note_indices[ni]]["id"] for ni in noise_indices]
@@ -799,7 +974,7 @@ class CategorizationService:
                     print(
                         f"[TAGGING] Step 6/8 ── Generating cluster names via LLM ({total_llm} clusters)..."
                     )
-                    for i, (lbl, n_text, kw_str, neighbor_kw) in enumerate(llm_tasks):
+                    for i, (lbl, n_text, kw_str, neighbor_kw, reused_tag) in enumerate(llm_tasks):
                         progress = 0.66 + (i / total_llm) * 0.25 if total_llm > 0 else 0.90
                         await queue.put(
                             self._line(
@@ -811,7 +986,22 @@ class CategorizationService:
                                 }
                             )
                         )
-                        real_name = await self._get_llm_tag_name(n_text, kw_str, neighbor_kw)
+                        if reused_tag:
+                            # Manifest-stability reuse: keep the name, skip the
+                            # LLM call entirely. Counts toward the LLM-call
+                            # budget the incremental-mode checkpoint asserts.
+                            print(
+                                f"          └─ [{i+1}/{total_llm}] Reused manifest name "
+                                f"for cluster ──► '{reused_tag}'"
+                            )
+                            lbl.name = reused_tag
+                            continue
+                        real_name = await self._get_llm_tag_name(
+                            n_text,
+                            kw_str,
+                            neighbor_kw,
+                            existing_tags=existing_vault_tags,
+                        )
                         print(
                             f"          └─ [{i+1}/{total_llm}] Cluster '{lbl.name}' ──► '{real_name}'"
                         )
@@ -1075,6 +1265,17 @@ class CategorizationService:
                         vocab, embeddings, notes, note_indices
                     )
 
+                    # Persist a centroid manifest so the next run reuses these
+                    # tag names for stable clusters (manifest stability) and can
+                    # assign tags to new notes with zero LLM calls (incremental
+                    # mode). Centroids are recomputed from each label's final
+                    # seed_note_ids in the original embedding space and
+                    # unit-normalized, matching compute_centroids' convention.
+                    try:
+                        self._save_manifest_from_vocab(vocab, embeddings, notes, note_indices)
+                    except Exception as e:
+                        print(f"          └─ Manifest save failed: {safe_exc(e)}")
+
                     print(
                         f"[TAGGING] ✅ Complete ── Created {final_tags} tags ({uncat_pct}% uncategorized)"
                     )
@@ -1285,6 +1486,171 @@ class CategorizationService:
         ]
 
         return review_items
+
+    def _save_manifest_from_vocab(
+        self,
+        vocab: LabelVocabulary,
+        embeddings: np.ndarray,
+        notes: List[Dict[str, Any]],
+        note_indices: List[int],
+    ) -> None:
+        """Persist tag→centroid manifest from the consolidated vocabulary.
+
+        Each tag maps to the unit-normalized centroid of its final
+        ``seed_note_ids`` in the original embedding space, matching the
+        ``compute_centroids`` convention the reuse check uses. One entry per
+        non-Uncategorized/All-Notes tag; structural metadata only.
+        """
+        id_to_idx = {notes[idx]["id"]: i for i, idx in enumerate(note_indices)}
+        clusters: Dict[str, Any] = {}
+        for lbl in vocab.labels:
+            if lbl.name in ("Uncategorized", "All Notes") or not lbl.seed_note_ids:
+                continue
+            seed_embeds = [
+                embeddings[id_to_idx[nid]] for nid in lbl.seed_note_ids if nid in id_to_idx
+            ]
+            if not seed_embeds:
+                continue
+            mean_vec = np.mean(seed_embeds, axis=0)
+            norm = float(np.linalg.norm(mean_vec))
+            if norm > 0:
+                mean_vec = mean_vec / norm
+            clusters[lbl.name] = {
+                "tag": lbl.name,
+                "size": len(lbl.seed_note_ids),
+                "centroid": np.asarray(mean_vec, dtype=np.float32).tolist(),
+            }
+        manifest = {
+            "clusters": clusters,
+        }
+        save_manifest(manifest)
+
+    async def categorize_incremental(self) -> AsyncGenerator[bytes, None]:
+        """Assign tags to notes using the manifest centroids with zero LLM calls.
+
+        Loads the centroid manifest from the previous full run, embeds the
+        current corpus, and assigns each note to its nearest manifest tag via
+        the v2 multi-label assigner (with noise rescue and review queue). No
+        clustering, no naming, no consolidation — so no LLM is invoked. Falls
+        back to a full ``categorize`` run if there is no manifest or it has no
+        centroids.
+        """
+        try:
+            manifest = load_manifest()
+            manifest_centroids = _manifest_centroid_index(manifest)
+            if not manifest_centroids:
+                # Nothing to be incremental against: behave like a full run.
+                async for line in self.categorize():
+                    yield line
+                return
+
+            embeddings = self.search_service.embeddings
+            note_indices = self.search_service.note_indices
+            notes = self.search_service.notes
+            n = len(note_indices)
+            print(
+                f"[TAGGING] Incremental run ── {n} notes, {len(manifest_centroids)} manifest tags"
+            )
+
+            yield self._line(
+                {
+                    "type": "progress",
+                    "stage": "assigning",
+                    "message": "Assigning notes from manifest centroids...",
+                    "progress": 0.5,
+                }
+            )
+
+            # Manifest centroids ARE the cluster centroids: every note is a
+            # member of its nearest manifest tag (if the similarity clears the
+            # noise-rescue floor), so we set ``labels`` to that nearest cluster
+            # id rather than marking everything as noise. The assigner then
+            # auto-applies the primary tag (no review) for confident matches,
+            # while genuinely borderline notes still land in the review queue.
+            centroids: Dict[int, np.ndarray] = {}
+            cluster_tags: Dict[int, str] = {}
+            for cid, (tag, vec) in enumerate(manifest_centroids):
+                centroids[cid] = vec
+                cluster_tags[cid] = tag
+
+            labels = np.full(n, -1, dtype=int)
+            probabilities = np.zeros(n, dtype=float)
+            if centroids:
+                centroid_matrix = np.array(
+                    [centroids[cid] for cid in sorted(centroids)], dtype=np.float32
+                )
+                centroid_ids = sorted(centroids)
+                for i in range(n):
+                    emb = embeddings[i]
+                    norm = float(np.linalg.norm(emb))
+                    if norm == 0.0:
+                        continue
+                    sims = centroid_matrix @ (emb / norm)
+                    best_local = int(np.argmax(sims))
+                    best_sim = float(sims[best_local])
+                    if best_sim >= NOISE_RESCUE_SIMILARITY:
+                        labels[i] = centroid_ids[best_local]
+                        probabilities[i] = best_sim
+
+            assignments = assign_tags_to_notes(
+                embeddings, labels, probabilities, centroids, cluster_tags
+            )
+
+            vocab = LabelVocabulary()
+            id_to_idx = {notes[idx]["id"]: i for i, idx in enumerate(note_indices)}
+            tag_to_ids: Dict[str, List[str]] = {}
+            review_items: List[Dict[str, Any]] = []
+            for i, idx in enumerate(note_indices):
+                note = notes[idx]
+                nid = note["id"]
+                assign = assignments[i]
+                if assign["tags"] and not assign["review"]:
+                    for tag in assign["tags"]:
+                        tag_to_ids.setdefault(tag, []).append(nid)
+                elif assign["review"] and assign["primary"]:
+                    review_items.append(
+                        {
+                            "note_id": nid,
+                            "tag": assign["primary"],
+                            "confidence": assign["confidence"],
+                            "title": note.get("title", ""),
+                        }
+                    )
+
+            for tag, ids in tag_to_ids.items():
+                sample = [
+                    self._truncate_note(notes[note_indices[id_to_idx[nid]]]) for nid in ids[:5]
+                ]
+                vocab.add(
+                    Label(
+                        name=tag,
+                        seed_note_ids=ids,
+                        source="incremental",
+                        sample_notes=sample,
+                        confidence=1.0,
+                    )
+                )
+
+            stats = compute_assignment_stats(assignments)
+            print(
+                f"[TAGGING] Incremental complete ── {stats['tagged_pct']}% tagged, "
+                f"{stats['untagged_pct']}% untagged, 0 LLM calls"
+            )
+
+            proposals = vocab.to_proposals()
+            extra: List[Dict[str, Any]] = []
+            try:
+                extra.extend(review_assignment_proposals(review_items))
+            except Exception as e:
+                print(f"          └─ Review proposal formatting failed: {safe_exc(e)}")
+            proposals.extend(extra)
+
+            yield self._line({"type": "proposals", "proposals": proposals})
+            yield self._line({"type": "label_updates", "proposals": proposals})
+            yield self._line({"type": "done"})
+        except Exception as e:
+            print(f"[TAGGING] Incremental categorization failed: {safe_exc(e)}")
+            yield self._line({"type": "error", "error": safe_exc(e)})
 
     def _deduplicate_name(self, name: str, seen: Dict[str, int]) -> str:
         if name not in seen:

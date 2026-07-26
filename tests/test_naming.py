@@ -1,55 +1,216 @@
-from app.services.tagging.naming import (
-    BANNED_TAGS,
-    clean_and_normalize_tag,
-    name_clusters_sequential,
-    name_single_cluster,
-    validate_tag,
-)
+"""Tests for the merged naming path (T27).
+
+The wave-6 merge folded the v2 ``tagging/naming.py`` (PydanticAI-based, with
+the removed-API bug B15) into ``CategorizationService``. What survived is the
+shipped tool-calling naming prompt with its retry ladder, plus the
+``_sanitize_tag_name`` helper. This file covers:
+
+- the ``_sanitize_tag_name`` regression from the pre-wave audit (a real LLM
+  emitting ``Home_Improvement`` was silently dropped to ``""`` because the
+  char-set rejected underscores); and
+- the naming retry ladder's contract on success, empty response and total
+  failure — without exercising the LLM network path.
+
+The leak/privacy tests for the naming path live in
+``test_categorization_service.py`` (P1/P3) and are not duplicated here.
+"""
+
+import asyncio
+
+import pytest
+
+import app.services.categorization_service as cat_mod
+from app.services.categorization_service import CategorizationService
 
 
-def test_validate_tag_rules():
-    assert validate_tag("mechanical keyboards") is True
-    assert validate_tag("3d printing") is True
-    assert validate_tag("recipe & cooking") is True
-
-    # Invalid cases
-    assert validate_tag("misc") is False
-    assert validate_tag("notes") is False
-    assert validate_tag("general") is False
-    assert validate_tag("too many words in this tag label") is False
-    assert validate_tag("invalid!punctuation?") is False
-    assert validate_tag("") is False
+async def _instant_sleep(*_args, **_kwargs):
+    return None
 
 
-def test_clean_and_normalize_tag():
-    assert clean_and_normalize_tag('"Mechanical Keyboards."') == "mechanical keyboards"
-    assert clean_and_normalize_tag("  Python Programming. ") == "python programming"
+# --------------------------------------------------------------------------
+# _sanitize_tag_name — the pre-wave underscore regression
+# --------------------------------------------------------------------------
 
 
-def test_naming_fallback_on_invalid_output(monkeypatch):
-    # Stub model factory or agent run_sync to simulate invalid LLM response
-    def stub_name_single(keywords, samples_text, existing_tags):
-        # Emulate fallback when LLM fails validation
-        fallback = " ".join(keywords[:2])
-        cleaned = clean_and_normalize_tag(fallback)
-        return cleaned if validate_tag(cleaned) else "topics"
+def test_sanitize_allows_underscore_tag():
+    """Pre-wave audit: `Home_Improvement` was silently dropped to "".
 
-    monkeypatch.setattr("app.services.tagging.naming.name_single_cluster", stub_name_single)
+    The char-set now permits underscores, so a real LLM that emits an
+    underscore-joined tag survives sanitization instead of producing an
+    unnamed cluster.
+    """
+    assert CategorizationService._sanitize_tag_name("Home_Improvement") == "Home_Improvement"
 
-    clusters = [
-        {"size": 15, "keywords": ["python", "async", "tutorial"], "samples_text": "sample 1"},
-        {"size": 30, "keywords": ["keyboard", "switches", "keycaps"], "samples_text": "sample 2"},
-    ]
 
-    named = name_clusters_sequential(clusters)
+def test_sanitize_allows_multi_word_underscore_tag():
+    assert CategorizationService._sanitize_tag_name("Machine_Learning") == "Machine_Learning"
 
-    # Size DESC order check: 30-sized cluster first, 15-sized cluster second
-    assert named[0]["size"] == 30
-    assert named[0]["name"] == "keyboard switches"
-    assert named[1]["size"] == 15
-    assert named[1]["name"] == "python async"
 
-    # All tags pass validation and zero banned tags
-    for c in named:
-        assert validate_tag(c["name"]) is True
-        assert c["name"] not in BANNED_TAGS
+def test_sanitize_still_rejects_pure_punctuation():
+    # Sanitizer must not regress to letting junk through.
+    assert CategorizationService._sanitize_tag_name("!!!") == ""
+    assert CategorizationService._sanitize_tag_name("") == ""
+    assert CategorizationService._sanitize_tag_name("   ") == ""
+
+
+def test_sanitize_strips_punctuation_from_real_words():
+    # Surrounding punctuation is stripped; the words survive.
+    assert CategorizationService._sanitize_tag_name('"Travel Plans"') == "Travel Plans"
+    assert CategorizationService._sanitize_tag_name("'Recipes!'") == "Recipes"
+
+
+def test_sanitize_handles_json_wrapped_tag():
+    assert (
+        CategorizationService._sanitize_tag_name('{"tag": "Home Renovation"}') == "Home Renovation"
+    )
+
+
+def test_sanitize_handles_code_fence_wrapped_tag():
+    fenced = '```\n{"tag": "Gardening Tips"}\n```'
+    assert CategorizationService._sanitize_tag_name(fenced) == "Gardening Tips"
+
+
+def test_sanitize_truncates_to_three_words():
+    assert CategorizationService._sanitize_tag_name("one two three four five") == "One Two Three"
+
+
+def test_sanitize_allows_cyrillic():
+    # The shipped pipeline supports Bulgarian notes; Cyrillic must round-trip.
+    assert CategorizationService._sanitize_tag_name("Рецепти") == "Рецепти"
+
+
+def test_sanitize_allows_ampersand_and_slash():
+    assert CategorizationService._sanitize_tag_name("AT&T") == "At&T"
+    assert CategorizationService._sanitize_tag_name("Tips/Tricks") == "Tips/Tricks"
+
+
+# --------------------------------------------------------------------------
+# _get_llm_tag_name — retry ladder contract
+# --------------------------------------------------------------------------
+
+
+class _ScriptedToolLLM:
+    """LLM stub that returns a scripted sequence of tool-call responses.
+
+    Each call to ``complete_with_tools`` pops the next scripted response.
+    """
+
+    def __init__(self, responses):
+        self.responses = list(responses)
+        self.call_count = 0
+
+    async def complete_with_tools(self, *args, **kwargs):
+        self.call_count += 1
+        if self.responses:
+            return self.responses.pop(0)
+        return {"content": "", "tool_calls": []}
+
+    async def complete(self, *args, **kwargs):
+        self.call_count += 1
+        return ""
+
+
+def _tool_call_response(tag: str):
+    class MockFunction:
+        arguments = '{"tag": "%s"}' % tag
+
+    class MockToolCall:
+        function = MockFunction()
+
+    return {"content": tag, "tool_calls": [MockToolCall()]}
+
+
+@pytest.mark.asyncio
+async def test_get_llm_tag_name_returns_sanitized_tag(monkeypatch):
+    monkeypatch.setattr(cat_mod.asyncio, "sleep", _instant_sleep)
+
+    llm = _ScriptedToolLLM([_tool_call_response("Home Renovation")])
+    service = CategorizationService(search_service=None, note_service=None, llm=llm)
+
+    result = await service._get_llm_tag_name(
+        notes_text="unused by stub",
+        keywords="renovation, home",
+        neighbor_keywords="interior",
+    )
+    assert result == "Home Renovation"
+    assert llm.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_get_llm_tag_name_retries_on_empty_then_succeeds(monkeypatch):
+    """The retry ladder retries empty responses before giving up."""
+    monkeypatch.setattr(cat_mod.asyncio, "sleep", _instant_sleep)
+
+    llm = _ScriptedToolLLM(
+        [
+            {"content": "   ", "tool_calls": []},  # empty -> retry
+            _tool_call_response("Gardening"),  # success on attempt 2
+        ]
+    )
+    service = CategorizationService(search_service=None, note_service=None, llm=llm)
+
+    result = await service._get_llm_tag_name(notes_text="x", keywords="x", neighbor_keywords="x")
+    assert result == "Gardening"
+    assert llm.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_get_llm_tag_name_returns_empty_after_max_retries(monkeypatch, tmp_path):
+    """After 3 empty responses the ladder gives up and returns ""."""
+    monkeypatch.setattr(cat_mod.asyncio, "sleep", _instant_sleep)
+    # The failure log is written relative to CWD; isolate it to tmp_path so the
+    # repo root never accumulates one (and we never read its contents here).
+    monkeypatch.chdir(tmp_path)
+
+    llm = _ScriptedToolLLM(
+        [
+            {"content": "", "tool_calls": []},
+            {"content": "", "tool_calls": []},
+            {"content": "", "tool_calls": []},
+        ]
+    )
+    service = CategorizationService(search_service=None, note_service=None, llm=llm)
+
+    result = await service._get_llm_tag_name(notes_text="x", keywords="x", neighbor_keywords="x")
+    assert result == ""
+    assert llm.call_count == 3
+
+
+@pytest.mark.asyncio
+async def test_get_llm_tag_name_passes_existing_tags_to_prompt(monkeypatch):
+    """T07 wiring: the vault's existing tags seed the prompt so the LLM reuses them.
+
+    Captures the messages handed to the LLM (structural shape only — never
+    dumped) and asserts an EXISTING TAGS section is present when the caller
+    supplies tags. The prompt body itself is never inspected for note text.
+    """
+    monkeypatch.setattr(cat_mod.asyncio, "sleep", _instant_sleep)
+
+    captured = {}
+
+    class _CapturingLLM:
+        call_count = 0
+
+        async def complete_with_tools(self, *args, **kwargs):
+            self.call_count += 1
+            captured["messages"] = kwargs.get("messages", [])
+            return _tool_call_response("Cooking")
+
+        async def complete(self, *args, **kwargs):
+            self.call_count += 1
+            return ""
+
+    service = CategorizationService(search_service=None, note_service=None, llm=_CapturingLLM())
+    await service._get_llm_tag_name(
+        notes_text="x",
+        keywords="x",
+        neighbor_keywords="x",
+        existing_tags=["Cooking", "Travel", "Work"],
+    )
+
+    # The user message must carry the EXISTING TAGS marker we append for T07.
+    user_msgs = [m for m in captured["messages"] if m.get("role") == "user"]
+    assert user_msgs, "no user message reached the LLM"
+    assert "EXISTING TAGS" in user_msgs[-1]["content"]
+    # And the supplied tags appear alongside the marker.
+    assert "Cooking" in user_msgs[-1]["content"]

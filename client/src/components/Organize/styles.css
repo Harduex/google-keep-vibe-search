@@ -282,6 +282,28 @@
   border-color: var(--primary-color);
 }
 
+/* Icon-only export, sitting with the tag stats rather than the action row: it is a
+   side errand, not one of the panel's primary actions. */
+.tag-export-btn {
+  display: flex;
+  align-items: center;
+  padding: 2px;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.tag-export-btn:hover {
+  color: var(--primary-color);
+  background-color: var(--light-bg);
+}
+
+.tag-export-btn .material-icons {
+  font-size: 1.1rem;
+}
+
 .dashboard-stats {
   display: flex;
   flex-wrap: wrap;

@@ -17,6 +17,7 @@ export const API_ROUTES = {
   CHAT_SESSIONS: '/api/chat/sessions',
   TAGS: '/api/tags',
   TAG_NOTES: '/api/notes/tag',
+  TAG_SAMPLE_NOTES: '/api/tags/sample-notes',
   EXCLUDED_TAGS: '/api/tags/excluded',
   REMOVE_TAG: '/api/notes',
   REMOVE_TAG_FROM_ALL: '/api/tags/remove',

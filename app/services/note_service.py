@@ -303,6 +303,34 @@ class NoteService:
         tags.sort(key=lambda x: x["name"])
         return tags
 
+    def sample_notes_for_tag(self, tag_name: str, limit: int = 5) -> List[Dict[str, Any]]:
+        """A few notes carrying ``tag_name``, truncated for preview.
+
+        Same shape as a proposal's ``sample_notes`` (id/title/content) so the tag manager
+        can reuse the proposal card's preview renderer. Raises ``KeyError`` when no note
+        carries the tag, which the route turns into a 404.
+        """
+        tagged = {nid for nid, tags in self.note_tags.items() if tag_name in tags}
+        if not tagged:
+            raise KeyError(tag_name)
+
+        # One pass over the corpus rather than an id lookup per match: the tag map holds
+        # canonical ids, and this keeps corpus order without building a throwaway index.
+        samples: List[Dict[str, Any]] = []
+        for note in self.notes:
+            if note.get("id") not in tagged:
+                continue
+            samples.append(
+                {
+                    "id": note.get("id", ""),
+                    "title": note.get("title", ""),
+                    "content": (note.get("content") or "")[:200],
+                }
+            )
+            if len(samples) >= limit:
+                break
+        return samples
+
     def get_excluded_tags(self) -> List[str]:
         return list(self.excluded_tags)
 

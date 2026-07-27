@@ -1,6 +1,7 @@
 import { memo, useState, useCallback } from 'react';
 
-import { Tag } from '@/types';
+import { API_ROUTES } from '@/const';
+import { NoteSample, Tag } from '@/types';
 
 interface TagManagementCardProps {
   tag: Tag;
@@ -15,6 +16,31 @@ export const TagManagementCard = memo(
     const [isRenaming, setIsRenaming] = useState(false);
     const [renameValue, setRenameValue] = useState(tag.name);
     const [isMerging, setIsMerging] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(false);
+    // A saved tag carries no sample notes (unlike a proposal, which ships its own), so the
+    // preview fetches them on first open and keeps them for subsequent toggles.
+    const [samples, setSamples] = useState<NoteSample[] | null>(null);
+    const [previewError, setPreviewError] = useState<string | null>(null);
+
+    const togglePreview = useCallback(async () => {
+      const opening = !isExpanded;
+      setIsExpanded(opening);
+      if (!opening || samples !== null) {
+        return;
+      }
+      setPreviewError(null);
+      try {
+        const params = new URLSearchParams({ tag: tag.name, limit: '5' });
+        const response = await fetch(`${API_ROUTES.TAG_SAMPLE_NOTES}?${params}`);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const data = await response.json();
+        setSamples(data.notes ?? []);
+      } catch (err) {
+        setPreviewError(`Could not load notes: ${(err as Error).message}`);
+      }
+    }, [isExpanded, samples, tag.name]);
 
     const handleRenameSubmit = useCallback(() => {
       const trimmed = renameValue.trim();
@@ -133,6 +159,24 @@ export const TagManagementCard = memo(
                   {t.name}
                 </button>
               ))}
+          </div>
+        )}
+
+        <button className="proposal-preview-toggle" onClick={togglePreview}>
+          <span className="material-icons">{isExpanded ? 'expand_less' : 'expand_more'}</span>
+          {isExpanded ? 'Hide' : 'Preview'} notes
+        </button>
+
+        {isExpanded && (
+          <div className="proposal-preview-notes">
+            {previewError && <div className="preview-note">{previewError}</div>}
+            {!previewError && samples === null && <div className="preview-note">Loading...</div>}
+            {samples?.map((note) => (
+              <div key={note.id} className="preview-note">
+                {note.title && <div className="preview-note-title">{note.title}</div>}
+                <div className="preview-note-content">{note.content}</div>
+              </div>
+            ))}
           </div>
         )}
       </div>

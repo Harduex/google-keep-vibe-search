@@ -1,4 +1,4 @@
-import { memo, useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 
 import { Tag } from '@/types';
 
@@ -17,6 +17,20 @@ export const TagManagerDashboard = memo(
   ({ tags, isLoading, onRename, onMerge, onRemove }: TagManagerDashboardProps) => {
     const [sort, setSort] = useState<TagSort>('count-desc');
     const sortedTags = useMemo(() => sortTags(tags, sort), [tags, sort]);
+
+    /** Download the tag list as JSON — names and note counts only, no note content, so the
+     *  file is safe to share. Written in the currently selected sort order. */
+    const handleExport = useCallback(() => {
+      const payload = sortedTags.map((tag) => ({ name: tag.name, note_count: tag.count }));
+      const url = URL.createObjectURL(
+        new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }),
+      );
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `tags-${new Date().toISOString().slice(0, 10)}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+    }, [sortedTags]);
 
     if (isLoading) {
       return <div className="tag-manager-loading">Loading tags...</div>;
@@ -45,6 +59,14 @@ export const TagManagerDashboard = memo(
               <span className="material-icons">description</span>
               {totalNotes} assignment{totalNotes === 1 ? '' : 's'}
             </span>
+            <button
+              className="tag-export-btn"
+              onClick={handleExport}
+              title="Export tag names and note counts as JSON"
+              aria-label="Export tags as JSON"
+            >
+              <span className="material-icons">download</span>
+            </button>
           </div>
           <label className="tag-sort">
             <span className="material-icons">sort</span>

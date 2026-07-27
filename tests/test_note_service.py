@@ -1,6 +1,8 @@
 import json
 import time
 
+import pytest
+
 from app.core.config import settings
 from app.services.chat_service import ChatService
 from app.services.context_builder import ContextBuilder
@@ -288,3 +290,33 @@ class TestSearchServiceScope:
         service = self._service({"n1": ["Recipes"]})
 
         assert [r["id"] for r in service.search("q")] == ["n1", "n2", "n3", "n4"]
+
+
+def test_sample_notes_for_tag_returns_truncated_previews(tmp_keep_dir, tmp_path):
+    """The tag manager's preview needs id/title/content for a saved tag, capped by limit."""
+    settings.google_keep_path = str(tmp_keep_dir)
+    settings.cache_dir = str(tmp_path)
+
+    store = SQLiteStore(tmp_path / "store.db")
+    service = NoteService(store=store)
+    notes = service.load_notes()
+    ids = [n["id"] for n in notes]
+    service.tag_notes(ids[:3], "Recipes")
+
+    samples = service.sample_notes_for_tag("Recipes", limit=2)
+    assert len(samples) == 2
+    assert set(samples[0]) == {"id", "title", "content"}
+    assert all(len(s["content"]) <= 200 for s in samples)
+    assert {s["id"] for s in samples} <= set(ids[:3])
+
+
+def test_sample_notes_for_tag_raises_for_unknown_tag(tmp_keep_dir, tmp_path):
+    settings.google_keep_path = str(tmp_keep_dir)
+    settings.cache_dir = str(tmp_path)
+
+    store = SQLiteStore(tmp_path / "store.db")
+    service = NoteService(store=store)
+    service.load_notes()
+
+    with pytest.raises(KeyError):
+        service.sample_notes_for_tag("NoSuchTag")

@@ -26,6 +26,23 @@ def get_all_tags(note_service: NoteService = Depends(get_note_service)):
     return {"tags": note_service.get_all_tags()}
 
 
+@router.get("/tags/sample-notes")
+def sample_notes_for_tag(
+    tag: str,
+    limit: int = 5,
+    note_service: NoteService = Depends(get_note_service),
+):
+    """A few notes carrying ``tag``, for the tag manager's preview.
+
+    The tag arrives as a query parameter, not a path segment: generated tag names legally
+    contain ``/`` and ``&`` (see the tag-name character set), which a path segment mangles.
+    """
+    try:
+        return {"notes": note_service.sample_notes_for_tag(tag, limit=max(1, min(limit, 20)))}
+    except KeyError:
+        raise HTTPException(status_code=404, detail="tag not found")
+
+
 @router.get("/tags/excluded")
 def get_excluded_tags(note_service: NoteService = Depends(get_note_service)):
     return {"excluded_tags": note_service.get_excluded_tags()}

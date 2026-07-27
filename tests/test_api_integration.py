@@ -10,18 +10,105 @@ def test_wired_app_loads_no_real_models(wired_app):
     downloads and runs the real model, so the suite stays green while depending on
     network and a warm HF cache. This asserts every model handle in the wired app is a
     stub, by class name only — never touching note text.
+
+    T40 made the heavy models lazy, which is exactly how this test could rot into a
+    vacuous pass: the handles no longer exist at boot, so "the attribute is absent" would
+    be green while the real weights load on the first request. So every assertion below
+    *forces* construction through the lazy property and asserts on what comes back.
     """
-    from tests.fixtures.stubs import StubCrossEncoder, StubEmbedder
+    from tests.fixtures.stubs import StubCrossEncoder, StubEmbedder, StubSpacyNLP
+
+    models = wired_app.state.models
+    # Non-vacuous by construction: nothing is built yet, so each assertion that follows
+    # is what triggers the build.
+    assert models.loaded == {
+        "reranker": False,
+        "verification": False,
+        "grounding": False,
+        "chunking": False,
+    }
 
     chat_service = wired_app.state.chat_service
-    verification_service = chat_service.verification_service
-    grounding_service = chat_service.grounding_service
-    reranker = chat_service.retrieval.reranker
 
     assert isinstance(chat_service.retrieval.search_service.engine.model, StubEmbedder)
-    assert isinstance(verification_service.nli_model, StubCrossEncoder)
-    assert isinstance(grounding_service.nli_model, StubCrossEncoder)
-    assert isinstance(reranker.model, StubCrossEncoder)
+    assert isinstance(models.reranker.model, StubCrossEncoder)
+    assert isinstance(models.verification.nli_model, StubCrossEncoder)
+    assert isinstance(models.grounding.nli_model, StubCrossEncoder)
+    assert isinstance(models.chunking.model, StubEmbedder)
+    assert isinstance(wired_app.state.entity_service.nlp, StubSpacyNLP)
+
+    # And the collaborators reach those very objects through their placeholders — a stub
+    # behind `app.state.models` would prove nothing if chat held a second, real instance.
+    assert chat_service.verification_service.nli_model is models.verification.nli_model
+    assert chat_service.grounding_service.nli_model is models.grounding.nli_model
+    assert chat_service.retrieval.reranker.model is models.reranker.model
+    assert chat_service.retrieval.chunking_service.model is models.chunking.model
+    assert wired_app.state.search_service.engine.reranker.model is models.reranker.model
+
+
+def test_heavy_models_are_built_on_first_use_and_only_once(client, monkeypatch):
+    """T40: prove the laziness, not just the wiring.
+
+    Boot builds none of them; a `/api/search` builds only what the search path actually
+    touches; a `/api/chat` builds the rest; a second `/api/chat` builds nothing new.
+    """
+    from app.core.config import settings
+
+    models = client.app.state.models
+    assert dict(models.construction_counts) == {}
+
+    # `/api/search` pulls the cross-encoder — app/search.py reranks the fused window on
+    # every query — but must not pull the NLI weights or the chunk index.
+    resp = client.post("/api/search", json={"query": "this"})
+    assert resp.status_code == 200
+    assert len(resp.json()["results"]) > 1  # non-vacuous: the rerank branch was reachable
+    assert models.loaded == {
+        "reranker": True,
+        "verification": False,
+        "grounding": False,
+        "chunking": False,
+    }
+
+    monkeypatch.setattr(settings, "agent_max_steps", 1)
+    monkeypatch.setattr(client.app.state.chat_service.retrieval, "max_context_notes", 20)
+    _stub_agent_decision(monkeypatch, ["Content with label"])
+    payload = {
+        "messages": [{"role": "user", "content": "what did I write about labels"}],
+        "stream": True,
+        "useNotesContext": True,
+    }
+
+    # The whole stream, not just the context event: grounding is scored after `done`.
+    context = _chat_events(client, payload)
+    assert len(context) > 1  # non-vacuous: conflict detection needs two notes to run
+    after_first_chat = dict(models.construction_counts)
+    assert after_first_chat == {
+        "reranker": 1,
+        "verification": 1,
+        "grounding": 1,
+        "chunking": 1,
+    }
+
+    # Cached for the process, not rebuilt per request.
+    assert _chat_events(client, payload)
+    assert dict(models.construction_counts) == after_first_chat
+
+
+def _chat_events(client, payload):
+    """Drain a whole chat stream; return the context notes it reported.
+
+    Unlike `_chat_context_notes`, this consumes every event, so the post-`done` grounding
+    step actually runs.
+    """
+    resp = client.post("/api/chat", json=payload)
+    assert resp.status_code == 200
+    notes = []
+    for line in resp.iter_lines():
+        if line and line.strip():
+            event = json.loads(line)
+            if event["type"] == "context":
+                notes = event["notes"]
+    return notes
 
 
 def test_ready_and_stats(client):

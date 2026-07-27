@@ -1,5 +1,7 @@
 import time
+from collections import Counter
 from contextlib import asynccontextmanager
+from typing import Any, Callable, Dict
 
 from fastapi import FastAPI
 from sentence_transformers import SentenceTransformer
@@ -29,6 +31,99 @@ def _step(label: str, start: float) -> float:
     elapsed = time.time() - start
     print(f"  [{elapsed:5.1f}s] OK: {label}")
     return time.time()
+
+
+class _Lazy:
+    """Placeholder that builds the wrapped service on first *use*, then caches it.
+
+    Collaborators (`VibeSearch`, `RetrievalOrchestrator`, `ChatService`) hold a direct
+    reference to each heavy service and guard it with `if self.<service>:`, so the
+    placeholder forwards attribute access to the real object and is truthy *without*
+    constructing anything. That keeps behaviour identical while moving the weight load
+    off the boot path (T40).
+    """
+
+    def __init__(self, factory: Callable[[], Any], label: str, counts: Counter):
+        self._factory = factory
+        self._label = label
+        self._counts = counts
+        self._instance: Any = None
+
+    @property
+    def loaded(self) -> bool:
+        return self._instance is not None
+
+    def resolve(self) -> Any:
+        if self._instance is None:
+            start = time.time()
+            self._instance = self._factory()
+            self._counts[self._label] += 1
+            print(f"  [{time.time() - start:5.1f}s] OK (first use): {self._label}")
+        return self._instance
+
+    def __getattr__(self, name: str) -> Any:
+        # Never resolve on a dunder / private probe (copy, pickle, inspect): those must
+        # not be able to trigger a model load as a side effect.
+        if name.startswith("_"):
+            raise AttributeError(name)
+        return getattr(self.resolve(), name)
+
+    def __bool__(self) -> bool:
+        return True
+
+
+class LazyModels:
+    """The heavy models no `/api/search` request needs at boot.
+
+    `app.state.ready` still means "search works": the embedding model, the vector index
+    and the BM25 index are built eagerly in :func:`lifespan`, as is `EntityService`
+    (`app/search.py` folds its signal into every query). Everything held here is reached
+    only by the cross-encoder rerank step or by `/api/chat` (verification, grounding,
+    chunk-level retrieval), so it is constructed on first use and cached for the process.
+
+    `construction_counts` is the counter the laziness tests assert on: it is incremented
+    exactly once per service, at the single point where its factory runs.
+    """
+
+    def __init__(self, chunking_factory: Callable[[], Any]):
+        self.construction_counts: Counter = Counter()
+        self._lazies: Dict[str, _Lazy] = {
+            "reranker": _Lazy(lambda: RerankerService(), "reranker", self.construction_counts),
+            "verification": _Lazy(
+                lambda: VerificationService(), "verification", self.construction_counts
+            ),
+            "grounding": _Lazy(
+                lambda: GroundingService(nli_model=self.verification.nli_model),
+                "grounding",
+                self.construction_counts,
+            ),
+            "chunking": _Lazy(chunking_factory, "chunking", self.construction_counts),
+        }
+
+    def ref(self, name: str) -> _Lazy:
+        """The forwarding placeholder to inject into a collaborator."""
+        return self._lazies[name]
+
+    @property
+    def reranker(self) -> Any:
+        return self._lazies["reranker"].resolve()
+
+    @property
+    def verification(self) -> Any:
+        return self._lazies["verification"].resolve()
+
+    @property
+    def grounding(self) -> Any:
+        return self._lazies["grounding"].resolve()
+
+    @property
+    def chunking(self) -> Any:
+        return self._lazies["chunking"].resolve()
+
+    @property
+    def loaded(self) -> Dict[str, bool]:
+        """Which services have been constructed — structural metadata only."""
+        return {name: lazy.loaded for name, lazy in self._lazies.items()}
 
 
 @asynccontextmanager
@@ -83,26 +178,26 @@ async def lifespan(app: FastAPI):
     else:
         print("  Image search: disabled")
 
-    # Build chunk-level embeddings for enhanced RAG context retrieval
-    chunking_service = ChunkingService(search_engine.model)
-    chunking_service.build_chunks(note_service.notes)
-    chunking_service.load_or_compute_embeddings()
-    t = _step("Chunking service ready", t)
+    # Heavy models nothing on the search path needs at boot. Chunk-level embeddings are
+    # chat-only (RetrievalOrchestrator), and the cross-encoder / NLI weights are pulled on
+    # first use instead of before the app answers anything.
+    def _build_chunking_service():
+        service = ChunkingService(search_engine.model)
+        service.build_chunks(note_service.notes)
+        service.load_or_compute_embeddings()
+        return service
 
-    # Cross-encoder reranker for precision reranking
-    reranker = RerankerService()
+    models = LazyModels(chunking_factory=_build_chunking_service)
+    reranker = models.ref("reranker")
     search_engine.reranker = reranker
-    t = _step("Reranker loaded", t)
+    t = _step("Heavy models deferred to first use", t)
 
-    # Entity resolution for named entity-based retrieval
+    # Entity resolution for named entity-based retrieval. Eager by design: `VibeSearch.search`
+    # folds the entity signal into every query, so it is on the search path and
+    # `app.state.ready` would overstate readiness without it.
     entity_service = EntityService(note_service.notes)
     search_engine.entity_service = entity_service
     t = _step("Entity service ready", t)
-
-    # Citation verification (NLI-based) + grounding
-    verification_service = VerificationService()
-    grounding_service = GroundingService(nli_model=verification_service.nli_model)
-    t = _step("Verification + grounding ready", t)
 
     # Shared LLM client (LiteLLM-powered)
     llm = LLMClient(
@@ -126,7 +221,7 @@ async def lifespan(app: FastAPI):
     context_builder = ContextBuilder()
     retrieval = RetrievalOrchestrator(
         search_service=search_service,
-        chunking_service=chunking_service,
+        chunking_service=models.ref("chunking"),
         reranker=reranker,
         entity_service=entity_service,
         query_service=query_service,
@@ -138,8 +233,8 @@ async def lifespan(app: FastAPI):
         context_builder=context_builder,
         conversation_mgr=conversation_mgr,
         protocol=protocol,
-        verification_service=verification_service,
-        grounding_service=grounding_service,
+        verification_service=models.ref("verification"),
+        grounding_service=models.ref("grounding"),
         llm=llm,
     )
     _step(f"Chat service ready (model: {settings.resolved_litellm_model})", t)
@@ -151,6 +246,8 @@ async def lifespan(app: FastAPI):
     app.state.store = store
     app.state.vectors = vectors
     app.state.embedder = embedder
+    app.state.models = models
+    app.state.entity_service = entity_service
     app.state.note_service = note_service
     app.state.search_service = search_service
     app.state.chat_service = chat_service

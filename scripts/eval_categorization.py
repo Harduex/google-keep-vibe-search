@@ -147,10 +147,31 @@ async def run_categorization(temp_dir: str):
     llm = CountingFakeLLM()
     cat_service = CategorizationService(search_service, note_service, llm)
 
+    # Granularity is "specific", not "broad". At "broad" this 28-note fixture produces
+    # ZERO clusters, so every note fell into a single "Uncategorized" label and the
+    # stability metric compared that one label against itself — 100%, unfailable, and
+    # measuring nothing. "specific" produces real clusters, so naming and manifest reuse
+    # are actually exercised.
+    #
+    # Read the POST-naming frame. This used to accept only `type == "proposals"`,
+    # and inside `categorize()` the sole frame of that type was emitted *before* the
+    # naming loop ran, carrying placeholder names ("Topic 1", "Topic 2", ...). So
+    # primary-tag stability was measured over placeholders: it compared cluster
+    # ordering, not tag names, and could not fail unless clustering itself changed.
+    # That is the third time a gate in this project turned out to be vacuous, so:
+    # prefer `label_updates`, the authoritative end-of-run frame whose names are the
+    # ones actually applied. `proposals` is still accepted as a fallback because the
+    # two terminal early-exit paths ("All Notes", "Uncategorized") emit only that
+    # frame, with real names and no naming pass.
     proposals = None
-    async for line in cat_service.categorize(granularity="broad"):
+    authoritative = False
+    async for line in cat_service.categorize(granularity="specific"):
         data = json.loads(line.decode("utf-8"))
-        if data.get("type") == "proposals":
+        ftype = data.get("type")
+        if ftype == "label_updates":
+            proposals = data.get("proposals", [])
+            authoritative = True
+        elif ftype == "proposals" and not authoritative:
             proposals = data.get("proposals", [])
 
     return proposals, llm.call_count
@@ -173,6 +194,19 @@ async def main():
 
     if not run1_proposals or not run2_proposals:
         print("ERROR: Categorization failed to produce proposals.")
+        sys.exit(1)
+
+    # `label_updates` carries the classic tag proposals *plus* dashboard cards
+    # (auto-merge info, gray-zone merge suggestions, the review queue). Those have no
+    # `tag_name` and describe actions rather than tags, so every metric below must run
+    # over the classic ones only — the client draws the same distinction.
+    def classic(proposals):
+        return [p for p in proposals if p.get("tag_name") and "note_ids" in p]
+
+    run1_proposals = classic(run1_proposals)
+    run2_proposals = classic(run2_proposals)
+    if not run1_proposals or not run2_proposals:
+        print("ERROR: No classic tag proposals in the run; nothing to measure.")
         sys.exit(1)
 
     tag_count = len([p for p in run1_proposals if p["tag_name"] != "Uncategorized"])

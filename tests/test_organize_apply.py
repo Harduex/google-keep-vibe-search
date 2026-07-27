@@ -1,5 +1,6 @@
 import json
 import os
+import re
 
 import numpy as np
 import pytest
@@ -261,8 +262,11 @@ class _StreamingDeterministicLLM:
 
     async def complete_with_tools(self, *args, **kwargs):
         self.call_count += 1
-        # Distinct name per naming call so clusters do not collide.
-        name = f"Topic {self.call_count}"
+        # Distinct name per naming call so clusters do not collide. Deliberately NOT
+        # shaped like "Topic 3"/"cluster 3": that is what the pipeline's internal
+        # pre-naming placeholder looked like, and a fixture that mimics the bug it is
+        # used to detect makes the detector useless.
+        name = f"Fixture Tag {self.call_count}"
 
         class MockFunction:
             arguments = json.dumps({"tag": name})
@@ -503,3 +507,50 @@ async def test_a_locked_tag_survives_consolidation_while_unlocked_duplicates_mer
     ), "locking did not prevent the merge the unlocked run performed"
 
     clear_pending_proposals()
+
+
+@pytest.mark.asyncio
+async def test_no_cluster_reaches_the_client_before_it_has_a_name():
+    """A cluster is streamed exactly once, when it has a real name.
+
+    ``categorize`` used to emit a ``proposals`` frame *before* the naming loop, carrying
+    placeholder names ("Topic 1", "Topic 2", ...). The client renders ``proposals`` by
+    replacing its list and ``proposal`` by adding to it, so every cluster appeared twice
+    for the duration of a run: placeholders first, real names alongside them, until the
+    final ``label_updates`` frame replaced everything.
+
+    Two independent assertions, because either alone can pass while the bug is present:
+    no frame carries a placeholder-shaped name, and no ``proposals`` frame precedes the
+    first ``proposal`` frame.
+    """
+    embeddings, notes, note_indices = _two_cluster_corpus()
+    service = CategorizationService(
+        search_service=_StreamingStubSearch(embeddings, notes, note_indices),
+        note_service=None,
+        llm=_StreamingDeterministicLLM(),
+    )
+
+    frames = await _collect_frames(service)
+    assert frames and frames[-1]["type"] == "done"
+
+    placeholder = re.compile(r"^(topic|cluster)\s+\d+$", re.IGNORECASE)
+
+    def names_in(frame):
+        if frame.get("type") == "proposal" and frame.get("proposal"):
+            return [frame["proposal"].get("tag_name", "")]
+        if frame.get("type") in ("proposals", "label_updates"):
+            return [p.get("tag_name", "") for p in frame.get("proposals") or []]
+        return []
+
+    offenders = [n for f in frames for n in names_in(f) if placeholder.match(n or "")]
+    assert not offenders, f"placeholder names reached the client: {offenders}"
+
+    # The naming loop must be what puts a cluster on the wire. Non-vacuous: assert a
+    # streamed proposal actually exists before asserting nothing precedes it.
+    types = [f.get("type") for f in frames]
+    assert "proposal" in types, "expected the run to stream at least one named cluster"
+    first_proposal = types.index("proposal")
+    assert "proposals" not in types[:first_proposal], (
+        "a 'proposals' frame preceded the first named cluster — the client replaces its "
+        "list on that frame, so those entries render as real, reviewable cards"
+    )

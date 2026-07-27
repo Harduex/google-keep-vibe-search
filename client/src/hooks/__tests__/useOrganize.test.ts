@@ -306,7 +306,7 @@ describe('useOrganize streamed proposals', () => {
       total,
     }) + '\n';
 
-  it('appends proposal frames in arrival order (no re-sort)', async () => {
+  it('shows the most recently named proposal first, and does not re-sort', async () => {
     const { result } = renderHook(() => useOrganize());
 
     const stream =
@@ -323,10 +323,14 @@ describe('useOrganize streamed proposals', () => {
       await result.current.startCategorization();
     });
 
+    // Newest-named on top: reverse arrival order, so a name the user just watched
+    // being generated is where their eye already is. Still no sorting by size or
+    // name — order is a pure function of arrival, so nothing reshuffles under the
+    // cursor beyond the single insertion at the top.
     expect(result.current.proposals.map((p) => p.proposal.tag_name)).toEqual([
-      'Alpha',
-      'Beta',
       'Gamma',
+      'Beta',
+      'Alpha',
     ]);
     // Every streamed proposal starts pending.
     expect(result.current.proposals.every((p) => p.action === 'pending')).toBe(true);

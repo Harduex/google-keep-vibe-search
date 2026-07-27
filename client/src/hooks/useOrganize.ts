@@ -348,11 +348,11 @@ export const useOrganize = () => {
                 break;
 
               case 'proposal': {
-                // One named cluster arrives — append it in arrival order (no re-sort).
-                // Naming is size-descending, so the most important clusters come first;
-                // a list that re-sorts while the user works in it moves cards under the
-                // cursor. Show as pending until the user decides.
-                setProposals((prev) => [...prev, { proposal: data.proposal, action: 'pending' }]);
+                // One named cluster arrives — put it on top, so the newest name is where
+                // the eye already is. Nothing is inserted before a cluster has a name:
+                // the pipeline no longer emits a pre-naming frame, so this list only ever
+                // contains real, reviewable tags. Show as pending until the user decides.
+                setProposals((prev) => [{ proposal: data.proposal, action: 'pending' }, ...prev]);
                 // The frame carries the most up-to-date naming progress (current of total);
                 // mirror it into the progress state so the progress bar advances per cluster
                 // even between the coarser `progress` frames.

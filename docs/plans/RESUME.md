@@ -3,22 +3,27 @@
 **Paste this file's contents to a fresh agent to resume the plan.** It is written for someone with
 none of the originating conversation's context.
 
-**Last updated:** 2026-07-27 (fourth refresh) — **WAVE 6 COMPLETE.** All eight wave-6 tasks landed
-straight to `master` in eight commits (`9adc290`→`9f66ba5`); the wave-6 spec file is deleted in the
-barrier commit and the gate is green. **Resume by dispatching Wave 7** — T40 · T41 · T42 in parallel
-(T39 already landed early in `a4588b5`), then Wave 8 (T37 serial). See Next steps.
+**Last updated:** 2026-07-27 (fifth refresh) — **WAVE 7 COMPLETE.** All four wave-7 tasks are on
+`master` (`a4588b5`, `63793cf`, `fcb73d3`, `5736d27`); the wave-7 spec file is deleted in the barrier
+commit and the gate is green. **Only Wave 8 remains — T37, serial, on a quiet tree.** See Next steps.
 
-**Out-of-order landing to note:** **T39 (wave 7 Lane U) landed early in `a4588b5`** (loopback CORS,
-8 MiB body cap, rate limiter, `app/core/security.py`) — its task-index row and wave-7 § Status are
-marked done. Wave 7 still has T40 · T41 · T42 outstanding.
+**Read this before dispatching wave 8:** wave 7 was resumed by a *fresh* driver after the previous
+session ended mid-wave. Two things that cost real time, both worth knowing:
+1. **Lanes W and X had finished their edits but were never gated or committed** — the work sat
+   uncommitted in the tree with no agent alive to own it. A resuming driver should always start with
+   `git status` + each lane's *mechanical* checkpoint (they are greppable by design) before assuming
+   a lane did nothing. Lane V genuinely had not started.
+2. **The wave-6 barrier commit `2e20ca5` staged only the spec deletion**, leaving the `PLANS.md` and
+   `RESUME.md` edits its own message described sitting in the working tree. Committed after the fact
+   as `e9bb1a9`. When a barrier commit says it updated the docs, `git show --stat` it.
 
 **Three things changed outside the plan, all owner-authorised:**
 1. **`cache/` was deleted** (2026-07-26) for a clean slate; the owner keeps note backups externally
    and re-imports from the Takeout export (15,381 note pairs, path intact). **The next app boot
-   re-ingests and re-embeds the whole corpus — a long GPU run.** No remaining wave-7/8 task depends
+   re-ingests and re-embeds the whole corpus — a long GPU run.** No remaining wave-8 task depends
    on a warm cache; `make check` and `make eval` are fully isolated and do not need one.
 2. **The repo is PUBLIC and the plan's work through `6250507` is pushed** — see § Decisions &
-   constraints. The wave-6 commits (`9adc290`→barrier) are local, NOT pushed. Agents still never
+   constraints. The wave-6 and wave-7 commits (`9adc290`→`5736d27`) are local, NOT pushed. Agents still never
    push; that stays the owner's call alone.
 3. **A quota outage mid-wave-6-round-1 stopped 4 of 6 lane agents mid-work.** They were re-dispatched
    against their partial WIP (each told "finish, don't redo"), all six reported READY, the combined
@@ -42,9 +47,9 @@ Precedence: `AGENTS.md` > EXECUTION-PROTOCOL > wave file > PLANS.md.
 
 ## State
 
-Waves 1–6 complete; each wave reviewed and repaired before the next started. Branch `master`,
-working tree clean, gate green (see § Verified gate). `origin/master` is still `6250507` — **the
-wave-6 commits are local only, not pushed.** T39 (wave 7) landed early in `a4588b5`.
+Waves 1–7 complete; each wave reviewed and repaired before the next started. Branch `master`,
+working tree clean, gate green (see § Verified gate). `origin/master` is still `6250507` — **every
+wave-6 and wave-7 commit is local only, not pushed.**
 
 **Read `PLANS.md` § Post-wave-4 review and § Proposed follow-ups before resuming.** Wave 6 followed
 the tightened gate discipline: each lane ran its own checkpoint, the combined `make check` was run
@@ -146,30 +151,70 @@ Six commits straight to `master`, order P→O→Q→S→N→M (independent → r
   which a plain `/api/search` never touches. Deferred to a later wave — it is a behaviour change on
   the lifespan wiring, outside wave 5's "where data lives" scope.
 
+## Wave 7 complete — committed 2026-07-27
+
+Four commits on `master`. T39 landed early, in a prior session; the other three were gated and
+committed by a resuming driver.
+
+- **T39 (`a4588b5`) · Lane U — network posture.** Loopback CORS, 8 MiB body cap, per-IP rate
+  limiter, `app/core/security.py`. Landed out of order, before the wave was dispatched.
+- **T41 (`63793cf`) · Lane W — redaction sweep.** Every raw `str(e)` / `{e}` in `app/` now routes
+  through `safe_exc` / `safe_meta`; the mechanical grep gate returns zero lines. The before-count
+  was **20 sites, re-derived at the parent commit** — not the spec's estimated 22, because T27 had
+  deleted `tagging/naming.py` and `tagging/dedupe.py` out from under the list, so `tagging/**`
+  needed no edits at all. `pydantic_agent._log_agent_step` kept, per its standing T10 exemption.
+- **T42 (`fcb73d3`) · Lane X — legacy embedding path deleted.** `load_or_compute_embeddings`,
+  `_save_embeddings_to_cache`, `_load_embeddings_from_cache`, `_is_cache_valid`,
+  `_compute_notes_hash` and the `force_refresh` parameter are gone from `app/search.py`; the four
+  callers moved to `from_model(...)` + `build(documents)`. `make eval-retrieval` reproduces the
+  baseline **byte-identically** (dense_only R@1 0.607 / R@5 0.687 / R@10 0.833 / MRR 0.683), which
+  is the proof it was a pure removal. This also removes the write path that once let `make eval`
+  destroy the real corpus.
+- **T40 (`5736d27`) · Lane V — heavy models built on first use.** Reranker, NLI verification,
+  grounding and the chunk index are now behind a `_Lazy` forwarding placeholder on
+  `app.state.models`: truthy *without* constructing, so the `if self.<service>:` guards in
+  `VibeSearch.search`, `RetrievalOrchestrator` and `ChatService` keep their exact meaning.
+  `EntityService` stays **eager on purpose** — `app/search.py` folds its signal into every query, so
+  deferring it would make `ready` overstate readiness. Cold start: **CPU-only 3.78 → 3.34 s
+  (−11.4%)**, GPU −5%. Honest read, from the lane: the win is real but modest, because boot is
+  dominated by work this task did not touch — note load/embedding, CLIP init, and above all the
+  entity index (**17.1 s of a 21.3 s boot at 2900 notes, cold**). See § Proposed follow-ups.
+
+**Two spec errors this wave, both found by execution rather than review** — worth expecting again:
+
+- **T42's spec said "nothing in the running app uses" the legacy path. `GET /api/embeddings` did**,
+  keying its PCA `lru_cache` on `engine._compute_notes_hash()`. The deletion 500'd the route, and
+  **only the driver's combined gate caught it** — the file was Lane W's, the breakage was Lane X's,
+  so no lane's targeted tests covered the pair. The driver granted the file to T42 for that fix
+  only. This is the shared-tree lesson in its purest form: a write set drawn by *file* does not
+  contain a dependency that runs by *call*.
+- **T40's checkpoint asserted a boot-then-search flow constructs no reranker. False here** —
+  `app/search.py:488` reranks every multi-result query. Lane V corrected the test rather than
+  weakening the search path, which is the right way round.
+
+**Also fixed at this barrier:** § Verification invariant 1 (lane-overlap) matched `^\| ([1-6]) \|`,
+so it had **silently skipped waves 7 and 8 since the day they were written** — it printed
+`overlaps: 0` without ever reading those rows. Widened to `[1-8]`. Re-run after widening:
+`overlaps: 0`, `unowned: none`, including a simulated run with the wave-7 spec removed (the check
+that caught B15 going unowned at the wave-6 barrier).
+
 ## Next steps, in order
 
-1. **Dispatch Wave 7 — deployability** (4 parallel lanes, 1 round): **T39 already done** (`a4588b5`) ·
-   T40 lazy heavy models (A7 completion, Lane V) · T41 finish the redaction sweep (P1–P3 completion,
-   Lane W) · T42 delete the legacy whole-corpus embedding cache (A1 third impl, Lane X). Spec:
-   `wave-7-deployability.md`. Brief every lane with § The concurrency protocol below. Owner decision
-   2026-07-26: **single-user, loopback-only, no auth** — T39 (done) makes that boundary explicit.
-   Two boundaries the wave-7 spec states explicitly (Lane W vs Lane X, see PLANS.md matrix footnote):
-   `app/search.py` has `str(e)` sites but belongs to Lane X — Lane W reports them; and
-   `ChunkingService.load_or_compute_embeddings` is legacy but its call site is `lifespan.py` (Lane V)
-   — Lane X leaves it and records a follow-up.
-2. **Wave 7 barrier:** once T40/T41/T42 are in, run combined `make check` + `make eval`, then delete
-   `wave-7-deployability.md` in the barrier commit (EXECUTION-PROTOCOL §3), grepping first for any
-   source comment that quotes the file by name.
-3. **Wave 8 — release** (serial, `wave-8-release.md`): T37 comment sweep + pre-push audit.
-   **T43 is retired.** T37's audit is now a *delta* over what waves 6–7 add, since the full history
-   was audited on 2026-07-26 with no hard findings — but the wave-6/7 commits are local and
-   unaudited, so T37 covers them. T37 is comments-only (AST-identical to parent) and asserts it.
+1. **Wave 8 — release** (serial, `wave-8-release.md`): T37 comment sweep + pre-push safety audit.
+   **T43 is retired.** T37's audit is a *delta* over what waves 6–7 add: the full history was audited
+   2026-07-26 with no hard findings, but every wave-6 and wave-7 commit is local and unaudited, so
+   T37 covers them. T37 is comments-only (AST-identical to its parent) and must assert it — the
+   `assert-code-unchanged.py` script in the shared-tree lane skill proves that claim mechanically.
+2. **After T37: the owner decides about pushing.** No agent pushes, ever. The leak audit is a
+   precondition, not a formality.
+3. **Worth doing before or alongside wave 8, all in § Proposed follow-ups:** `EntityService` is now
+   the single dominant cold-start cost and already has an unused wave-5 `build`/`apply` interface;
+   `ChunkingService.load_or_compute_embeddings` is the last legacy whole-corpus embedding pair, and
+   deleting it finally closes A1; and `stats.py`'s `using_cached_embeddings` now reports on a file
+   nothing writes, so it is permanently `False`.
 
-**Follow-ups added by wave 6** (in `PLANS.md` § Proposed follow-ups, to pick up later):
-T34's `entity_service.py` silent-except (B16 class, file unowned this wave) and `loadSession` drops
-citations on reload (needs a client change); T31's inert Tailwind class strings in
-`LoadingScreen.tsx` (dead, harmless); T38's `cache/tag_manifest.json` write-during-diagnosis (no
-data loss — derived file, now correctly absent; process note, not a code follow-up).
+**Follow-ups added by wave 7** (in `PLANS.md` § Proposed follow-ups): the three above, plus CLIP
+init on the search path, and the two spec errors recorded as process notes.
 
 ## Gate discipline (tightened after the review)
 
@@ -186,10 +231,24 @@ data loss — derived file, now correctly absent; process note, not a code follo
 
 ## Verified gate, as of this checkpoint
 
-**Wave-6 barrier gate — `GOOGLE_KEEP_PATH=. make check` on the committed tree (`9f66ba5`), exit 0**:
-**408** pytest passed, 1 skipped, ~65 s; **14 vitest files / 83 tests**; eslint 0 errors; tsc clean;
-black/isort clean. The pytest count rose across wave 6 from 328 (pre-wave) → 408 (+80), and vitest
-12 files/67 → 14 files/83 (+2 files, +16 tests). Per-task checkpoint evidence is in each commit body.
+**Wave-7 barrier gate — `GOOGLE_KEEP_PATH=. make check` on the committed tree (`5736d27`), exit 0**:
+**421** pytest passed, 1 skipped, ~65 s; **14 vitest files / 83 tests**; eslint 0 errors (2
+pre-existing warnings); tsc clean; black/isort clean. The pytest count rose across wave 7 from 408
+→ 421 (+13). Per-task checkpoint evidence is in each commit body.
+
+**Wave-7 `make eval-retrieval` (T42 parity), exit 0** — `dense_only` R@1 0.607 / R@5 0.687 / R@10
+0.833 / MRR 0.683, identical to the recorded baseline. **`make eval`** exit 0, primary-tag
+stability 100.0%. Both re-run by the driver on the combined tree, not taken from a lane's report.
+
+**Verified rather than accepted, at this barrier:** Lane V's red-then-green claim was re-run
+independently against HEAD's `lifespan.py` (`assert 1 == 0` from an external spy — boot really did
+construct the reranker before), the rewritten hermeticity test was read to confirm it *forces*
+construction instead of asserting absence, and `app/` was grepped for `isinstance()` against the
+four wrapped service classes and for private-attribute access on the injected collaborators (none
+of either, so the forwarding placeholder is safe).
+
+**Wave-6 barrier gate, for reference (`9f66ba5`)**: 408 pytest passed, 1 skipped; 14 vitest files /
+83 tests. The count rose across wave 6 from 328 (pre-wave) → 408 (+80).
 
 **Wave-6 `make eval` (T27/T28/T38 parity), exit 0** across rounds: tag count, untagged %, mean
 cluster size, **primary-tag stability 100.0%** (target ≥95%) on every run. T27: LLM calls 2 (run 2
@@ -203,11 +262,15 @@ wave-5 barrier (`828331a`) 325 pytest. The T25/T26 parity gate `make eval-retrie
 the wave-5 barrier (broken since `fa27fb8`) — fixture baseline `dense_only` R@1 0.607 / R@5 0.687 /
 R@10 0.833 / MRR 0.683.
 
-PLANS.md invariants, re-run at the wave-6 barrier: `overlaps: 0`, `unowned: none` (the coverage
-script handles findings the plan split into lettered parts, e.g. B3 → B3a/B3b).
+PLANS.md invariants, re-run at the wave-7 barrier: `overlaps: 0`, `unowned: none` — the latter also
+simulated with the wave-7 spec removed *before* deleting it, which is the check that caught B15
+going unowned at the wave-6 barrier. Invariant 1 was widened from `[1-6]` to `[1-8]` at this
+barrier; it had never once read the wave-7 or wave-8 rows. The coverage script handles findings the
+plan split into lettered parts (B3 → B3a/B3b).
 
-**The tree is clean; wave 6 is complete.** The wave-6 barrier is this commit (spec file deleted,
-§ Status flipped, this file refreshed). **All wave-6 commits are local — NOT pushed.** Next: wave 7.
+**The tree is clean; wave 7 is complete.** The wave-7 barrier is this commit (spec file deleted,
+§ Status flipped, follow-ups recorded, this file refreshed). **All wave-6 and wave-7 commits are
+local — NOT pushed.** Next: wave 8 (T37), then the owner's push decision.
 
 Tier-1 eval: `make eval-retrieval` (fixture corpus, ~6 s). Tier-2 benchmarks: `make bench-fetch`
 once, then `make bench` / `make bench-compare` — real models over SciFact and 20 Newsgroups, minutes
@@ -262,8 +325,7 @@ All lanes share ONE working tree. Lane ownership makes their *edits* disjoint bu
 
 - `PLANS.md` — wave graph, ownership matrix, § Task index (State column), § Status, § Post-wave-4 review.
 - `EXECUTION-PROTOCOL.md` — §1.3 dispatch rounds, §2 ownership, §3 commits + wave-file deletion policy, §4 gates.
-- Remaining specs: `wave-6-unify-and-quality.md`, `wave-7-deployability.md` (new 2026-07-26),
-  `wave-8-release.md` (was `wave-7-release-readiness.md`; renumbered, T37 unchanged, T43 retired).
-  Waves 1–5 files are deleted (policy). Unscheduled ideas live in `docs/feature-ideas/` — the imports
+- Remaining spec: `wave-8-release.md` only (was `wave-7-release-readiness.md`; renumbered, T37
+  unchanged, T43 retired). Waves 1–7 spec files are all deleted at their barriers (policy). Unscheduled ideas live in `docs/feature-ideas/` — the imports
   UI and the extra importers are there, not in any wave.
 - Gate: `GOOGLE_KEEP_PATH=. make check`.

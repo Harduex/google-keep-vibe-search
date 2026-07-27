@@ -8,7 +8,8 @@ work is publishable. **T43 is retired** — see below; the branch was published 
 Total ≈ ½ day.
 
 **Was wave 7 until 2026-07-26**, renumbered when the pre-wave-6 audit turned four unowned follow-ups
-into a real deployability wave (`wave-7-deployability.md`). Nothing about T37 changed; it just moved
+into a real deployability wave (`wave-7-deployability.md`, since executed and deleted at its
+barrier per EXECUTION-PROTOCOL §3). Nothing about T37 changed; it just moved
 back one place, because a comments-only AST-freeze over the whole repo has to observe the *final*
 code, and wave 7 changes code.
 

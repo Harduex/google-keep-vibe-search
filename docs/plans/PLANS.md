@@ -129,9 +129,9 @@ report it instead of working around it.
 | T36 | 3 T | 2 | Signal ablation, tagging correctness, baseline gate | T4 | 1 d | done (rebuilt in review) |
 | T37 | 8 — | 1 | Production-readiness comment sweep + pre-push safety audit | — | ½ d | todo |
 | T39 | 7 U | 1 | Loopback-only posture: CORS, body cap, rate limit | H8 | ½ d | done (landed early in `a4588b5`) |
-| T40 | 7 V | 1 | Construct reranker/NLI/grounding models on first use | A7 (completion) | ½ d | todo |
-| T41 | 7 W | 1 | Route every raw exception string through `safe_exc` | P1–P3 (completion) | ½ d | todo |
-| T42 | 7 X | 1 | Delete the legacy whole-corpus embedding cache | A1 (third impl) | ½ d | todo |
+| T40 | 7 V | 1 | Construct reranker/NLI/grounding models on first use | A7 (completion) | ½ d | done (`5736d27`; cold start −11% CPU / −5% GPU — boot now dominated by `EntityService`, see follow-ups) |
+| T41 | 7 W | 1 | Route every raw exception string through `safe_exc` | P1–P3 (completion) | ½ d | done (`63793cf`; 20 sites at the parent commit, not the spec's 22) |
+| T42 | 7 X | 1 | Delete the legacy whole-corpus embedding cache | A1 (third impl) | ½ d | done (`fcb73d3`; retrieval baseline byte-identical) |
 | T43 | 8 — | 2 | ~~Rewrite the unpushed commit messages for a public reader~~ | — | — | **retired** (branch published 2026-07-26 — see § Superseded) |
 | T38 | 6 M | 3 | Stream proposals as they are named, actionable mid-run (serial, after T30) | — | 1 d | done |
 
@@ -169,7 +169,7 @@ task of that wave lands.
 | 4 | H I J K | 4 lanes → T18 → T20 | done |
 | 5 | L1–L6 | T21 → T22·T23 → T24·T25 → T26 | done |
 | 6 | M N O P Q S | T27·T29·T30·T31·T32·T34 ∥ T28 → T38 | done — barrier closed 2026-07-27 (`9f66ba5`, spec file deleted) |
-| 7 | U V W X | 4 lanes, 1 round | T39 (Lane U) landed early in `a4588b5`; T40·T41·T42 remain |
+| 7 | U V W X | 4 lanes, 1 round | done — barrier closed 2026-07-27 (`a4588b5`, `63793cf`, `fcb73d3`, `5736d27`; spec file deleted) |
 | 8 | — | T37 (T43 retired) | todo |
 
 ## Post-wave-4 review (2026-07-25)
@@ -225,6 +225,12 @@ Tasks discovered while executing the plan. Add here instead of building them
 | T26 | `scripts/migrate_to_store.py` was specified but the owner migrated the real cache by hand, so the script was not built. If a migration script is ever wanted (e.g. for another machine's cache), the mapping is lossless and mechanical: legacy Keep filename-keyed ids map to `stable_id("keep", filename)` exactly, and `tags.json`/`excluded_tags.json` are filename-keyed. Not open work — recorded so a future request does not re-derive the mapping. |
 | T34 | `app/services/entity_service.py:85` `except Exception: return False` in `_is_cache_valid()` swallows everything (corrupt meta vs bug indistinguishable) — same B16 class as the `session_service.py` catch-all T34 just fixed. `entity_service.py` is unowned this wave and freshly restructured by T25, so reported not edited. Recommend: catch `(OSError, json.JSONDecodeError)`, return False; log type via `safe_exc`; let the rest propagate. |
 | T34 | Sessions store citations in messages but the client `loadSession` discards them on reload. Not fixed — needs a client change (Lane O / whoever owns `client/src/hooks/useChat.ts` next). Proposed follow-up. |
+| T40 | **`EntityService` is now the dominant cold-start cost** and is the natural sequel to A7. Measured by Lane V on a synthetic 2900-note corpus with a cold cache dir: **17.1 s of a 21.3 s boot** (~0.4 s warm). It stays eager by design — `app/search.py` folds the entity signal into every query, so deferring it would make `app.state.ready` overstate readiness — but wave 5 gave `entity_service.py` a content-addressed `build`/`apply` interface that `lifespan.py` still does not use; it calls the whole-corpus legacy constructor instead. Wiring it to the store is the fix, and needs `entity_service.py`, outside Lane V's write set. |
+| T40 | `ChunkingService.load_or_compute_embeddings` (`chunk_embeddings.npz`) is the **last** legacy whole-corpus embedding pair — the sibling T42 deleted from `app/search.py`. T42 deferred it to Lane V because its call site was `lifespan.py`; Lane V moved *when* it runs (off the boot path, built on first chat) but the load/save pair itself lives in `app/services/chunking_service.py`, which no wave-7 lane owned. Deleting or migrating it to the `VectorStore` closes A1 completely. |
+| T40 | CLIP image-search init costs ~1.5–2.0 s of boot and happens inside `VibeSearch.from_model` when `enable_image_search` is set — i.e. on the search path, in `app/search.py`, so Lane V reported it rather than touching it. Whether it is genuinely needed before `ready` is worth deciding: text search does not use it. |
+| driver (wave-7 barrier) | **The wave-7 spec's T40 checkpoint asserted something false about this codebase** — "a boot-then-search flow constructs NO reranker". `app/search.py:488` is `if self.reranker and len(results) > 1`, so every multi-result query reranks and the first `/api/search` does construct the cross-encoder. Lane V corrected the test to the true behaviour (search builds the reranker only; chat builds NLI/grounding/chunking) instead of weakening the search path to satisfy the sentence — the right call, recorded because a spec that asserts a false invariant invites the opposite one. |
+| driver (wave-7 barrier) | **T42's spec claimed "nothing in the running app uses" the legacy embedding path; `GET /api/embeddings` did.** It keyed its PCA `lru_cache` on `engine._compute_notes_hash()`, so the deletion 500'd the route. Caught only by the driver's combined gate — no lane's targeted tests covered it, because the file belonged to Lane W and the breakage belonged to Lane X. Driver granted the file to T42 for that fix only. The lesson is the shared-tree one: a write-set boundary drawn by *file* does not contain a dependency that runs by *call*. |
+| driver (wave-7 barrier) | `app/routes/stats.py:29` reports `using_cached_embeddings` from `os.path.exists(settings.embeddings_cache_file)`, but after T42 nothing writes that file — so the stat is now permanently `False`, and `settings.embeddings_cache_file` / `settings.notes_hash_file` in `app/core/config.py` have no remaining writer. Both were outside every wave-7 write set. Delete the stat and the two config properties together, or the next reader will trust a field that cannot be true. |
 
 ## Verification
 
@@ -232,11 +238,15 @@ Two invariants this plan must keep. Re-run both after editing it:
 
 ```bash
 # 1. no two lanes in the same wave own the same path
+#    The range was `[1-6]` until the wave-7 barrier, so this check had silently skipped
+#    waves 7 and 8 since the day they were written — it printed `overlaps: 0` without ever
+#    having read those rows. Widen it whenever a wave is added; a scan that cannot see the
+#    wave you are closing is not a check.
 python3 - <<'PY'
 import re, collections
 waves = collections.defaultdict(dict)
 for l in open('docs/plans/PLANS.md'):
-    m = re.match(r'^\| ([1-6]) \| (\*\*)?([A-Z0-9]+|—)', l)
+    m = re.match(r'^\| ([1-8]) \| (\*\*)?([A-Z0-9]+|—)', l)
     if not m: continue
     c = [x.strip() for x in l.strip().strip('|').split('|')]
     waves[c[0]][c[1]] = set(re.findall(r'`([^`]+)`', c[2]))

@@ -7,6 +7,7 @@ emits (see ``dedupe.format_dashboard_proposals``) so the frontend has one
 contract:
 
 - auto-merges the pipeline already applied -> informational (no buttons)
+- merges deferred for approval (``MERGE_REQUIRES_APPROVAL``) -> actionable ``merge_tags``
 - surviving near-duplicate tag pairs -> actionable ``merge_tags`` proposals
 - low-confidence (catch-all) note assignments -> ``assign_tag`` review proposals
 
@@ -124,6 +125,41 @@ def review_assignment_proposals(items: List[Dict[str, Any]]) -> List[Dict[str, A
                 "note_title": item.get("title", ""),
                 "confidence": round(confidence, 2),
                 "message": f"Assign tag '{tag}' to note '{title}' (confidence: {confidence:.2f})",
+            }
+        )
+    return proposals
+
+
+def deferred_merge_proposals(pairs: List[Tuple[str, str]]) -> List[Dict[str, Any]]:
+    """Actionable cards for merges consolidation chose not to apply.
+
+    Emitted when ``MERGE_REQUIRES_APPROVAL`` is on. Same ``merge_tags`` shape as
+    :func:`gray_zone_merge_proposals`, so the client and the apply route need no new
+    case: approving one runs the merge at apply time, rejecting one leaves both tags
+    standing on their own.
+
+    Confidence is deliberately absent from the message. These pairs come from three
+    different stages (silent auto-merge, LLM adjudication, and the over-cap fallback)
+    whose scores are not comparable, so printing one number would invite a comparison
+    that means nothing. Self-merges and duplicates are skipped.
+    """
+    proposals: List[Dict[str, Any]] = []
+    seen = set()
+    for source, target in pairs:
+        if not source or not target or source == target:
+            continue
+        key = (source, target)
+        if key in seen:
+            continue
+        seen.add(key)
+        proposals.append(
+            {
+                "type": "proposal",
+                "action": "merge_tags",
+                "source_tag": source,
+                "target_tag": target,
+                "note_count": 0,
+                "message": f"Merge '{source}' into '{target}'?",
             }
         )
     return proposals

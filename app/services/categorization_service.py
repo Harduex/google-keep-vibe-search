@@ -22,9 +22,10 @@ from app.services.tagging.assign import (
     select_label_indices,
 )
 from app.services.tagging.cluster import cluster_notes, compute_centroids, reduce_embeddings
-from app.services.tagging.constants import NOISE_RESCUE_SIMILARITY
+from app.services.tagging.constants import MERGE_REQUIRES_APPROVAL, NOISE_RESCUE_SIMILARITY
 from app.services.tagging.dashboard_stream import (
     auto_merge_info,
+    deferred_merge_proposals,
     gray_zone_merge_proposals,
     review_assignment_proposals,
 )
@@ -231,6 +232,32 @@ class CategorizationService:
                 if src and src != into:
                     pairs.append((src, into))
         return pairs
+
+    def _commit_merges(
+        self,
+        vocab: LabelVocabulary,
+        merge_map: Dict[str, Any],
+        locked_tags: Optional[set],
+        applied: List[Tuple[str, str]],
+        deferred: List[Tuple[str, str]],
+    ) -> None:
+        """Apply a merge map now, or record it for the user to approve.
+
+        The one place that choice is made, so the three consolidation stages (silent
+        auto-merge, LLM adjudication, over-cap fallback) cannot disagree about it.
+
+        With ``MERGE_REQUIRES_APPROVAL`` off — the default — this is exactly the previous
+        behaviour: record the pairs for the informational cards and mutate the vocabulary.
+        With it on, nothing is mutated and the pairs become approve/reject cards, which is
+        what makes rejecting a merge an actual opt-out rather than a no-op on a merge that
+        already happened.
+        """
+        pairs = self._merge_pairs(merge_map)
+        if MERGE_REQUIRES_APPROVAL:
+            deferred.extend(pairs)
+            return
+        applied.extend(pairs)
+        self._apply_merge_map(vocab, merge_map, locked_tags)
 
     @staticmethod
     def _apply_merge_map(
@@ -1004,6 +1031,11 @@ class CategorizationService:
                 # (source_tag, target_tag) for every merge auto-applied during
                 # consolidation; surfaced as informational dashboard cards.
                 applied_merges: List[Tuple[str, str]] = []
+                # Pairs consolidation wanted to merge but did not, because
+                # MERGE_REQUIRES_APPROVAL is on. They become approve/reject cards instead,
+                # which is what makes rejecting a merge a genuine opt-out: by default most
+                # merges are applied before the user ever sees them.
+                deferred_merges: List[Tuple[str, str]] = []
                 review_items: List[Dict[str, Any]] = []
                 try:
                     total_llm = len(llm_tasks)
@@ -1175,8 +1207,9 @@ class CategorizationService:
                             auto_merges["merges"].append({"into": r, "from": children})
 
                         if auto_merges["merges"]:
-                            applied_merges.extend(self._merge_pairs(auto_merges))
-                            self._apply_merge_map(vocab, auto_merges, locked_tags)
+                            self._commit_merges(
+                                vocab, auto_merges, locked_tags, applied_merges, deferred_merges
+                            )
 
                         remaining_labels = [
                             lbl for lbl in vocab.labels if lbl.name != "Uncategorized"
@@ -1277,8 +1310,9 @@ class CategorizationService:
                                     raw_stripped = "\n".join(lines[1:-1]).strip()
 
                             merge_map = json.loads(raw_stripped)
-                            applied_merges.extend(self._merge_pairs(merge_map))
-                            self._apply_merge_map(vocab, merge_map, locked_tags)
+                            self._commit_merges(
+                                vocab, merge_map, locked_tags, applied_merges, deferred_merges
+                            )
 
                             # Fallback aggressive merge if still over max_tags
                             remaining_labels = [
@@ -1314,13 +1348,18 @@ class CategorizationService:
                                     fallback_map = {
                                         "merges": [{"into": best_pair[0], "from": [best_pair[1]]}]
                                     }
-                                    applied_merges.extend(self._merge_pairs(fallback_map))
                                     # Locked tags survive the fallback too — `_apply_merge_map`
                                     # skips a locked source or target, so the merge is a no-op
                                     # and the locked tag is left intact (possibly still over
                                     # MAX_TAGS, which is the correct trade-off: the user's
                                     # decision outranks the count cap).
-                                    self._apply_merge_map(vocab, fallback_map, locked_tags)
+                                    self._commit_merges(
+                                        vocab,
+                                        fallback_map,
+                                        locked_tags,
+                                        applied_merges,
+                                        deferred_merges,
+                                    )
                                     remaining_labels = [
                                         lbl for lbl in vocab.labels if lbl.name != "Uncategorized"
                                     ]
@@ -1394,6 +1433,7 @@ class CategorizationService:
                     extra_proposals: List[Dict[str, Any]] = []
                     try:
                         extra_proposals.extend(auto_merge_info(applied_merges))
+                        extra_proposals.extend(deferred_merge_proposals(deferred_merges))
                         final_labels = [
                             (lbl.name, len(lbl.seed_note_ids), lbl.prototype_vector)
                             for lbl in vocab.labels

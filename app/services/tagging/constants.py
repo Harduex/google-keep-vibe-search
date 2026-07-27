@@ -25,3 +25,10 @@ RELATIVE_TAG_MARGIN = 0.85
 # newly catches are, by definition, the ones nothing matched well.
 ASSIGNMENT_FLOOR = 0.45
 RANDOM_SEED = 42
+
+# When True, consolidation stops *applying* merges and proposes them instead: every pair
+# the pipeline wanted to merge becomes an approve/reject card, so rejecting one is a real
+# per-merge opt-out. Default False, which keeps the historical behaviour exactly — most
+# merges are applied during the run (>= TAG_MERGE_AUTO silently, and gray-zone pairs once
+# the LLM adjudicates them), and only the leftovers reach the user as cards.
+MERGE_REQUIRES_APPROVAL = False

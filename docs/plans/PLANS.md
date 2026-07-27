@@ -127,7 +127,7 @@ report it instead of working around it.
 | T34 | 6 S | 1 | Session service hygiene | B14, B16 | ¼ d | done |
 | T35 | 3 T | 1 | Benchmark corpora, scale generator, shared metrics | T4 | 1 d | done (loader fixed in review) |
 | T36 | 3 T | 2 | Signal ablation, tagging correctness, baseline gate | T4 | 1 d | done (rebuilt in review) |
-| T37 | 8 — | 1 | Production-readiness comment sweep + pre-push safety audit | — | ½ d | done (`__T37SHA__`; AST-identical, 50 files; audit verdict SAFE TO PUBLISH) |
+| T37 | 8 — | 1 | Production-readiness comment sweep + pre-push safety audit | — | ½ d | done (`35535b8`; AST-identical, 50 files; audit verdict SAFE TO PUBLISH) |
 | T39 | 7 U | 1 | Loopback-only posture: CORS, body cap, rate limit | H8 | ½ d | done (landed early in `a4588b5`) |
 | T40 | 7 V | 1 | Construct reranker/NLI/grounding models on first use | A7 (completion) | ½ d | done (`5736d27`; cold start −11% CPU / −5% GPU — boot now dominated by `EntityService`, see follow-ups) |
 | T41 | 7 W | 1 | Route every raw exception string through `safe_exc` | P1–P3 (completion) | ½ d | done (`63793cf`; 20 sites at the parent commit, not the spec's 22) |
@@ -170,7 +170,7 @@ task of that wave lands.
 | 5 | L1–L6 | T21 → T22·T23 → T24·T25 → T26 | done |
 | 6 | M N O P Q S | T27·T29·T30·T31·T32·T34 ∥ T28 → T38 | done — barrier closed 2026-07-27 (`9f66ba5`, spec file deleted) |
 | 7 | U V W X | 4 lanes, 1 round | done — barrier closed 2026-07-27 (`a4588b5`, `63793cf`, `fcb73d3`, `5736d27`; spec file deleted) |
-| 8 | — | T37 (T43 retired) | todo |
+| 8 | — | T37 (T43 retired) | done — barrier closed 2026-07-27 (`35535b8`; spec file deleted). **Plan complete.** |
 
 ## Post-wave-4 review (2026-07-25)
 
@@ -225,6 +225,9 @@ Tasks discovered while executing the plan. Add here instead of building them
 | T26 | `scripts/migrate_to_store.py` was specified but the owner migrated the real cache by hand, so the script was not built. If a migration script is ever wanted (e.g. for another machine's cache), the mapping is lossless and mechanical: legacy Keep filename-keyed ids map to `stable_id("keep", filename)` exactly, and `tags.json`/`excluded_tags.json` are filename-keyed. Not open work — recorded so a future request does not re-derive the mapping. |
 | T34 | `app/services/entity_service.py:85` `except Exception: return False` in `_is_cache_valid()` swallows everything (corrupt meta vs bug indistinguishable) — same B16 class as the `session_service.py` catch-all T34 just fixed. `entity_service.py` is unowned this wave and freshly restructured by T25, so reported not edited. Recommend: catch `(OSError, json.JSONDecodeError)`, return False; log type via `safe_exc`; let the rest propagate. |
 | T34 | Sessions store citations in messages but the client `loadSession` discards them on reload. Not fixed — needs a client change (Lane O / whoever owns `client/src/hooks/useChat.ts` next). Proposed follow-up. |
+| T37 | **Four plan coordinates survive in code that is executable, not comment**, so a comments-only task could not touch them and they were deliberately left rather than smuggled past the AST freeze: a `describe()` string in `client/src/hooks/__tests__/useOrganize.test.ts:275`; the `pytest.skip(...)` reason at `tests/test_importers.py:616-618` (a user-visible skip message naming two task codes — the lane rewrote it, the AST check caught it as a logic change, and it was reverted, which is the check working); the filename `tests/test_t29_reuse_stored_vectors.py`; and the class name `TestB5LiveWiring` in `tests/test_note_service.py:199`. All four are one-line renames for whoever next touches those files under a write set that permits code. |
+| T37 | `tests/test_search_cache.py` is the only file in the repo stored with **CRLF line endings**. A batch comment edit silently normalised it to LF, producing a 320-line whole-file diff; the lane caught it and restored CRLF (its real diff is 5 lines). Worth deciding deliberately: either add a `.gitattributes` rule or normalise the file in a commit of its own, so the next mechanical sweep does not rediscover it. |
+| T37 (audit) | **`refs/heads/backup/pre-history-rewrite` (`b3e6f0f`) holds 55 commits reachable from no `origin` ref.** gitleaks found no leaks in them, so this is publication mechanics, not a known leak — but the branch name says it is the pre-removal copy of a history rewrite. **Publish with `git push origin master`; never `--all` or `--mirror`.** Deleting the local backup once the rewrite is settled removes the hazard permanently. |
 | T40 | **`EntityService` is now the dominant cold-start cost** and is the natural sequel to A7. Measured by Lane V on a synthetic 2900-note corpus with a cold cache dir: **17.1 s of a 21.3 s boot** (~0.4 s warm). It stays eager by design — `app/search.py` folds the entity signal into every query, so deferring it would make `app.state.ready` overstate readiness — but wave 5 gave `entity_service.py` a content-addressed `build`/`apply` interface that `lifespan.py` still does not use; it calls the whole-corpus legacy constructor instead. Wiring it to the store is the fix, and needs `entity_service.py`, outside Lane V's write set. |
 | T40 | `ChunkingService.load_or_compute_embeddings` (`chunk_embeddings.npz`) is the **last** legacy whole-corpus embedding pair — the sibling T42 deleted from `app/search.py`. T42 deferred it to Lane V because its call site was `lifespan.py`; Lane V moved *when* it runs (off the boot path, built on first chat) but the load/save pair itself lives in `app/services/chunking_service.py`, which no wave-7 lane owned. Deleting or migrating it to the `VectorStore` closes A1 completely. |
 | T40 | CLIP image-search init costs ~1.5–2.0 s of boot and happens inside `VibeSearch.from_model` when `enable_image_search` is set — i.e. on the search path, in `app/search.py`, so Lane V reported it rather than touching it. Whether it is genuinely needed before `ready` is worth deciding: text search does not use it. |
@@ -280,11 +283,12 @@ PY
 
 - **T43 — rewrite the unpushed commit messages.** Written and retired the same day (2026-07-26). Its
   precondition was that the 60 commits were unpushed; the owner pushed them, so `origin/master` is now
-  `6250507` and rewriting those messages would rewrite published history for a cosmetic gain — while
+  `4862b6c` and rewriting those messages would rewrite published history for a cosmetic gain — while
   not un-publishing anything, since the old SHAs stay cloned and cached wherever they were fetched.
   The plan coordinates in those messages are noise, not a leak: the full-history audit of the same day
   found no secrets, no note text and no committed cache data. What survives is a convention rather
-  than a task — new commit messages stay coordinate-free. Detail in `wave-8-release.md`.
+  than a task — new commit messages stay coordinate-free. (The wave-8 spec that recorded the
+  retirement in full was deleted at its barrier, per `EXECUTION-PROTOCOL.md` §3.)
 
 - `23-live-acceptance-signoff.md` — its subject (the unwired v2 tagging pipeline, finding A1) is
   resolved by **T27**. Its four acceptance checkpoints move into T27's checkpoint verbatim; the file

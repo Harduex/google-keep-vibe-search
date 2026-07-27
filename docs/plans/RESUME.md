@@ -3,26 +3,27 @@
 **Paste this file's contents to a fresh agent to resume the plan.** It is written for someone with
 none of the originating conversation's context.
 
-**Last updated:** 2026-07-27 (fifth refresh) — **WAVE 7 COMPLETE.** All four wave-7 tasks are on
-`master` (`a4588b5`, `63793cf`, `fcb73d3`, `5736d27`); the wave-7 spec file is deleted in the barrier
-commit and the gate is green. **Only Wave 8 remains — T37, serial, on a quiet tree.** See Next steps.
+**Last updated:** 2026-07-27 (sixth refresh) — **THE PLAN IS COMPLETE.** All eight waves and all
+43 tasks are done (T43 retired deliberately, not skipped). The last spec file is deleted; `docs/plans/`
+now holds only this file, `PLANS.md` and `EXECUTION-PROTOCOL.md`.
 
-**Read this before dispatching wave 8:** wave 7 was resumed by a *fresh* driver after the previous
-session ended mid-wave. Two things that cost real time, both worth knowing:
-1. **Lanes W and X had finished their edits but were never gated or committed** — the work sat
-   uncommitted in the tree with no agent alive to own it. A resuming driver should always start with
-   `git status` + each lane's *mechanical* checkpoint (they are greppable by design) before assuming
-   a lane did nothing. Lane V genuinely had not started.
-2. **The wave-6 barrier commit `2e20ca5` staged only the spec deletion**, leaving the `PLANS.md` and
-   `RESUME.md` edits its own message described sitting in the working tree. Committed after the fact
-   as `e9bb1a9`. When a barrier commit says it updated the docs, `git show --stat` it.
+**There is no next wave. The only open decision is the owner's: whether to publish.**
+`docs/audit/PRE-PUSH-AUDIT.md` says **SAFE TO PUBLISH** for `origin/master..HEAD` (16 commits,
+`9adc290..abc753b`, audited 2026-07-27, zero hard findings). Two things to know before pushing:
+
+- **Push with an explicit refspec: `git push origin master`. Never `--all` or `--mirror`.** The local
+  branch `backup/pre-history-rewrite` (`b3e6f0f`) holds 55 commits reachable from no `origin` ref;
+  gitleaks found nothing in them, but the name says it is the pre-removal copy of a history rewrite.
+- **Re-run the audit if any commit lands after `abc753b`.** The verdict names its range on purpose.
+
+**No agent pushes, ever** — that is the owner's call alone, published repo or not.
 
 **Three things changed outside the plan, all owner-authorised:**
 1. **`cache/` was deleted** (2026-07-26) for a clean slate; the owner keeps note backups externally
    and re-imports from the Takeout export (15,381 note pairs, path intact). **The next app boot
-   re-ingests and re-embeds the whole corpus — a long GPU run.** No remaining wave-8 task depends
+   re-ingests and re-embeds the whole corpus — a long GPU run.** No task in this plan depends
    on a warm cache; `make check` and `make eval` are fully isolated and do not need one.
-2. **The repo is PUBLIC and the plan's work through `6250507` is pushed** — see § Decisions &
+2. **The repo is PUBLIC and the plan's work through `4862b6c` is pushed** — see § Decisions &
    constraints. The wave-6 and wave-7 commits (`9adc290`→`5736d27`) are local, NOT pushed. Agents still never
    push; that stays the owner's call alone.
 3. **A quota outage mid-wave-6-round-1 stopped 4 of 6 lane agents mid-work.** They were re-dispatched
@@ -47,9 +48,12 @@ Precedence: `AGENTS.md` > EXECUTION-PROTOCOL > wave file > PLANS.md.
 
 ## State
 
-Waves 1–7 complete; each wave reviewed and repaired before the next started. Branch `master`,
-working tree clean, gate green (see § Verified gate). `origin/master` is still `6250507` — **every
-wave-6 and wave-7 commit is local only, not pushed.**
+All eight waves complete; each was reviewed and repaired before the next started. Branch `master`,
+working tree clean, gate green (see § Verified gate). `origin/master` is **`4862b6c`** — **every
+wave-6, wave-7 and wave-8 commit is local only, not pushed.** (Earlier revisions of this file said
+`origin/master` was `6250507`; that was wrong. `6250507` is an *ancestor* of `4862b6c`. The
+pre-push audit caught it — a stale remote SHA makes every future "what is unpushed" calculation
+scan the wrong range.)
 
 **Read `PLANS.md` § Post-wave-4 review and § Proposed follow-ups before resuming.** Wave 6 followed
 the tightened gate discipline: each lane ran its own checkpoint, the combined `make check` was run
@@ -198,23 +202,48 @@ so it had **silently skipped waves 7 and 8 since the day they were written** —
 `overlaps: 0`, `unowned: none`, including a simulated run with the wave-7 spec removed (the check
 that caught B15 going unowned at the wave-6 barrier).
 
+## Wave 8 complete — committed 2026-07-27
+
+One task, `35535b8`, run as two lanes with disjoint write sets (comments; the audit document).
+
+- **Part 1 — comment hygiene, 50 files** (18 `app/`, 22 `tests/`, 8 `client/src/`, 2 `bench/`). Task
+  codes, wave and lane references and ~60 bare audit-finding ids removed, with their reasoning kept
+  and reworded to stand alone. **The AST freeze held: `executable code identical: True`** across 42
+  Python files, proven twice — the spec's script and the independent `assert-code-unchanged.py`,
+  which agree. Both blank docstrings before comparing, because docstrings are AST nodes and this
+  task legitimately rewrites some.
+- **One comment was not noisy but false.** `app/routes/chat.py` said the deprecated `?title=` query
+  alias existed only until "the client moves in T30". The client never moved —
+  `client/src/hooks/useChat.ts:236` still sends it. Now the comment says why the alias stays and
+  when it can go. Three of the spec's four named cases needed nothing at all (`redact.py` and
+  `_log_agent_step` were already clean; `search_service.py`'s "becomes the `Retriever`" comment never
+  existed), but `app/parser.py`'s *ghost* did: `app/importers/` and `tests/test_importers.py` still
+  referenced `app.parser.render_list_content` as though the file had not been deleted in wave 5.
+- **Part 2 — `docs/audit/PRE-PUSH-AUDIT.md`, verdict SAFE TO PUBLISH**, zero hard findings over the
+  16-commit range. gitleaks self-test PASS before any clean result was accepted; clean over the
+  range, per-commit, and over full branch history. All 653 lines of all 16 commit messages read end
+  to end rather than grepped — that was the higher-risk half, since this plan pasted checkpoint
+  evidence into roughly fifteen of them.
+
+**Four plan coordinates deliberately survive**, because they are executable rather than comment: a
+`describe()` string, a `pytest.skip` reason, a filename, and a class name. The lane rewrote the skip
+reason, the AST check caught it as a logic change, and it was reverted — the check working as
+designed. All four are recorded in § Proposed follow-ups as one-line renames for whoever next opens
+those files under a write set that permits code.
+
 ## Next steps, in order
 
-1. **Wave 8 — release** (serial, `wave-8-release.md`): T37 comment sweep + pre-push safety audit.
-   **T43 is retired.** T37's audit is a *delta* over what waves 6–7 add: the full history was audited
-   2026-07-26 with no hard findings, but every wave-6 and wave-7 commit is local and unaudited, so
-   T37 covers them. T37 is comments-only (AST-identical to its parent) and must assert it — the
-   `assert-code-unchanged.py` script in the shared-tree lane skill proves that claim mechanically.
-2. **After T37: the owner decides about pushing.** No agent pushes, ever. The leak audit is a
-   precondition, not a formality.
-3. **Worth doing before or alongside wave 8, all in § Proposed follow-ups:** `EntityService` is now
-   the single dominant cold-start cost and already has an unused wave-5 `build`/`apply` interface;
-   `ChunkingService.load_or_compute_embeddings` is the last legacy whole-corpus embedding pair, and
-   deleting it finally closes A1; and `stats.py`'s `using_cached_embeddings` now reports on a file
-   nothing writes, so it is permanently `False`.
+**There are none inside this plan — it is finished.** What remains is the owner's:
 
-**Follow-ups added by wave 7** (in `PLANS.md` § Proposed follow-ups): the three above, plus CLIP
-init on the search path, and the two spec errors recorded as process notes.
+1. **Decide whether to publish.** The audit's verdict is SAFE TO PUBLISH for `9adc290..abc753b`.
+   Push with `git push origin master` — **never `--all` or `--mirror`** (see the header). Re-run the
+   audit first if any commit has landed since `abc753b`.
+2. **Pick up § Proposed follow-ups when convenient.** The three with the most value behind them:
+   `EntityService` is now the single dominant cold-start cost (**17.1 s of a 21.3 s boot at 2900
+   notes**) and already has an unused store-backed `build`/`apply` interface; `ChunkingService.
+   load_or_compute_embeddings` is the last legacy whole-corpus embedding pair, and deleting it
+   finally closes A1 for good; and `stats.py`'s `using_cached_embeddings` now reports on a file
+   nothing writes, so it is permanently `False`.
 
 ## Gate discipline (tightened after the review)
 
@@ -231,10 +260,13 @@ init on the search path, and the two spec errors recorded as process notes.
 
 ## Verified gate, as of this checkpoint
 
-**Wave-7 barrier gate — `GOOGLE_KEEP_PATH=. make check` on the committed tree (`5736d27`), exit 0**:
-**421** pytest passed, 1 skipped, ~65 s; **14 vitest files / 83 tests**; eslint 0 errors (2
-pre-existing warnings); tsc clean; black/isort clean. The pytest count rose across wave 7 from 408
-→ 421 (+13). Per-task checkpoint evidence is in each commit body.
+**Wave-8 barrier gate — `GOOGLE_KEEP_PATH=. make check` on the committed tree (`35535b8`), exit 0**:
+**421** pytest passed, 1 skipped; **14 vitest files / 83 tests**; eslint 0 errors (2 pre-existing
+warnings); tsc clean; black/isort clean. **Counts identical to wave 7's**, which is the point — T37
+is comments-only, so a moved count would have meant a logic change slipped through.
+
+**Wave-7 barrier gate (`5736d27`)**: same numbers. The pytest count rose across wave 7 from 408 →
+421 (+13). Per-task checkpoint evidence is in each commit body.
 
 **Wave-7 `make eval-retrieval` (T42 parity), exit 0** — `dense_only` R@1 0.607 / R@5 0.687 / R@10
 0.833 / MRR 0.683, identical to the recorded baseline. **`make eval`** exit 0, primary-tag
@@ -268,9 +300,10 @@ going unowned at the wave-6 barrier. Invariant 1 was widened from `[1-6]` to `[1
 barrier; it had never once read the wave-7 or wave-8 rows. The coverage script handles findings the
 plan split into lettered parts (B3 → B3a/B3b).
 
-**The tree is clean; wave 7 is complete.** The wave-7 barrier is this commit (spec file deleted,
-§ Status flipped, follow-ups recorded, this file refreshed). **All wave-6 and wave-7 commits are
-local — NOT pushed.** Next: wave 8 (T37), then the owner's push decision.
+**The tree is clean; the plan is complete.** The wave-8 barrier is this commit (last spec file
+deleted, § Status flipped, follow-ups recorded, this file refreshed). **Every commit from `9adc290`
+is local — NOT pushed.** Nothing remains but the owner's publish decision, and the follow-ups in
+`PLANS.md`, which are improvements rather than obligations.
 
 Tier-1 eval: `make eval-retrieval` (fixture corpus, ~6 s). Tier-2 benchmarks: `make bench-fetch`
 once, then `make bench` / `make bench-compare` — real models over SciFact and 20 Newsgroups, minutes
@@ -307,7 +340,7 @@ All lanes share ONE working tree. Lane ownership makes their *edits* disjoint bu
   owner's decision alone, and a leak audit stays a precondition of any push — T37's job. No lane agent
   pushes, ever, published branch or not.
 - **The repo is PUBLIC** (`github.com/Harduex/google-keep-vibe-search`) and, since 2026-07-26, so is
-  the plan's work through `6250507`. A full-history audit (gitleaks self-test PASS, all refs + 7
+  the plan's work through `4862b6c`. A full-history audit (gitleaks self-test PASS, all refs + 7
   stashes) found no secrets, keys,
   dumps, or committed cache/note artifacts. One advisory left deliberately in place — see `PLANS.md`
   § Proposed follow-ups. **This does not relax the never-push rule.**
@@ -325,7 +358,8 @@ All lanes share ONE working tree. Lane ownership makes their *edits* disjoint bu
 
 - `PLANS.md` — wave graph, ownership matrix, § Task index (State column), § Status, § Post-wave-4 review.
 - `EXECUTION-PROTOCOL.md` — §1.3 dispatch rounds, §2 ownership, §3 commits + wave-file deletion policy, §4 gates.
-- Remaining spec: `wave-8-release.md` only (was `wave-7-release-readiness.md`; renumbered, T37
-  unchanged, T43 retired). Waves 1–7 spec files are all deleted at their barriers (policy). Unscheduled ideas live in `docs/feature-ideas/` — the imports
+- **No wave spec files remain** — all eight were deleted at their barriers (policy). `docs/plans/`
+  holds this file, `PLANS.md` and `EXECUTION-PROTOCOL.md`; the audit verdict lives in
+  `docs/audit/PRE-PUSH-AUDIT.md`. Unscheduled ideas live in `docs/feature-ideas/` — the imports
   UI and the extra importers are there, not in any wave.
 - Gate: `GOOGLE_KEEP_PATH=. make check`.

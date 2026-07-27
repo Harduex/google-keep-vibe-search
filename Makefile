@@ -9,7 +9,11 @@ NVM_SOURCE = if [ -s "$$HOME/.nvm/nvm.sh" ]; then . "$$HOME/.nvm/nvm.sh" && nvm 
 
 setup:
 	@echo "=== Setting up Python backend ==="
-	uv sync --all-groups
+	@# Not --all-groups: the gpu and cpu torch profiles conflict by design, so
+	@# asking for both is an error. Plain `uv sync` takes the defaults from
+	@# pyproject.toml ([tool.uv] default-groups = dev + gpu). On a machine with no
+	@# NVIDIA GPU, run `uv sync --no-group gpu --group cpu` instead.
+	uv sync
 	@echo "=== Setting up Node frontend ==="
 	cd client && $(NVM_SOURCE) && npm ci
 	@if [ ! -f .env ]; then \

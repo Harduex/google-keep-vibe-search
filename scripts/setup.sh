@@ -8,7 +8,10 @@ echo "=== Google Keep Vibe Search - Setup ==="
 echo ""
 
 echo "Installing Python dependencies with uv..."
-uv sync --all-groups
+# Not --all-groups: the gpu and cpu torch profiles conflict by design, so asking
+# for both is an error. Plain `uv sync` takes pyproject's defaults (dev + gpu).
+uv sync
+echo "  (no NVIDIA GPU? re-run as: uv sync --no-group gpu --group cpu)"
 
 # Load nvm so npm/node are available in non-interactive shells
 export NVM_DIR="$HOME/.nvm"

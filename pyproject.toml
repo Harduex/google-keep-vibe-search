@@ -40,7 +40,7 @@ dependencies = [
     "tqdm"
 ]
 
-# Install paths (T32):
+# Install paths:
 #   • GPU (default):  uv sync                            -> cu121 wheels, via the `pytorch` index.
 #   • CPU only:       uv sync --no-group gpu --group cpu -> CPU wheels, via the `pytorch-cpu` index.
 # The cu121 pin is the default on purpose: the app calls .to("cuda"), pins numpy<2,

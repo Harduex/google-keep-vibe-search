@@ -20,7 +20,12 @@ jobs:
             pyproject.toml
 
       - name: Sync Python dependencies
-        run: uv sync --all-groups
+        # NOT `--all-groups`: the `gpu` and `cpu` torch profiles are declared as
+        # conflicting groups in pyproject.toml, so asking for all of them is an
+        # error by construction. Runners have no NVIDIA GPU, so take the CPU
+        # profile — it keeps the flat dependencies and only swaps the torch
+        # source, and it avoids pulling ~2 GB of CUDA wheels on every run.
+        run: uv sync --no-group gpu --group cpu
 
       - name: Set up Node
         uses: actions/setup-node@v7

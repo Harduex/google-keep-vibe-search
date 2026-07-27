@@ -1,15 +1,65 @@
 """Multi-label tag assignment and noise rescue service."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 import numpy as np
 
 from app.services.tagging.constants import (
+    ASSIGNMENT_FLOOR,
     CONFIDENCE_AUTO_APPLY,
     MAX_TAGS_PER_NOTE,
     MULTILABEL_SIMILARITY,
     NOISE_RESCUE_SIMILARITY,
+    RELATIVE_TAG_MARGIN,
 )
+
+
+def select_label_indices(
+    sims: "np.ndarray",
+    per_label_thresholds: Sequence[float],
+    *,
+    max_tags: int = MAX_TAGS_PER_NOTE,
+    relative_margin: float = RELATIVE_TAG_MARGIN,
+    floor: float = ASSIGNMENT_FLOOR,
+) -> List[int]:
+    """Which labels one note should carry, strongest match first.
+
+    The single place this decision is made. Both assignment paths call it, so the policy
+    cannot diverge between them — which it had: the live path assigned a tag for every
+    label a note cleared, with no cap, while the cap was enforced only in a path no route
+    could reach.
+
+    Three rules, in order:
+
+    1. **Eligibility** — a label is a candidate when the note reaches that label's own
+       threshold. Per-label, because a broad cluster and a tight one should not answer to
+       the same number.
+    2. **Relative margin, then cap** — of the candidates, keep those within
+       ``relative_margin`` of this note's best score, then at most ``max_tags``. Judging
+       each note against itself is what stops "matches everything" and "matches nothing"
+       from being the same threshold's two failure modes.
+    3. **Rescue** — if nothing was eligible, award the single best label provided it
+       reaches ``floor``. Otherwise no labels, and the caller treats the note as
+       uncategorized.
+
+    ``sims`` and ``per_label_thresholds`` are parallel; the returned indices point into
+    them.
+    """
+    if len(sims) == 0 or len(per_label_thresholds) == 0:
+        return []
+
+    order = sorted(range(len(sims)), key=lambda j: float(sims[j]), reverse=True)
+
+    eligible = [j for j in order if float(sims[j]) >= float(per_label_thresholds[j])]
+
+    if not eligible:
+        best = order[0]
+        return [best] if float(sims[best]) >= floor else []
+
+    best_score = float(sims[eligible[0]])
+    cutoff = best_score * relative_margin
+    kept = [j for j in eligible if float(sims[j]) >= cutoff]
+    return kept[:max_tags]
 
 
 def _cosine_sim(a: np.ndarray, b: np.ndarray) -> float:
@@ -80,7 +130,10 @@ def assign_tags_to_notes(
                 confidence = 0.0
                 review = True
 
-        # Combine primary first, then secondary, order-preserving dedupe, cap at MAX_TAGS_PER_NOTE
+        # Primary first, then secondary, order-preserving dedupe, capped by the shared
+        # policy's ceiling. The ordering here is deliberate and not a similarity ranking:
+        # the primary tag is the note's own cluster and outranks a merely-similar
+        # centroid even when the centroid scores higher.
         candidate_tags = []
         if primary_tag:
             candidate_tags.append(primary_tag)

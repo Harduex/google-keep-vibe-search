@@ -12,4 +12,16 @@ MULTILABEL_SIMILARITY = 0.60
 NOISE_RESCUE_SIMILARITY = 0.50
 CONFIDENCE_AUTO_APPLY = 0.70
 MAX_TAGS_PER_NOTE = 3
+# Keep a label only if the note scores at least this fraction of its OWN best match.
+# An absolute threshold alone cannot separate "this note belongs to several topics" from
+# "this note is vaguely near everything": raising it to shed weak matches orphans the
+# notes that sit between clusters, and lowering it to rescue those orphans re-floods the
+# well-matched notes with tags. This is relative, so each note is judged against itself.
+# 1.0 = only ties with the best match; 0.0 = disabled (cap alone decides).
+RELATIVE_TAG_MARGIN = 0.85
+# Absolute floor for the orphan rescue below. A note that clears no per-label threshold
+# gets its single best label if it reaches this, instead of falling into Uncategorized.
+# Lower it to shrink the uncategorized share, at the cost of weaker tags; the notes it
+# newly catches are, by definition, the ones nothing matched well.
+ASSIGNMENT_FLOOR = 0.45
 RANDOM_SEED = 42

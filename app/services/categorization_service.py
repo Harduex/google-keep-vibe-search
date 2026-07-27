@@ -16,7 +16,11 @@ from app.services.llm_client import LLMClient
 from app.services.note_service import NoteService
 from app.services.proposal_store import load_pending_actions
 from app.services.search_service import SearchService
-from app.services.tagging.assign import assign_tags_to_notes, compute_assignment_stats
+from app.services.tagging.assign import (
+    assign_tags_to_notes,
+    compute_assignment_stats,
+    select_label_indices,
+)
 from app.services.tagging.cluster import cluster_notes, compute_centroids, reduce_embeddings
 from app.services.tagging.constants import NOISE_RESCUE_SIMILARITY
 from app.services.tagging.dashboard_stream import (
@@ -1511,11 +1515,14 @@ class CategorizationService:
             nid = notes[idx]["id"]
             sims = similarities[i]
 
-            assigned = False
-            for j, score in enumerate(sims):
-                if score >= label_thresholds[j]:
-                    new_assignments[valid_labels[j].name].add(nid)
-                    assigned = True
+            # One shared policy decides how many labels a note carries — floor, relative
+            # margin, then cap. This loop used to assign a tag for EVERY label the note
+            # cleared, with no cap, which is how single notes ended up with 15-20 tags
+            # while MAX_TAGS_PER_NOTE sat enforced in a code path no route could reach.
+            chosen = select_label_indices(sims, label_thresholds)
+            for j in chosen:
+                new_assignments[valid_labels[j].name].add(nid)
+            assigned = bool(chosen)
 
             if not assigned:
                 best_j = int(np.argmax(sims))

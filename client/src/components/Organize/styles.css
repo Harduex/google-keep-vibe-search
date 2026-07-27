@@ -254,6 +254,34 @@
   gap: 12px;
 }
 
+/* Tag list sort control. Uses the same token layer as the rest of the panel so it
+   inherits both themes rather than hardcoding colours. */
+.tag-sort {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.tag-sort .material-icons {
+  font-size: 1.1rem;
+}
+
+.tag-sort-select {
+  padding: 4px 8px;
+  background-color: var(--light-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: var(--text-color);
+  cursor: pointer;
+}
+
+.tag-sort-select:hover {
+  border-color: var(--primary-color);
+}
+
 .dashboard-stats {
   display: flex;
   flex-wrap: wrap;
@@ -661,6 +689,11 @@
 
   .dashboard-header {
     flex-direction: column;
+  }
+
+  .tag-sort {
+    width: 100%;
+    justify-content: flex-end;
   }
 
   .dashboard-actions {

@@ -1,8 +1,9 @@
-import { memo } from 'react';
+import { memo, useMemo, useState } from 'react';
 
 import { Tag } from '@/types';
 
 import { TagManagementCard } from './TagManagementCard';
+import { SORT_LABELS, TagSort, sortTags } from './tagSort';
 
 interface TagManagerDashboardProps {
   tags: Tag[];
@@ -14,6 +15,9 @@ interface TagManagerDashboardProps {
 
 export const TagManagerDashboard = memo(
   ({ tags, isLoading, onRename, onMerge, onRemove }: TagManagerDashboardProps) => {
+    const [sort, setSort] = useState<TagSort>('count-desc');
+    const sortedTags = useMemo(() => sortTags(tags, sort), [tags, sort]);
+
     if (isLoading) {
       return <div className="tag-manager-loading">Loading tags...</div>;
     }
@@ -42,10 +46,26 @@ export const TagManagerDashboard = memo(
               {totalNotes} assignment{totalNotes === 1 ? '' : 's'}
             </span>
           </div>
+          <label className="tag-sort">
+            <span className="material-icons">sort</span>
+            <span className="tag-sort-label">Sort</span>
+            <select
+              className="tag-sort-select"
+              value={sort}
+              onChange={(e) => setSort(e.target.value as TagSort)}
+              aria-label="Sort tags"
+            >
+              {(Object.keys(SORT_LABELS) as TagSort[]).map((key) => (
+                <option key={key} value={key}>
+                  {SORT_LABELS[key]}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
 
         <div className="proposals-list">
-          {tags.map((tag) => (
+          {sortedTags.map((tag) => (
             <TagManagementCard
               key={tag.name}
               tag={tag}

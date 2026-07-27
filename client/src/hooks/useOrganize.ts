@@ -12,6 +12,8 @@ import {
   isAssignProposal,
 } from '@/types';
 
+import { QUERY_KEYS, invalidate } from './dataLayer';
+
 export interface ApplyActionPayload {
   action: string;
   tag_name?: string;
@@ -553,6 +555,16 @@ export const useOrganize = () => {
       // server-side — threw away a generation that had cost hundreds of LLM calls.
       const applied = (result?.notes_tagged || 0) > 0 || (result?.tags_created || 0) > 0;
       if (applied) {
+        // The applied tags are no longer *proposals*, so the review list empties — but the
+        // Tag Manager reads the tag list through the cached data layer, and nothing here
+        // used to invalidate it. The tags had been written to disk and the panel went on
+        // showing the pre-apply set, so applying looked like it had thrown the work away.
+        // Invalidate the same keys a tag rename/merge does: the panel refetches and the
+        // new tags appear with their note counts.
+        invalidate(QUERY_KEYS.TAGS);
+        invalidate(QUERY_KEYS.NOTES);
+        invalidate(QUERY_KEYS.ALL_NOTES);
+        invalidate(QUERY_KEYS.STATS);
         setProposals([]);
         setProgress(null);
         stagedActionsRef.current = {};

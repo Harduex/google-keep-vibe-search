@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from app.core.config import settings
 from app.core.dependencies import get_chat_service, get_session_service
 from app.core.exceptions import SessionNotFound
+from app.core.redact import safe_exc
 from app.models.chat import ChatRequest, ChatResponse
 from app.services.chat_service import ChatService
 from app.services.session_service import SessionService
@@ -131,7 +132,9 @@ async def chat(
                 media_type="application/x-ndjson",
             )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error generating chat response: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error generating chat response: {safe_exc(e)}"
+        )
 
 
 @router.get("/model")

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.core.dependencies import get_note_service
 from app.core.exceptions import NoteNotTagged, TagNotFound
+from app.core.redact import safe_exc
 from app.models.tag import RemoveTagRequest, RenameTagRequest, TagManagementRequest, TagNotesRequest
 from app.services.note_service import NoteService
 
@@ -17,7 +18,7 @@ def tag_notes(
         count = note_service.tag_notes(request.note_ids, request.tag_name)
         return {"message": f"Tagged {count} notes with '{request.tag_name}'"}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"invalid tag request: {safe_exc(e)}")
 
 
 @router.get("/tags")
@@ -75,6 +76,6 @@ def rename_tag(
             "message": f"Renamed tag '{request.old_name}' to '{request.new_name}' on {count} notes"
         }
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"invalid rename request: {safe_exc(e)}")
     except KeyError:
         raise TagNotFound(request.old_name)

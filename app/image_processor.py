@@ -12,6 +12,7 @@ from PIL import Image, UnidentifiedImageError
 from tqdm import tqdm
 
 from app.core.config import settings
+from app.core.redact import safe_exc
 
 # Suppress warnings that might come from PIL or CLIP
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -159,7 +160,7 @@ class ImageProcessor:
             return results
 
         except Exception as e:
-            print(f"Error processing query image: {str(e)}")
+            print(f"Error processing query image: {safe_exc(e)}")
             return []
 
     def encode_uploaded_image(self, image_file) -> Optional[np.ndarray]:
@@ -186,7 +187,7 @@ class ImageProcessor:
 
             return embedding
         except Exception as e:
-            print(f"Error encoding uploaded image: {str(e)}")
+            print(f"Error encoding uploaded image: {safe_exc(e)}")
             return None
 
     def _get_all_image_paths(self, notes: List[Dict[str, Any]]) -> List[str]:
@@ -229,7 +230,7 @@ class ImageProcessor:
                 self.processed_image_paths.add(image_path)
 
             except (UnidentifiedImageError, OSError, Exception) as e:
-                print(f"Error processing image {image_path}: {str(e)}")
+                print(f"Error processing image {image_path}: {safe_exc(e)}")
                 continue
 
     def _compute_embeddings_hash(self) -> str:
@@ -293,7 +294,7 @@ class ImageProcessor:
             print(f"Loaded {len(self.image_embeddings)} image embeddings from cache")
 
         except Exception as e:
-            print(f"Error loading image embeddings from cache: {e}")
+            print(f"Error loading image embeddings from cache: {safe_exc(e)}")
             # Reset in case of partial loading
             self.image_embeddings = {}
             self.processed_image_paths = set()

@@ -3,6 +3,7 @@
 import re
 from typing import Any, Callable, Dict, List, Tuple
 
+from app.core.redact import safe_exc
 from app.services.llm_client import LLMClient
 
 COMPLEXITY_MARKERS = [
@@ -64,7 +65,7 @@ class QueryService:
             return sub_queries[:3]
 
         except Exception as e:
-            print(f"[query] Decomposition failed, using original: {e}")
+            print(f"[query] Decomposition failed, using original: {safe_exc(e)}")
             return [query]
 
     async def retrieve_with_gap_analysis(
@@ -94,7 +95,7 @@ class QueryService:
                     temperature=0.0,
                 )
             except Exception as e:
-                print(f"[query] Gap analysis LLM error: {e}")
+                print(f"[query] Gap analysis LLM error: {safe_exc(e)}")
                 return notes, "sufficient"
 
             if text.upper().startswith("SUFFICIENT"):

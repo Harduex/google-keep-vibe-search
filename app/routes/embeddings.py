@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sklearn.decomposition import PCA
 
 from app.core.dependencies import get_search_service
+from app.core.redact import safe_exc
 from app.search import VibeSearch
 from app.services.search_service import SearchService
 
@@ -44,4 +45,4 @@ def get_embeddings(search_service: SearchService = Depends(get_search_service)):
             )
         return {"embeddings": data}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error generating embeddings: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error generating embeddings: {safe_exc(e)}")

@@ -37,6 +37,7 @@ from typing import Iterable, Iterator, Optional, Protocol
 
 import numpy as np
 
+from app.core.redact import safe_exc
 from app.domain import ChangeSet, Document, SourceDoc, content_hash, stable_id
 from app.importers import get_importer, scan
 from app.store import SQLiteStore, VectorStore
@@ -276,7 +277,7 @@ class IngestService:
                 importer_key,
                 type(e).__name__,
             )
-            yield proto.error(f"{type(e).__name__}: {e}")
+            yield proto.error(f"ingest failed: {safe_exc(e)}")
             raise
 
     # ------------------------------------------------------------------ #

@@ -10,6 +10,7 @@ from app.core.exceptions import (
     InvalidFileType,
     SearchEngineNotInitialized,
 )
+from app.core.redact import safe_exc
 from app.models.search import SearchRequest
 from app.services.note_service import NoteService
 from app.services.search_service import SearchService
@@ -68,4 +69,4 @@ async def search_by_image(
     except Exception as e:
         from fastapi import HTTPException
 
-        raise HTTPException(status_code=500, detail=f"Error searching by image: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error searching by image: {safe_exc(e)}")

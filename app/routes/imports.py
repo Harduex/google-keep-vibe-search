@@ -26,6 +26,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
+from app.core.redact import safe_exc
 from app.models.imports import (
     ImportCounts,
     ImportListResponse,
@@ -90,14 +91,14 @@ async def import_documents(payload: ImportRequest, request: Request):
             dry_run=payload.dry_run,
         )
     except KeyError as e:
-        # Unknown importer key — the registry raises KeyError with a helpful
-        # message listing known keys.
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        # Unknown importer key — the registry raises KeyError; log the type, not
+        # the message (which is not under our control and could carry anything).
+        raise HTTPException(status_code=400, detail=f"unknown importer: {safe_exc(e)}") from e
     except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
+        raise HTTPException(status_code=404, detail=f"import path not found: {safe_exc(e)}") from e
     except Exception as e:
         log.warning("import failed: exc=%s", type(e).__name__)
-        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {e}") from e
+        raise HTTPException(status_code=500, detail=f"import failed: {safe_exc(e)}") from e
 
     counts = ImportCounts(
         added=len(change_set.added),

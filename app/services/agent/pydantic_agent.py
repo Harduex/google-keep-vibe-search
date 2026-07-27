@@ -8,6 +8,7 @@ import numpy as np
 from pydantic_ai import Agent
 
 from app.core.config import settings
+from app.core.redact import safe_exc
 from app.services.agent.constants import STEP_TIMEOUT_SECONDS, TOOL_RETRIES
 from app.services.agent.coverage import coverage_is_sufficient
 from app.services.agent.decision import SearchDecision
@@ -180,13 +181,17 @@ async def gather_context_pydantic_agent(
             res = await asyncio.wait_for(agent.run(step_prompt), timeout=STEP_TIMEOUT_SECONDS)
             decision: SearchDecision = res.output
         except Exception as e:
+            # The provider exception can quote the step prompt, which embeds
+            # sampled note titles — so neither the reasoning nor the summary may
+            # carry the raw message. safe_exc keeps the type + status only.
+            safe = safe_exc(e)
             step = AgentStep(
                 step_number=state.steps_taken + 1,
                 action="error",
                 params={},
-                reasoning=f"Agent decision failed: {e}",
+                reasoning=f"Agent decision failed: {safe}",
                 notes_found=0,
-                result_summary=str(e),
+                result_summary=f"agent step failed: {safe}",
             )
             steps_history.append(step)
             _log_agent_step(step)

@@ -97,9 +97,11 @@ each, naming the task that found it and why it was not done then.
 Two invariants any parallel plan must keep. **Re-run both after editing this file**, and paste the
 output — a result copied forward from last time is not a check.
 
-**With no active plan, invariant 2 reports every finding as unowned** (currently 43 of the 46 in
-`docs/audit/`). That is correct and expected: nothing is planned, so nothing is owned. It becomes a
-real signal again once § Task index is filled in.
+**Invariant 2 needs a source-of-truth document to read.** It scans `docs/audit/*.md` for rows shaped
+`| B12 | ... |` and checks each id is mentioned somewhere in `docs/plans/`. With no active plan and no
+new audit, it finds nothing to check and prints `unowned: none` — a vacuous pass, not a real one. It
+becomes a real signal the moment you drop an audit into `docs/audit/` and start filling in § Task
+index. Point it at a different directory if your source of truth lives elsewhere.
 
 ```bash
 # 1. no two lanes in the same wave own the same path

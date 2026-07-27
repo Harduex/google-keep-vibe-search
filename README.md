@@ -107,13 +107,52 @@ All settings are read from `.env`. Copy `.env.example` to get started.
 | `CHAT_CONTEXT_NOTES` | `10` | Number of notes injected as context per chat message |
 | `CHAT_MAX_RECENT_MESSAGES` | `6` | Number of recent messages kept verbatim in context window |
 | `CHAT_SUMMARIZATION_THRESHOLD` | `12` | Total messages before older ones are summarized |
-| `ENABLE_IMAGE_SEARCH` | `true` | Enable CLIP-based image search (downloads ~350 MB model on first run) |
+| `ENABLE_IMAGE_SEARCH` | `false` | Enable CLIP-based image search (downloads ~350 MB model on first use) |
 | `IMAGE_SEARCH_THRESHOLD` | `0.2` | Minimum image similarity score |
-
-| `CACHE_DIR` | `./cache/` | Directory for embeddings and session cache |
+| `EMBEDDING_MODEL` | `paraphrase-multilingual-MiniLM-L12-v2` | Sentence-transformers model used for note and query embeddings |
+| `LLM_TEMPERATURE` | `0.1` | Sampling temperature for chat |
+| `LLM_MAX_TOKENS` | `2048` | Maximum tokens in a chat completion |
+| `LLM_CONTEXT_WINDOW` | `131072` | Context window assumed when packing the prompt |
+| `AGENT_MAX_STEPS` | `5` | Hard ceiling on agent retrieval steps per message |
+| `DEFAULT_SOURCE_KEY` | `keep` | Importer used for the automatic first-boot import (`keep`, `markdown-dir`) |
+| `CACHE_DIR` | `./cache/` | Directory for the document store, vectors and session cache |
 | `FORCE_CACHE_REFRESH` | `false` | Set `true` to ignore cached notes/embeddings on startup |
 
+Tuning values that are not deployment concerns — rerank window sizes, clustering
+parameters, agent thresholds — are module constants rather than environment
+variables, each with a comment saying what it trades off. See
+`app/services/*/constants.py`.
+
 ---
+
+## Security & supported configuration
+
+**This app is single-user and loopback-only by design. It has no authentication, and
+adding some would be an architecture change, not a hardening task** — `tags.json` and
+`store.db` are single-corpus, with no notion of who owns a note.
+
+What that means in practice, and what the code already does to hold the line:
+
+- **CORS** is restricted to the local dev client origins, with `allow_credentials=False`
+  (nothing in the app uses cookies or credentialed requests).
+- **Request bodies are capped at 8 MiB**, rejected with `413` before being buffered.
+- **A small in-process per-IP rate limiter** (60 requests/60 s) sits in front of the
+  expensive routes — search, chat, embeddings, organize. It is cheap insurance against a
+  runaway client pinning the GPU, **not a security control**; do not mistake it for one.
+- **Docker publishes both ports on `127.0.0.1` only**, so `docker compose up` does not
+  expose the app to your network.
+
+All of the above lives in `app/core/security.py` as module constants.
+
+**Before exposing this to anything beyond localhost** you would need, at minimum: real
+authentication and a per-user data model; a durable rate limiter that survives restarts
+and works across processes; TLS termination; and a review of every route that reads or
+writes the corpus. Binding to `0.0.0.0` without those publishes your notes to your
+network.
+
+**Your notes stay on your machine** as long as your LLM endpoint is local (Ollama, LM
+Studio). Pointing `LLM_API_BASE_URL` at a hosted provider sends retrieved note text to
+that provider as part of each chat request.
 
 ## Docker
 
@@ -124,6 +163,13 @@ docker compose up -d
 ```
 
 Access the app at http://localhost (port 80 → frontend, port 8000 → backend API).
+Both are published on `127.0.0.1` only — see [Security](#security--supported-configuration).
+The backend image carries a healthcheck with a generous start period, because the first
+boot may import and embed the whole corpus.
+
+The Python image installs the CUDA build of torch by default. For a machine without an
+NVIDIA GPU, install the `cpu` dependency group instead — the two are declared as
+conflicting groups in `pyproject.toml`, so pick exactly one.
 
 **Ollama networking in Docker:**
 
@@ -143,9 +189,11 @@ Access the app at http://localhost (port 80 → frontend, port 8000 → backend 
 app/                    # FastAPI backend
   core/
     config.py           # Pydantic BaseSettings (all env vars)
-    lifespan.py         # App startup/shutdown — boots from the document store
+    lifespan.py         # App startup/shutdown — boots from the store, heavy models lazy
     dependencies.py     # FastAPI Depends() injection
     exceptions.py       # Custom exception handlers
+    security.py         # CORS allow-list, body-size cap, per-IP rate limiter
+    redact.py           # safe_exc / safe_meta — keeps note text out of errors and logs
   domain/               # Content-addressed document model (SourceDoc, Document, ChangeSet)
   store/                # SQLite document store + mmapped vector store (keyed by content_hash)
     sqlite.py           #   documents, tags, imports history, per-index staleness ledger
@@ -156,10 +204,19 @@ app/                    # FastAPI backend
   services/
     note_service.py     # Thin read/tag façade over the store
     search_service.py   # Wraps VibeSearch
-    chat_service.py     # LLM calls, streaming, RAG retrieval
+    retrieval_orchestrator.py  # Multi-signal retrieval: query, chunk, entity, rerank
+    chat_service.py     # LLM calls, streaming, RAG orchestration
     session_service.py  # Chat session persistence (JSON files)
     chunking_service.py # Note → chunks for high-precision retrieval
     citation_service.py # Parse [Note #N] citations from responses
+    verification_service.py / grounding_service.py  # NLI citation checks
+    reranker_service.py # Cross-encoder rerank of the fused candidate window
+    entity_service.py   # Named-entity index folded into every query
+    categorization_service.py  # Smart Tags: cluster → name → apply
+    llm_client.py       # Every LLM call goes through here (LiteLLM)
+    agent/              # PydanticAI agent loop: tools, state, stopping rules, constants
+    tagging/            # Clustering, sampling, c-TF-IDF keywords, embedding cache
+    search/             # BM25 index and search constants
   routes/               # One file per API route group (incl. POST /api/imports)
   prompts/
     system_prompts.py   # LLM system prompt templates
@@ -183,8 +240,12 @@ tests/                  # pytest backend tests
   conftest.py           # Synthetic fixture corpus + isolated cache dir (autouse)
   test_store.py         # SQLite + vector store round-trips, idempotence, concurrency
   test_importers.py     # keep-takeout + markdown-dir importers
-  test_ingest.py        # ingestion diff/upsert contract tests (A4, A5)
+  test_ingest.py        # ingestion diff/upsert contract tests
   test_search_cache.py  # VibeSearch.build / apply incremental indexing
+  test_redaction.py     # No raw exception text reaches a response body or stdout
+
+scripts/                # setup / dev entry points, plus the two eval harnesses
+bench/                  # Tier-2 benchmarks over public corpora (never part of make check)
 ```
 
 The corpus is no longer "a folder of JSON files re-parsed on every change". It is a
@@ -256,7 +317,9 @@ To install them manually: `uv run pre-commit install`.
 2. **Startup** — The app opens the document store and memory-maps the vectors,
    rather than re-parsing and re-embedding the export. Subsequent boots load in
    seconds; only a note whose content hash is absent from the vector store is
-   ever encoded.
+   ever encoded. The heavy models a plain search never touches — the
+   cross-encoder reranker, the NLI verification and grounding models, and the
+   chunk index — are constructed on first use and cached, not at boot.
 
 3. **Semantic search** — Your query is embedded with the same model. Cosine similarity ranks notes. An optional keyword overlap score is blended in for better precision on exact matches.
 

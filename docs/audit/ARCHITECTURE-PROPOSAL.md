@@ -1,7 +1,11 @@
 # Architecture Proposal — from "Keep export viewer" to "personal knowledge engine"
 
-**Companion to:** `SYSTEM-OVERVIEW.md` (findings referenced as B*/A*/T*/H*/P*)
-**Date:** 2026-07-24 · **Baseline commit:** `6dab505`
+**Status: IMPLEMENTED.** Written 2026-07-24 against baseline `6dab505` as a proposal; delivered in
+full over the eight waves that followed, and kept because six modules cite its section numbers as the
+spec their schema implements (`app/domain/model.py`, `app/store/{__init__,sqlite,vectors}.py`,
+`app/importers/base.py`, `app/ingest.py`). **Read §1–2 as an as-built description; read the staging
+and migration sections as history.** The audit that motivated it, `SYSTEM-OVERVIEW.md`, described the
+pre-remediation system and was deleted once all 46 of its findings were closed — `git log` has it.
 
 ---
 

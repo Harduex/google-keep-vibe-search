@@ -117,7 +117,7 @@ report it instead of working around it.
 | T24 | 5 L4 | 3 | Ingestion diff/upsert + `/api/imports` (+ `dry_run`) | Q4, A4 | 1 d | done |
 | T25 | 5 L5 | 3 | Indexes gain `build(all)` / `apply(ChangeSet)` | A4 | 1 d | done |
 | T26 | 5 L6 | 4 | Cutover: lifespan on store, migration, drop `cache_service` (serial) | A3, A7 | 1 d | done (migration owner-handled; A7 lazy-models deferred — see follow-ups) |
-| T27 | 6 M | 1 | Merge the two tagging pipelines into one | A1 | 1½ d | done |
+| T27 | 6 M | 1 | Merge the two tagging pipelines into one | A1, B15 | 1½ d | done |
 | T28 | 6 M | 2 | Wire granularity through; one UMAP pass | B4 | ¼ d | done |
 | T29 | 6 N | 1 | Reuse stored vectors on the chat hot path | A8 | ½ d | done |
 | T30 | 6 O | 1 | Client data layer (cache + dedupe + invalidation) | A11 | ½ d | done (in-house dataLayer, no new dep) |
@@ -168,7 +168,7 @@ task of that wave lands.
 | 3 | F G R T | T11·T33·T35 → T12·T13·T36 → T14 | done |
 | 4 | H I J K | 4 lanes → T18 → T20 | done |
 | 5 | L1–L6 | T21 → T22·T23 → T24·T25 → T26 | done |
-| 6 | M N O P Q S | round 1 done (T27·T29·T30·T31·T32·T34) → T28 → T38 | round 1 done; T28 + T38 remain |
+| 6 | M N O P Q S | T27·T29·T30·T31·T32·T34 ∥ T28 → T38 | done — barrier closed 2026-07-27 (`9f66ba5`, spec file deleted) |
 | 7 | U V W X | 4 lanes, 1 round | T39 (Lane U) landed early in `a4588b5`; T40·T41·T42 remain |
 | 8 | — | T37 (T43 retired) | todo |
 

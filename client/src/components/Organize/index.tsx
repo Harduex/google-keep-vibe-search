@@ -7,10 +7,16 @@ import { AppliedSummary } from './AppliedSummary';
 import { CategorizationProgress } from './CategorizationProgress';
 import { GranularitySelector } from './GranularitySelector';
 import { ProposalDashboard } from './ProposalDashboard';
+import { TagCoverageInfo } from './TagCoverageInfo';
 import { TagManagerDashboard } from './TagManagerDashboard';
 import './styles.css';
 
-export const Organize = () => {
+interface OrganizeProps {
+  /** Show every note carrying a tag in the notes list (App switches tabs). */
+  onExploreTag: (tagName: string) => void;
+}
+
+export const Organize = ({ onExploreTag }: OrganizeProps) => {
   const {
     granularity,
     setGranularity,
@@ -36,6 +42,8 @@ export const Organize = () => {
 
   const {
     tags,
+    coverage,
+    isCoverageLoading,
     isLoading: isTagsLoading,
     renameTag,
     removeTagFromAllNotes,
@@ -66,6 +74,8 @@ export const Organize = () => {
           topic detection.
         </p>
       </div>
+
+      <TagCoverageInfo coverage={coverage} isLoading={isCoverageLoading} />
 
       {!isProcessing && !hasProposals && (
         <>
@@ -139,6 +149,7 @@ export const Organize = () => {
           onRename={renameTag}
           onMerge={handleMerge}
           onRemove={removeTagFromAllNotes}
+          onExplore={onExploreTag}
         />
       </div>
     </div>

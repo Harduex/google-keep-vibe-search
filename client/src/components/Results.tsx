@@ -26,6 +26,9 @@ interface ResultsProps {
   onRefine: (keywords: string) => void;
   onResetRefinement: () => void;
   onResultsUpdate?: () => void;
+  /** Clicking a tag chip leaves the search results and shows every note with that tag in
+   *  the notes list — the search list has no include filter of its own. */
+  onExploreTag?: (tagName: string) => void;
 }
 
 export const Results = memo(
@@ -41,6 +44,7 @@ export const Results = memo(
     onRefine,
     onResetRefinement,
     onResultsUpdate,
+    onExploreTag,
   }: ResultsProps) => {
     const [viewMode, setViewMode] = useState<ViewMode>(VIEW_MODES.LIST);
     const [showRefinement, setShowRefinement] = useState<boolean>(false);
@@ -315,6 +319,7 @@ export const Results = memo(
                   onSelectNote={handleNoteSelection}
                   onRemoveTag={removeTagFromNote}
                   onRenameTag={renameTag}
+                  onTagClick={onExploreTag}
                 />
               </div>
             ))}

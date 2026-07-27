@@ -26,6 +26,12 @@ def get_all_tags(note_service: NoteService = Depends(get_note_service)):
     return {"tags": note_service.get_all_tags()}
 
 
+@router.get("/tags/coverage")
+def tag_coverage(note_service: NoteService = Depends(get_note_service)):
+    """How much of the corpus is tagged — drives the Organize panel's info section."""
+    return note_service.tag_coverage()
+
+
 @router.get("/tags/sample-notes")
 def sample_notes_for_tag(
     tag: str,

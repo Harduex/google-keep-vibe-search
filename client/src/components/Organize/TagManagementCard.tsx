@@ -9,10 +9,12 @@ interface TagManagementCardProps {
   onRename: (oldName: string, newName: string) => void;
   onMerge: (sourceTag: string, targetTag: string) => void;
   onRemove: (tagName: string) => void;
+  /** Show every note carrying this tag in the notes list. */
+  onExplore: (tagName: string) => void;
 }
 
 export const TagManagementCard = memo(
-  ({ tag, allTags, onRename, onMerge, onRemove }: TagManagementCardProps) => {
+  ({ tag, allTags, onRename, onMerge, onRemove, onExplore }: TagManagementCardProps) => {
     const [isRenaming, setIsRenaming] = useState(false);
     const [renameValue, setRenameValue] = useState(tag.name);
     const [isMerging, setIsMerging] = useState(false);
@@ -115,6 +117,13 @@ export const TagManagementCard = memo(
         </div>
 
         <div className="proposal-actions">
+          <button
+            className="proposal-action-btn explore"
+            onClick={() => onExplore(tag.name)}
+            title="Explore tag: show these notes in the notes list"
+          >
+            <span className="material-icons">travel_explore</span>
+          </button>
           <button
             className="proposal-action-btn rename"
             onClick={() => {

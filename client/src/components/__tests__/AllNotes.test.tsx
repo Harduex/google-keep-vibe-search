@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AllNotes } from '@/components/AllNotes';
@@ -66,6 +67,18 @@ const notes: Note[] = [
   },
 ];
 
+/** The include filter is owned by App, so a test needs a state owner of its own. */
+const StatefulAllNotes = () => {
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  return (
+    <AllNotes
+      onShowRelated={vi.fn()}
+      selectedTags={selectedTags}
+      setSelectedTags={setSelectedTags}
+    />
+  );
+};
+
 describe('AllNotes tag merge from filter', () => {
   const renameTag = vi.fn().mockResolvedValue(undefined);
 
@@ -89,13 +102,15 @@ describe('AllNotes tag merge from filter', () => {
       renameTag,
       refetchTags: vi.fn(),
       refetchExcludedTags: vi.fn(),
+      coverage: null,
+      isCoverageLoading: false,
     });
     vi.spyOn(window, 'confirm').mockReturnValue(true);
   });
 
   it('shows merge only after selecting more than one tag', async () => {
     const user = userEvent.setup();
-    render(<AllNotes onShowRelated={vi.fn()} />);
+    render(<StatefulAllNotes />);
 
     await user.click(screen.getByText('Filter by Tags'));
 
@@ -112,7 +127,7 @@ describe('AllNotes tag merge from filter', () => {
 
   it('merges selected tags into the chosen selected target', async () => {
     const user = userEvent.setup();
-    render(<AllNotes onShowRelated={vi.fn()} />);
+    render(<StatefulAllNotes />);
 
     await user.click(screen.getByText('Filter by Tags'));
     await user.click(screen.getByRole('checkbox', { name: /work/i }));

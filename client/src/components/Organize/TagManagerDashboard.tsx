@@ -11,10 +11,11 @@ interface TagManagerDashboardProps {
   onRename: (oldName: string, newName: string) => void;
   onMerge: (sourceTag: string, targetTag: string) => void;
   onRemove: (tagName: string) => void;
+  onExplore: (tagName: string) => void;
 }
 
 export const TagManagerDashboard = memo(
-  ({ tags, isLoading, onRename, onMerge, onRemove }: TagManagerDashboardProps) => {
+  ({ tags, isLoading, onRename, onMerge, onRemove, onExplore }: TagManagerDashboardProps) => {
     const [sort, setSort] = useState<TagSort>('count-desc');
     const sortedTags = useMemo(() => sortTags(tags, sort), [tags, sort]);
 
@@ -95,6 +96,7 @@ export const TagManagerDashboard = memo(
               onRename={onRename}
               onMerge={onMerge}
               onRemove={onRemove}
+              onExplore={onExplore}
             />
           ))}
         </div>

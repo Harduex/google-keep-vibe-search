@@ -55,6 +55,9 @@ const App = () => {
   const [activeTab, setActiveTab] = useState<TabId>('search');
   // Add state for search mode
   const [searchMode, setSearchMode] = useState<SearchMode>('text');
+  // The All Notes include filter. Owned here, not by AllNotes, so a tag chip in the search
+  // results or Explore in the Organize tab can point the notes list at a single tag.
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
   const handleSearch = useCallback(
     (searchQuery: string) => {
@@ -107,6 +110,16 @@ const App = () => {
 
   const handleTabSwitch = useCallback((tab: string) => {
     setActiveTab(tab as TabId);
+  }, []);
+
+  /** Show exactly the notes carrying `tagName`, wherever the request came from.
+   *  Lifted to App because the include filter is owned by All Notes but triggered from
+   *  three places outside it: a tag chip in the search results, a tag chip in the notes
+   *  list, and Explore in the Organize tag manager. */
+  const handleExploreTag = useCallback((tagName: string) => {
+    setSelectedTags([tagName]);
+    setActiveTab('all-notes');
+    scrollToElement('.tab-navigation', UI_ELEMENTS.SEARCH_OFFSET);
   }, []);
 
   const statsText = useMemo(() => {
@@ -185,13 +198,18 @@ const App = () => {
               onRefine={handleRefinement}
               onResetRefinement={resetRefinement}
               onResultsUpdate={handleResultsUpdate}
+              onExploreTag={handleExploreTag}
             />
           </ErrorBoundary>
         )}
 
         {activeTab === 'all-notes' && (
           <ErrorBoundary fallbackLabel="All Notes">
-            <AllNotes onShowRelated={handleSearch} />
+            <AllNotes
+              onShowRelated={handleSearch}
+              selectedTags={selectedTags}
+              setSelectedTags={setSelectedTags}
+            />
           </ErrorBoundary>
         )}
 
@@ -203,7 +221,7 @@ const App = () => {
 
         {activeTab === 'organize' && (
           <ErrorBoundary fallbackLabel="Organize">
-            <Organize />
+            <Organize onExploreTag={handleExploreTag} />
           </ErrorBoundary>
         )}
 

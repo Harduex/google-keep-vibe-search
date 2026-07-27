@@ -36,6 +36,18 @@ export interface Tag {
   count: number;
 }
 
+/** Corpus-level tagging counts from /api/tags/coverage. */
+export interface TagCoverage {
+  total_notes: number;
+  tagged_notes: number;
+  untagged_notes: number;
+  distinct_tags: number;
+  assignments: number;
+  excluded_tags: number;
+  avg_tags_per_tagged_note: number;
+  tagged_pct: number;
+}
+
 export interface TagsResponse {
   tags: Tag[];
 }

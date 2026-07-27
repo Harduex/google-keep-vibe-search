@@ -320,3 +320,25 @@ def test_sample_notes_for_tag_raises_for_unknown_tag(tmp_keep_dir, tmp_path):
 
     with pytest.raises(KeyError):
         service.sample_notes_for_tag("NoSuchTag")
+
+
+def test_tag_coverage_counts_notes_not_assignments(tmp_keep_dir, tmp_path):
+    """A multi-tagged note counts once in tagged_notes, and stale ids never inflate it."""
+    settings.google_keep_path = str(tmp_keep_dir)
+    settings.cache_dir = str(tmp_path)
+
+    store = SQLiteStore(tmp_path / "store.db")
+    service = NoteService(store=store)
+    notes = service.load_notes()
+    ids = [n["id"] for n in notes]
+    service.tag_notes(ids[:2], "Recipes")
+    service.tag_notes([ids[0]], "Dinner")
+    # A tag left over for a note that no longer exists must not be counted.
+    service.note_tags["deleted-note-id"] = ["Ghost"]
+
+    coverage = service.tag_coverage()
+    assert coverage["total_notes"] == len(notes)
+    assert coverage["tagged_notes"] == 2
+    assert coverage["untagged_notes"] == len(notes) - 2
+    assert coverage["assignments"] == 3
+    assert coverage["avg_tags_per_tagged_note"] == 1.5

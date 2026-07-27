@@ -303,6 +303,35 @@ class NoteService:
         tags.sort(key=lambda x: x["name"])
         return tags
 
+    def tag_coverage(self) -> Dict[str, Any]:
+        """Corpus-level tagging counts for the Organize panel's info section.
+
+        ``tagged_notes`` counts notes, not assignments: a note with three tags counts once,
+        which is why summing ``get_all_tags()`` counts does not answer this. Only notes that
+        still exist in the corpus are counted, so a stale tag map cannot inflate the total.
+        """
+        live_ids = {n.get("id") for n in self.notes}
+        tagged = 0
+        assignments = 0
+        for note_id, tags in self.note_tags.items():
+            if note_id not in live_ids or not tags:
+                continue
+            tagged += 1
+            assignments += len(tags)
+
+        total = len(self.notes)
+        distinct = len({t for tags in self.note_tags.values() for t in tags})
+        return {
+            "total_notes": total,
+            "tagged_notes": tagged,
+            "untagged_notes": total - tagged,
+            "distinct_tags": distinct,
+            "assignments": assignments,
+            "excluded_tags": len(self.excluded_tags),
+            "avg_tags_per_tagged_note": round(assignments / tagged, 2) if tagged else 0.0,
+            "tagged_pct": round(100 * tagged / total, 1) if total else 0.0,
+        }
+
     def sample_notes_for_tag(self, tag_name: str, limit: int = 5) -> List[Dict[str, Any]]:
         """A few notes carrying ``tag_name``, truncated for preview.
 

@@ -1,4 +1,4 @@
-import { memo, useState, useCallback, useMemo, useEffect } from 'react';
+import { Dispatch, SetStateAction, memo, useState, useCallback, useMemo, useEffect } from 'react';
 
 import { NoteCard } from '@/components/NoteCard';
 import { NoteSkeleton } from '@/components/NoteSkeleton';
@@ -15,16 +15,19 @@ import './styles.css';
 
 interface AllNotesProps {
   onShowRelated: (content: string) => void;
+  /** Include filter, owned by App: a tag chip in the search results or Explore in the
+   *  Organize tab points this list at a single tag, so the state cannot live here. */
+  selectedTags: string[];
+  setSelectedTags: Dispatch<SetStateAction<string[]>>;
 }
 
-export const AllNotes = memo(({ onShowRelated }: AllNotesProps) => {
+export const AllNotes = memo(({ onShowRelated, selectedTags, setSelectedTags }: AllNotesProps) => {
   const { notes, isLoading, error, refetch } = useAllNotes();
   const { tags, removeTagFromNote, renameTag } = useTags(refetch);
   const [viewMode, setViewMode] = useState<ViewMode>(VIEW_MODES.LIST);
   const [sortBy, setSortBy] = useState<'edited' | 'created'>('edited');
   const [filterArchived, setFilterArchived] = useState<boolean>(false);
   const [filterPinned, setFilterPinned] = useState<boolean>(false);
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [visibleNotesCount, setVisibleNotesCount] = useState<number>(20);
   const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
 
@@ -92,16 +95,33 @@ export const AllNotes = memo(({ onShowRelated }: AllNotesProps) => {
     setVisibleNotesCount((prev) => prev + 20);
   }, []);
 
-  const handleTagsChange = useCallback((newSelectedTags: string[]) => {
-    setSelectedTags(newSelectedTags);
-  }, []);
+  const handleTagsChange = useCallback(
+    (newSelectedTags: string[]) => {
+      setSelectedTags(newSelectedTags);
+    },
+    [setSelectedTags],
+  );
+
+  /** Clicking a tag chip toggles that tag in the include filter — the list is already on
+   *  screen, so this filters in place instead of navigating. Clicking a green (currently
+   *  applied) chip switches it back off. Membership toggles rather than replacing, which
+   *  matches the OR semantics of the checkbox filter. */
+  const handleExploreTagInList = useCallback(
+    (tagName: string) => {
+      setSelectedTags((prev) =>
+        prev.includes(tagName) ? prev.filter((t) => t !== tagName) : [...prev, tagName],
+      );
+      setVisibleNotesCount(20);
+    },
+    [setSelectedTags],
+  );
 
   const handleRenameTag = useCallback(
     async (oldName: string, newName: string) => {
       await renameTag(oldName, newName);
       setSelectedTags((prev) => prev.map((t) => (t === oldName ? newName : t)));
     },
-    [renameTag],
+    [renameTag, setSelectedTags],
   );
 
   const handleMergeSelectedTags = useCallback(
@@ -114,7 +134,7 @@ export const AllNotes = memo(({ onShowRelated }: AllNotesProps) => {
 
       setSelectedTags([targetTag]);
     },
-    [renameTag, selectedTags],
+    [renameTag, selectedTags, setSelectedTags],
   );
 
   const handleNoteSelection = useCallback((noteId: string, isSelected: boolean) => {
@@ -267,6 +287,8 @@ export const AllNotes = memo(({ onShowRelated }: AllNotesProps) => {
                   onSelectNote={handleNoteSelection}
                   onRemoveTag={removeTagFromNote}
                   onRenameTag={renameTag}
+                  onTagClick={handleExploreTagInList}
+                  activeTags={selectedTags}
                 />
               </div>
             ))

@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 
 import { API_ROUTES } from '@/const';
-import { TagsResponse, ExcludedTagsResponse } from '@/types';
+import { TagCoverage, TagsResponse, ExcludedTagsResponse } from '@/types';
 
 import { ApiError, QUERY_KEYS, fetchJson, invalidate } from './dataLayer';
 import { useCachedQuery } from './useCachedQuery';
@@ -23,6 +23,9 @@ import { useCachedQuery } from './useCachedQuery';
 export const useTags = (onNotesChanged?: () => void) => {
   const tagsQuery = useCachedQuery<TagsResponse>(API_ROUTES.TAGS);
   const excludedQuery = useCachedQuery<ExcludedTagsResponse>(API_ROUTES.EXCLUDED_TAGS);
+  // Coverage lives under /api/tags, and invalidation matches by prefix, so every tag
+  // mutation already refreshes it — no extra invalidate calls needed below.
+  const coverageQuery = useCachedQuery<TagCoverage>(API_ROUTES.TAG_COVERAGE);
   const isLoading = tagsQuery.isLoading || excludedQuery.isLoading;
   const error = tagsQuery.error ?? excludedQuery.error;
 
@@ -121,6 +124,8 @@ export const useTags = (onNotesChanged?: () => void) => {
   return {
     tags: tagsQuery.data?.tags ?? [],
     excludedTags: excludedQuery.data?.excluded_tags ?? [],
+    coverage: coverageQuery.data ?? null,
+    isCoverageLoading: coverageQuery.isLoading,
     isLoading,
     error,
     tagNotes,

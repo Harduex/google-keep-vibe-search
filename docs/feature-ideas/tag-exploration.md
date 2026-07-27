@@ -1,6 +1,13 @@
 # Tag Exploration — Feature Idea
 
-**Status:** Idea / brainstorm paused (not yet designed or implemented)
+**Status:** Option A shipped (2026-07-28); B and C still open ideas
+
+> **Update (2026-07-28):** the "simple filter" fork below is implemented. Tag chips in the
+> notes list toggle that tag in the include filter (green while applied); chips in the
+> search results and Explore in the tag manager jump to the notes list filtered by that
+> tag, with the filter state lifted to `App.tsx`. The tag manager also previews a tag's
+> notes via `GET /api/tags/sample-notes`, so the "no notes-for-a-tag endpoint" gap below is
+> partly closed. Relatedness (B) and the explorable map (C) are untouched.
 **Created:** 2026-07-26
 **Seed:** "When I press a tag in the notes list, I would like to explore this tag — how can we achieve good UX for tag exploration?"
 

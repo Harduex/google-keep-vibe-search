@@ -18,6 +18,7 @@ export const API_ROUTES = {
   TAGS: '/api/tags',
   TAG_NOTES: '/api/notes/tag',
   TAG_SAMPLE_NOTES: '/api/tags/sample-notes',
+  TAG_COVERAGE: '/api/tags/coverage',
   EXCLUDED_TAGS: '/api/tags/excluded',
   REMOVE_TAG: '/api/notes',
   REMOVE_TAG_FROM_ALL: '/api/tags/remove',

@@ -16,6 +16,12 @@ interface NoteCardProps {
   onSelectNote?: (noteId: string, isSelected: boolean) => void;
   onRemoveTag?: (noteId: string, tagName: string) => void;
   onRenameTag?: (oldTagName: string, newTagName: string) => void;
+  /** Toggle this tag in the notes-list include filter. Omitted where filtering makes no
+   *  sense, in which case the chip stays plain text. */
+  onTagClick?: (tagName: string) => void;
+  /** Tags currently in the include filter — those chips render green, so it is obvious
+   *  which tags the list is filtered by and which click will switch the filter off. */
+  activeTags?: string[];
 }
 
 export const NoteCard = memo(
@@ -29,6 +35,8 @@ export const NoteCard = memo(
     onSelectNote,
     onRemoveTag,
     onRenameTag,
+    onTagClick,
+    activeTags,
   }: NoteCardProps) => {
     const scorePercentage = calculateScorePercentage(note.score);
     const highlightedTitle = highlightMatches(note.title, query, refinementKeywords);
@@ -51,6 +59,15 @@ export const NoteCard = memo(
         }
       },
       [note.id, isSelected, onSelectNote],
+    );
+
+    const handleTagClick = useCallback(
+      (e: React.MouseEvent, tagName: string) => {
+        // Without this the click bubbles to the card, which toggles note selection.
+        e.stopPropagation();
+        onTagClick?.(tagName);
+      },
+      [onTagClick],
     );
 
     const handleRemoveTag = useCallback(
@@ -150,52 +167,79 @@ export const NoteCard = memo(
           <div className="note-badges">
             {note.pinned && <span className="note-badge badge-pinned">Pinned</span>}
             {note.archived && <span className="note-badge badge-archived">Archived</span>}
-            {note.tags?.map((tagName) => (
-              <span
-                key={tagName}
-                className={`note-badge badge-tag${editingTag === tagName ? ' editing' : ''}`}
-                title={`Tagged: ${tagName}`}
-              >
-                {editingTag === tagName ? (
-                  <>
-                    <input
-                      ref={editInputRef}
-                      className="tag-edit-input"
-                      value={editValue}
-                      onChange={(e) => setEditValue(e.target.value)}
-                      onKeyDown={(e) => handleEditKeyDown(e, tagName)}
-                      onBlur={() => handleEditBlur(tagName)}
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                  </>
-                ) : (
-                  <>
-                    <span className="material-icons">label</span>
-                    {tagName}
-                    {onRenameTag && (
-                      <button
-                        className="tag-edit-button"
-                        onClick={(e) => handleStartEditTag(e, tagName)}
-                        title="Rename tag"
-                        aria-label={`Rename tag ${tagName}`}
-                      >
-                        <span className="material-icons">edit</span>
-                      </button>
-                    )}
-                    {onRemoveTag && (
-                      <button
-                        className="tag-remove-button"
-                        onClick={(e) => handleRemoveTag(e, tagName)}
-                        title="Remove tag"
-                        aria-label={`Remove tag ${tagName}`}
-                      >
-                        <span className="material-icons">close</span>
-                      </button>
-                    )}
-                  </>
-                )}
-              </span>
-            ))}
+            {note.tags?.map((tagName) => {
+              const isFiltering = activeTags?.includes(tagName) ?? false;
+              return (
+                <span
+                  key={tagName}
+                  className={`note-badge badge-tag${editingTag === tagName ? ' editing' : ''}${
+                    isFiltering ? ' filtering' : ''
+                  }`}
+                  title={`Tagged: ${tagName}`}
+                >
+                  {editingTag === tagName ? (
+                    <>
+                      <input
+                        ref={editInputRef}
+                        className="tag-edit-input"
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        onKeyDown={(e) => handleEditKeyDown(e, tagName)}
+                        onBlur={() => handleEditBlur(tagName)}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      {onTagClick ? (
+                        <button
+                          className="tag-filter-button"
+                          onClick={(e) => handleTagClick(e, tagName)}
+                          title={
+                            isFiltering
+                              ? `Stop filtering by "${tagName}"`
+                              : `Show all notes tagged "${tagName}"`
+                          }
+                          aria-label={
+                            isFiltering
+                              ? `Stop filtering by tag ${tagName}`
+                              : `Filter notes by tag ${tagName}`
+                          }
+                        >
+                          <span className="material-icons">label</span>
+                          {tagName}
+                        </button>
+                      ) : (
+                        <>
+                          <span className="material-icons">label</span>
+                          {tagName}
+                        </>
+                      )}
+                      {onRenameTag && (
+                        <button
+                          className="tag-edit-button"
+                          onClick={(e) => handleStartEditTag(e, tagName)}
+                          title="Rename tag"
+                          aria-label={`Rename tag ${tagName}`}
+                        >
+                          <span className="material-icons">edit</span>
+                        </button>
+                      )}
+                      {onRemoveTag && (
+                        <button
+                          className="tag-remove-button"
+                          onClick={(e) => handleRemoveTag(e, tagName)}
+                          title="Remove tag"
+                          aria-label={`Remove tag ${tagName}`}
+                        >
+                          <span className="material-icons">close</span>
+                        </button>
+                      )}
+                    </>
+                  )}
+                </span>
+              );
+            })}
             {scorePercentage !== null && (
               <span className="note-badge badge-score">{scorePercentage}% match</span>
             )}

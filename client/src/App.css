@@ -459,6 +459,24 @@ h1 {
   font-size: 16px;
 }
 
+/* The tag name inside a chip is a button when the list can filter by it. Styled to stay
+   visually part of the chip — it must not read as a nested control. */
+.tag-filter-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.tag-filter-button:hover {
+  text-decoration: underline;
+}
+
 .tag-remove-button {
   background: none;
   border: none;
@@ -1601,4 +1619,10 @@ mark .refinement-highlight,
   width: 40%;
   height: 12px;
   margin-top: 4px;
+}
+
+/* A tag chip whose tag is currently in the notes-list include filter. Green so it reads as
+   "applied"; clicking it again removes it from the filter. */
+.note-badge.badge-tag.filtering {
+  background: var(--accent-green);
 }

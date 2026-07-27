@@ -38,11 +38,13 @@ except ImportError:
 from app.core.config import settings  # noqa: E402
 
 bench.assert_cache_isolated()
-from app.search import VibeSearch
+from app.domain import Document, content_hash
+from app.search import VibeSearch, _model_dim
 from app.services.categorization_service import CategorizationService
 from app.services.llm_client import LLMClient
 from app.services.note_service import NoteService
 from app.services.search_service import SearchService
+from app.store import VectorStore
 from tests.fixtures.notes import generate_synthetic_notes
 
 
@@ -97,13 +99,49 @@ def get_memory_stats():
     return rss_mb, vram_mb
 
 
+def _notes_to_documents(notes: list) -> list:
+    """Convert NoteService note dicts to content-addressed Documents.
+
+    Parity with the deleted legacy constructor: it embedded each note's
+    ``cleaned_text``, which ``NoteService._doc_to_dict`` sets to
+    ``clean_note(f"{title} {content}")``. Building the Document with the same
+    ``title`` and ``body`` reproduces that via ``_doc_to_note_dict``.
+    """
+    docs = []
+    for n in notes:
+        title = n.get("title", "") or ""
+        body = n.get("content", "") or ""
+        nid = n.get("id", "") or n.get("external_id", "")
+        docs.append(
+            Document(
+                external_id=n.get("external_id", nid),
+                title=title,
+                body=body,
+                id=nid,
+                source_key="eval",
+                content_hash=content_hash(title, body),
+            )
+        )
+    return docs
+
+
 async def run_categorization(temp_dir: str):
     settings.google_keep_path = temp_dir
     settings.enable_image_search = False
 
     note_service = NoteService()
     notes = note_service.load_notes(force_refresh=True)
-    search_engine = VibeSearch(notes=notes, force_refresh=True)
+    # Build the engine via the store-backed path (from_model + build) against an
+    # isolated VectorStore under the bench-isolated cache dir, replacing the
+    # deleted legacy constructor (which wrote embeddings.npz into the cache).
+    from sentence_transformers import SentenceTransformer
+
+    model = SentenceTransformer(settings.embedding_model)
+    vectors = VectorStore(
+        os.path.join(settings.resolved_cache_dir, "vibe_search"), dim=_model_dim(model)
+    )
+    search_engine = VibeSearch.from_model(model, vector_store=vectors)
+    search_engine.build(_notes_to_documents(notes))
     search_service = SearchService(search_engine=search_engine, note_service=note_service)
 
     llm = CountingFakeLLM()

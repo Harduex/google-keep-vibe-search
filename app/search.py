@@ -1,6 +1,4 @@
 import hashlib
-import json
-import os
 import re
 from typing import Any, BinaryIO, Dict, List, Optional, Set, Tuple, Union
 
@@ -9,6 +7,7 @@ from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 
 from app.core.config import settings
+from app.core.redact import safe_exc
 from app.domain import ChangeSet, Document, attachments_to_api
 from app.services.search.bm25 import BM25Index
 from app.services.search.constants import RERANK_CANDIDATE_WINDOW
@@ -30,74 +29,20 @@ if settings.enable_image_search:
 class VibeSearch:
     """Dense + BM25 + image + entity search over the live note corpus.
 
-    Two ways to populate the index:
+    The index is populated via the store-backed :meth:`build` / :meth:`apply`
+    interface (or :meth:`from_model` for an empty shell): callers hand
+    content-addressed :class:`~app.domain.model.Document` objects and vector
+    I/O flows through a :class:`~app.store.vectors.VectorStore` keyed by
+    ``content_hash``. An incremental :meth:`apply` embeds only
+    ``added ∪ updated`` and drops ``removed`` — the A4 fix, so one edited note
+    re-embeds only itself.
 
-    - The legacy constructor ``VibeSearch(notes, ...)`` builds everything from
-      a list of note dicts and persists embeddings to a side-car ``.npz`` cache
-      keyed by a whole-corpus hash. One edited note re-embeds everything.
-    - The :meth:`build` / :meth:`apply` interface takes content-addressed
-      :class:`~app.domain.model.Document` objects and routes vector I/O through
-      a :class:`~app.store.vectors.VectorStore` keyed by ``content_hash``. An
-      incremental :meth:`apply` embeds only ``added ∪ updated`` and drops
-      ``removed``. This is the A4 fix — one edited note re-embeds only itself.
-
-    Staleness under the new path is owned per-index via the optional
+    Staleness is owned per-index via the optional
     :class:`~app.store.sqlite.SQLiteStore` ``index_state`` ledger rather than a
     global corpus hash.
     """
 
     INDEX_NAME = "vibe_search"
-
-    def __init__(
-        self,
-        notes: List[Dict[str, Any]],
-        force_refresh: bool = False,
-        type_prefixes: List[str] = None,
-    ):
-        self.notes = notes
-        self.type_prefixes = type_prefixes or []
-        import torch
-
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.model = SentenceTransformer(settings.embedding_model).to(device)
-
-        # Create document embeddings for all notes
-        self.texts = []
-        self.note_indices = []
-
-        for i, note in enumerate(self.notes):
-            # Strip type prefixes from title
-            title = note.get("title", "")
-            for prefix in self.type_prefixes:
-                pattern = r"^\s*" + re.escape(prefix) + r"\s*[:\-—]\s+"
-                title = re.sub(pattern, "", title, flags=re.IGNORECASE)
-
-            # Combine title and content for embedding, using cleaned_text
-            cleaned = note.get("cleaned_text")
-            if not cleaned:
-                cleaned = clean_note(f"{title} {note.get('content', '')}")
-            if cleaned.strip():  # Only add non-empty notes
-                self.texts.append(cleaned)
-                self.note_indices.append(i)
-
-        # Try to load embeddings from cache or compute new ones
-        self.load_or_compute_embeddings(force_refresh)
-
-        # Build multilingual BM25 index over note texts for keyword search
-        self.bm25_index = BM25Index(self.notes)
-
-        # Initialize image processor if enabled
-        self.image_processor = None
-        self.image_note_map = {}  # Maps image paths to note indices
-        self.reranker = None  # Set externally for cross-encoder reranking
-        self.entity_service = None  # Set externally for entity-based retrieval
-        # New-path bookkeeping (populated by build/apply; empty under legacy path)
-        self.vector_store: Optional[VectorStore] = None
-        self.sqlite_store = None
-        self._id_to_note_idx: Dict[str, int] = {}
-        self._id_to_content_hash: Dict[str, str] = {}
-        if settings.enable_image_search:
-            self._init_image_search()
 
     # ------------------------------------------------------------------ #
     # Image search init (unchanged)
@@ -117,7 +62,7 @@ class VibeSearch:
 
             print("Image search functionality initialized")
         except Exception as e:
-            print(f"Failed to initialize image search: {e}")
+            print(f"Failed to initialize image search: {safe_exc(e)}")
             self.image_processor = None
 
     def _build_image_note_map(self):
@@ -131,100 +76,6 @@ class VibeSearch:
                             if image_path not in self.image_note_map:
                                 self.image_note_map[image_path] = []
                             self.image_note_map[image_path].append(i)
-
-    # ------------------------------------------------------------------ #
-    # Legacy embedding cache (whole-corpus hash → .npz). Used by __init__.
-    # ------------------------------------------------------------------ #
-
-    def load_or_compute_embeddings(self, force_refresh: bool = False):
-        """Load embeddings from cache if valid or compute and save new ones.
-
-        The ``force_refresh`` flag bypasses the cache even if the stored hash
-        matches, useful for development or when you suspect corruption.
-        """
-        # Ensure cache directory exists
-        os.makedirs(settings.resolved_cache_dir, exist_ok=True)
-
-        # Generate hash of current notes to check if cache is valid
-        current_hash = self._compute_notes_hash()
-
-        # Check if cached embeddings exist and are valid
-        if not force_refresh and self._is_cache_valid(current_hash):
-            self._load_embeddings_from_cache()
-            print("Loaded embeddings from cache")
-        else:
-            if force_refresh:
-                print("Force-refresh requested, recomputing embeddings")
-            # Compute new embeddings
-            self.embeddings = self.model.encode(self.texts)
-
-            # Save embeddings and hash to cache
-            self._save_embeddings_to_cache(current_hash)
-            print("Computed new embeddings and saved to cache")
-
-    def _compute_notes_hash(self) -> str:
-        """Compute a hash of all note texts and model identity to detect changes."""
-        hash_obj = hashlib.md5()
-        hash_obj.update(settings.embedding_model.encode("utf-8"))
-        for text in self.texts:
-            hash_obj.update(text.encode("utf-8"))
-        return hash_obj.hexdigest()
-
-    def _is_cache_valid(self, current_hash: str) -> bool:
-        """Check if cached embeddings exist and match current notes."""
-        if not os.path.exists(settings.embeddings_cache_file) or not os.path.exists(
-            settings.notes_hash_file
-        ):
-            return False
-
-        try:
-            with open(settings.notes_hash_file, "r") as f:
-                cache_info = json.load(f)
-
-            # Check if the number of notes and hash match
-            return cache_info.get("hash") == current_hash and cache_info.get("note_count") == len(
-                self.note_indices
-            )
-        except Exception as e:
-            print(f"Error checking cache validity: {e}")
-            return False
-
-    def _save_embeddings_to_cache(self, notes_hash: str):
-        """Save embeddings and metadata to cache."""
-        # Save embeddings
-        np.savez_compressed(
-            settings.embeddings_cache_file,
-            embeddings=self.embeddings,
-            note_indices=np.array(self.note_indices),
-        )
-
-        # Save hash and metadata
-        cache_info = {
-            "hash": notes_hash,
-            "note_count": len(self.note_indices),
-            "model_name": settings.embedding_model,
-        }
-
-        with open(settings.notes_hash_file, "w") as f:
-            json.dump(cache_info, f)
-
-    def _load_embeddings_from_cache(self):
-        """Load embeddings from cache."""
-        try:
-            data = np.load(settings.embeddings_cache_file)
-            self.embeddings = data["embeddings"]
-            cached_indices = data["note_indices"]
-
-            # Verify indices match
-            if not np.array_equal(cached_indices, np.array(self.note_indices)):
-                print("Warning: Cached note indices don't match current indices")
-                # Fall back to computing new embeddings
-                self.embeddings = self.model.encode(self.texts)
-
-        except Exception as e:
-            print(f"Error loading embeddings from cache: {e}")
-            # Fall back to computing new embeddings
-            self.embeddings = self.model.encode(self.texts)
 
     # ------------------------------------------------------------------ #
     # Store-backed incremental interface (build / apply)

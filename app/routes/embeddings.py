@@ -1,3 +1,4 @@
+import hashlib
 from functools import lru_cache
 from typing import Optional
 
@@ -25,7 +26,10 @@ def get_embeddings(search_service: SearchService = Depends(get_search_service)):
         note_indices = search_service.note_indices
         notes = search_service.notes
 
-        emb_hash = search_service.engine._compute_notes_hash()
+        # Cache key for the PCA fit. The legacy whole-corpus notes hash is gone
+        # (T42), so key on the embedding matrix itself — it is what PCA consumes,
+        # and it changes exactly when the projection would.
+        emb_hash = hashlib.md5(np.ascontiguousarray(search_service.engine.embeddings)).hexdigest()
         embeddings_3d = get_cached_pca(emb_hash, search_service.engine)
 
         data = []

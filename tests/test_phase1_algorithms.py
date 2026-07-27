@@ -7,7 +7,9 @@ os.environ.setdefault("ENABLE_IMAGE_SEARCH", "false")
 import numpy as np
 import pytest
 
+from app.domain import Document, content_hash
 from app.search import VibeSearch
+from app.store import VectorStore
 
 
 class DummyModel:
@@ -56,11 +58,27 @@ def search_notes():
 
 @pytest.fixture
 def vibe_search(tmp_path, search_notes, monkeypatch):
-    from app.core.config import settings
-
-    settings.cache_dir = str(tmp_path)
+    # Build via the store-backed path (from_model + build) against an isolated
+    # VectorStore, replacing the deleted legacy constructor. Each note dict's
+    # title+content is reproduced as a Document so the embedded text matches the
+    # legacy ``clean_note(f"{title} {content}")`` exactly.
     monkeypatch.setattr("app.search.SentenceTransformer", lambda *a, **kw: DummyModel())
-    return VibeSearch(search_notes)
+    model = DummyModel()
+    vectors = VectorStore(tmp_path / "vibe", dim=model.get_sentence_embedding_dimension())
+    engine = VibeSearch.from_model(model, vector_store=vectors)
+    docs = [
+        Document(
+            external_id=n["id"],
+            title=n.get("title", ""),
+            body=n.get("content", ""),
+            id=n["id"],
+            source_key="test",
+            content_hash=content_hash(n.get("title", ""), n.get("content", "")),
+        )
+        for n in search_notes
+    ]
+    engine.build(docs)
+    return engine
 
 
 class TestRRFFusion:

@@ -27,10 +27,12 @@ from bench.metrics import mrr, recall_at_k
 
 from sentence_transformers import SentenceTransformer
 
-from app.search import VibeSearch
+from app.domain import Document, content_hash
+from app.search import VibeSearch, _model_dim
 from app.services.chunking_service import ChunkingService
 from app.services.entity_service import EntityService
 from app.services.reranker_service import RerankerService
+from app.store import VectorStore
 from tests.fixtures.notes import generate_synthetic_notes
 
 GOLDEN_QUERIES: List[Tuple[str, Set[str]]] = [
@@ -87,6 +89,27 @@ def format_note_for_search(fid: str, n_dict: dict) -> dict:
     return note
 
 
+def _note_to_document(note: dict) -> Document:
+    """Convert a fixture note dict to a content-addressed Document.
+
+    Parity with the deleted legacy constructor: it embedded
+    ``clean_note(f"{title} {note.get('content', '')}")``, and these fixture
+    notes carry no ``content`` key (only ``title``/``textContent``/
+    ``listContent``), so the embedded text was just the cleaned title. Building
+    the Document with ``title`` and an empty ``body`` reproduces that exactly —
+    ``_doc_to_note_dict`` runs the same ``clean_note(f"{title} {body}")``.
+    """
+    title = note.get("title", "")
+    return Document(
+        external_id=note["id"],
+        title=title,
+        body="",
+        id=note["id"],
+        source_key="eval",
+        content_hash=content_hash(title, ""),
+    )
+
+
 def main():
     t0 = time.time()
 
@@ -94,6 +117,7 @@ def main():
     raw_notes = generate_synthetic_notes()
     # Filter out trashed.
     notes = [format_note_for_search(fid, n) for fid, n in raw_notes if not n.get("isTrashed")]
+    documents = [_note_to_document(n) for n in notes]
 
     print(f"Loaded {len(notes)} fixture notes.")
 
@@ -106,7 +130,15 @@ def main():
 
     cache_dir = settings.resolved_cache_dir
 
-    engine = VibeSearch(notes, force_refresh=True)
+    # Build the engine via the store-backed path (from_model + build) against an
+    # isolated VectorStore, replacing the deleted legacy constructor. The
+    # VectorStore lives under the bench-isolated cache dir, never the real one.
+    model = SentenceTransformer(settings.embedding_model)
+    vectors = VectorStore(
+        os.path.join(cache_dir, "vibe_search"), dim=_model_dim(model)
+    )
+    engine = VibeSearch.from_model(model, vector_store=vectors)
+    engine.build(documents)
     entity_service = EntityService(notes, cache_dir=cache_dir)
     chunk_service = ChunkingService(engine.model)
     chunk_service.build_chunks(notes)

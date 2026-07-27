@@ -34,8 +34,8 @@ class VibeSearch:
     content-addressed :class:`~app.domain.model.Document` objects and vector
     I/O flows through a :class:`~app.store.vectors.VectorStore` keyed by
     ``content_hash``. An incremental :meth:`apply` embeds only
-    ``added ∪ updated`` and drops ``removed`` — the A4 fix, so one edited note
-    re-embeds only itself.
+    ``added ∪ updated`` and drops ``removed``, so one edited note re-embeds only
+    itself rather than triggering a whole-corpus rebuild.
 
     Staleness is owned per-index via the optional
     :class:`~app.store.sqlite.SQLiteStore` ``index_state`` ledger rather than a
@@ -127,7 +127,7 @@ class VibeSearch:
 
         Embeddings are stored in ``vector_store`` keyed by each document's
         ``content_hash``; a second :meth:`build` with the same documents reuses
-        every stored vector and encodes none (the A4 idempotence property).
+        every stored vector and encodes none — the idempotence property.
         """
         if vector_store is not None:
             self.vector_store = vector_store
@@ -344,9 +344,9 @@ class VibeSearch:
     def _image_search(self, query: str) -> Dict[int, Tuple[float, str]]:
         """Search notes with images matching the query.
 
-        Returns ``{note_idx: (score, image_path)}``. A6 fix: this method no
-        longer mutates ``self.notes`` — image-match metadata is returned to the
-        caller, which attaches it to per-request result copies only.
+        Returns ``{note_idx: (score, image_path)}``. This method must not mutate
+        ``self.notes`` — image-match metadata is returned to the caller, which
+        attaches it to per-request result copies only.
         """
         # If image search isn't enabled or processor isn't initialized, return empty result
         if not settings.enable_image_search or not self.image_processor:
@@ -382,7 +382,7 @@ class VibeSearch:
             max_results: Maximum number of results to return
 
         Returns:
-            Sorted list of matching notes. A6 fix: ``matched_image`` /
+            Sorted list of matching notes. ``matched_image`` /
             ``has_matching_images`` are attached to per-request result copies
             only; the shared ``self.notes`` dicts are not mutated.
         """
@@ -424,10 +424,10 @@ class VibeSearch:
     def search(self, query: str, max_results: int = None) -> List[Dict[str, Any]]:
         """Search notes using RRF fusion of semantic, BM25 keyword, and image signals.
 
-        A6 fix: ``matched_image`` / ``has_matching_images`` are attached to
-        per-request result copies only; the shared ``self.notes`` dicts are no
-        longer mutated, so :meth:`search` is safe to call concurrently with
-        anything else that reads ``self.notes``.
+        ``matched_image`` / ``has_matching_images`` are attached to per-request
+        result copies only; the shared ``self.notes`` dicts are never mutated,
+        so :meth:`search` is safe to call concurrently with anything else that
+        reads ``self.notes``.
         """
         if not query.strip():
             return []
@@ -445,7 +445,7 @@ class VibeSearch:
         # Get BM25 keyword search scores (already as [(note_idx, score)])
         keyword_ranked = self._keyword_search(query)
 
-        # Get image search scores if enabled. A6: _image_search no longer mutates notes.
+        # Get image search scores if enabled. _image_search does not mutate notes.
         image_matches = self._image_search(query)
         image_ranked = [(idx, score) for idx, (score, _) in image_matches.items()]
 

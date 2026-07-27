@@ -19,11 +19,11 @@ from app.services.session_service import SessionService
 class RenameSessionRequest(BaseModel):
     """Body model for ``PATCH /api/chat/sessions/{id}``.
 
-    Titles routinely contain ``&``, ``#`` or ``/`` (B14a); a query parameter
-    makes correctness depend on the client's URL-encoding. The body sidesteps
-    that entirely. The old ``?title=`` query parameter is still accepted as a
-    deprecated alias so the client (owned by Lane O this wave, moved in T30)
-    keeps working until it switches over.
+    Titles routinely contain ``&``, ``#`` or ``/``; a query parameter makes
+    correctness depend on the client's URL-encoding. The body sidesteps that
+    entirely. The old ``?title=`` query parameter is still accepted as a
+    deprecated alias -- the bundled web client still sends it -- and can be
+    dropped once no caller relies on it.
     """
 
     title: str
@@ -196,8 +196,8 @@ def rename_session(
     body: Optional[RenameSessionRequest] = None,
     session_service: SessionService = Depends(get_session_service),
 ):
-    # B14a: prefer the JSON body; accept the legacy ``?title=`` query parameter
-    # as a deprecated alias for backward compatibility (the client moves in T30).
+    # Prefer the JSON body (safe for titles containing & # /); accept the legacy
+    # ``?title=`` query parameter as a deprecated alias for older callers.
     new_title = body.title if body is not None else title
     if new_title is None:
         raise HTTPException(

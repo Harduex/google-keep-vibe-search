@@ -3,8 +3,9 @@
 Reads a Google Keep Takeout export into the :class:`app.domain.SourceDoc` model:
 
 - ``listContent`` flattened into ``body`` as ``- [ ] item`` / ``- [x] item``
-  lines, appended after ``textContent`` when both are present (B3).
-- Keep ``labels[]`` → :attr:`SourceDoc.labels` (B3, free tag vocabulary).
+  lines, appended after ``textContent`` when both are present, so checklist
+  item text stays searchable.
+- Keep ``labels[]`` → :attr:`SourceDoc.labels`, giving a free tag vocabulary.
 - ``isTrashed`` notes are skipped (reason ``"trashed"``), not yielded.
 - Malformed JSON files are counted (reason ``"malformed"``), never raised.
 
@@ -28,8 +29,8 @@ from .base import ScanResult, Skip, register
 def _render_list_content(list_content: List[Dict[str, Any]]) -> str:
     """Render Keep checkbox items as ``- [ ] item`` / ``- [x] item`` lines.
 
-    Matches ``app.parser.render_list_content`` exactly so an imported Keep note
-    produces the same body the legacy parser would have stored in ``content``.
+    The rendering is byte-compatible with the original standalone Keep parser, so
+    re-importing an existing vault produces the same ``content`` it already had.
     """
     lines: List[str] = []
     for item in list_content:
@@ -119,9 +120,9 @@ class KeepTakeoutImporter:
             list_content = data.get("listContent")
             list_text = _render_list_content(list_content) if list_content else ""
 
-            # Same precedence as parser.py: free text + checklist joined by a
-            # newline when both have content; checklist alone otherwise; else
-            # the raw text content (possibly empty).
+            # Body precedence: free text + checklist joined by a newline when both
+            # have content; checklist alone otherwise; else the raw text content
+            # (possibly empty).
             if text_content.strip() and list_text.strip():
                 body = f"{text_content}\n{list_text}"
             elif list_text.strip():

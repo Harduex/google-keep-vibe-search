@@ -37,7 +37,7 @@ def test_stable_id_has_source_key_prefix():
 
 
 def test_stable_id_differs_for_different_external_ids():
-    """The whole point of A5: identity must not collapse across notes."""
+    """The whole point of stable_id: identity must not collapse across notes."""
     a = stable_id("keep", "note-1.json")
     b = stable_id("keep", "note-2.json")
     assert a != b

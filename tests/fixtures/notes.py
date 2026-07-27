@@ -28,7 +28,7 @@ def generate_synthetic_notes() -> List[Tuple[str, Dict[str, Any]]]:
         note.update(kwargs)
         return f"note_{id_num:02d}.json", note
 
-    # 1-5: Checkbox notes (listContent only) - B3
+    # 1-5: Checkbox notes (listContent only)
     for i in range(1, 6):
         notes.append(
             _make_note(
@@ -38,7 +38,7 @@ def generate_synthetic_notes() -> List[Tuple[str, Dict[str, Any]]]:
             )
         )
 
-    # 6-8: Notes carrying labels - B3b
+    # 6-8: Notes carrying labels
     for i in range(6, 9):
         notes.append(
             _make_note(

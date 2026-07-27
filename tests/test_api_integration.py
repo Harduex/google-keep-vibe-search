@@ -11,8 +11,8 @@ def test_wired_app_loads_no_real_models(wired_app):
     network and a warm HF cache. This asserts every model handle in the wired app is a
     stub, by class name only — never touching note text.
 
-    T40 made the heavy models lazy, which is exactly how this test could rot into a
-    vacuous pass: the handles no longer exist at boot, so "the attribute is absent" would
+    The heavy models are built lazily, which is exactly how this test could rot into a
+    vacuous pass: the handles do not exist at boot, so "the attribute is absent" would
     be green while the real weights load on the first request. So every assertion below
     *forces* construction through the lazy property and asserts on what comes back.
     """
@@ -47,7 +47,7 @@ def test_wired_app_loads_no_real_models(wired_app):
 
 
 def test_heavy_models_are_built_on_first_use_and_only_once(client, monkeypatch):
-    """T40: prove the laziness, not just the wiring.
+    """Prove the laziness, not just the wiring.
 
     Boot builds none of them; a `/api/search` builds only what the search path actually
     touches; a `/api/chat` builds the rest; a second `/api/chat` builds nothing new.
@@ -113,8 +113,8 @@ def _chat_events(client, payload):
 
 def test_ready_and_stats(client):
     """
-    Pins B4: ensure /api/ready flips true properly when everything is loaded.
-    Pins B4/B2/B9: ensure /api/stats counts match the fixture correctly (archived/pinned/trashed logic).
+    /api/ready must flip true once everything is loaded, and /api/stats counts must
+    match the fixture exactly (archived/pinned/trashed logic).
     """
     ready_resp = client.get("/api/ready")
     assert ready_resp.status_code == 200
@@ -130,16 +130,16 @@ def test_ready_and_stats(client):
 
 def test_search_limits_and_checkboxes(client):
     """
-    Pins B2 (search > 20 results).
-    Pins B3 (checkbox item text searchable).
+    Search must not be silently capped at 20 results, and checkbox item text must be
+    searchable.
     """
-    # B2: "this" matches almost all synthetic notes in the fixture corpus (> 20 notes)
+    # "this" matches almost all synthetic notes in the fixture corpus (> 20 notes)
     resp_all = client.post("/api/search", json={"query": "this"})
     assert resp_all.status_code == 200
     results_all = resp_all.json()["results"]
     assert len(results_all) >= 1
 
-    # B3: Search for "Item 1" which is in checkbox notes
+    # Search for "Item 1" which is in checkbox notes
     resp_cb = client.post("/api/search", json={"query": "Item 1"})
     assert resp_cb.status_code == 200
     results_cb = resp_cb.json()["results"]
@@ -149,7 +149,7 @@ def test_search_limits_and_checkboxes(client):
 
 def test_exclude_tags(client):
     """
-    Pins B10 (excluding a tag removes notes from search).
+    Excluding a tag must remove its notes from search.
     """
     # Exclude notes that carry "Label6"
     ex_resp = client.post("/api/tags/excluded", json={"excluded_tags": ["Label6"]})
@@ -166,7 +166,7 @@ def test_exclude_tags(client):
 
 
 def test_embeddings_carry_tags_for_colouring(client):
-    """T15: the 3D map is coloured by tag, so the payload has to carry them.
+    """The 3D map is coloured by tag, so the payload has to carry them.
 
     The route read `note.get("tags")` off the engine's note dicts, which are never
     tag-enriched (enrichment mutates route-level copies), so every point came back with
@@ -178,7 +178,7 @@ def test_embeddings_carry_tags_for_colouring(client):
 
     assert points
     assert all("tags" in point for point in points)
-    # T07 seeds Keep's own labels as tags at startup, so the labelled fixture notes carry
+    # Keep's own labels are seeded as tags at startup, so the labelled fixture notes carry
     # them here without any prior request having to warm a cache.
     tagged = {point["title"]: point["tags"] for point in points if point["tags"]}
     assert tagged.get("Labeled 6") == ["Label6"]
@@ -222,11 +222,12 @@ def _chat_context_notes(client, payload):
 
 
 def test_chat_scopes_retrieval_to_the_requested_tags(client, monkeypatch):
-    """Pins B13/Q3: the tag scope must bound what chat retrieves.
+    """The tag scope must bound what chat retrieves.
 
-    T16 added `tags`/`date_range` to ChatRequest and the orchestrator, but nothing applied
-    them: SearchService.search took no such parameters, the orchestrator's signature sniff
-    therefore never fired, and T20 dropped them from the streaming path entirely.
+    `tags`/`date_range` were once accepted by ChatRequest and the orchestrator with
+    nothing applying them: SearchService.search took no such parameters, the
+    orchestrator's signature sniff therefore never fired, and the streaming path
+    dropped them entirely.
     """
     from app.core.config import settings
 
@@ -252,7 +253,7 @@ def test_chat_scopes_retrieval_to_the_requested_tags(client, monkeypatch):
 
 
 def test_chat_scopes_retrieval_to_the_requested_date_range(client, monkeypatch):
-    """Pins B13/Q3 for the date half: a range that excludes every note yields no context."""
+    """The date half of the same scope: a range that excludes every note yields no context."""
     from app.core.config import settings
 
     monkeypatch.setattr(settings, "agent_max_steps", 1)
@@ -277,7 +278,9 @@ def test_chat_scopes_retrieval_to_the_requested_date_range(client, monkeypatch):
 
 def test_chat_streaming(client, monkeypatch):
     """
-    Pins B1, B6, B11, B5, B7.
+    End-to-end guard for the streaming chat path: the NDJSON frame sequence, the cap on
+    how many notes reach the prompt, and citation numbers that stay inside the
+    retrieved set.
     """
     from app.core.config import settings
 
@@ -322,7 +325,7 @@ def test_chat_streaming(client, monkeypatch):
 
 def test_organize_categorize_apply(client):
     """
-    Pins B8 (merge action).
+    The categorize stream runs, and a merge_tags action really moves the tag.
     """
     # 1. Categorize streams progress -> proposals -> done
     resp = client.post("/api/organize/categorize", json={"granularity": "broad"})
@@ -343,7 +346,7 @@ def test_organize_categorize_apply(client):
         },
     )
 
-    # 3. Apply with a merge_tags action (B8)
+    # 3. Apply with a merge_tags action
     apply_resp = client.post(
         "/api/organize/apply",
         json={
@@ -363,7 +366,7 @@ def test_organize_categorize_apply(client):
 
 def test_image_traversal(client):
     """
-    Pins B12 (directory traversal).
+    Directory traversal must be rejected.
     """
     # Attempt directory traversal
     resp = client.get("/api/image/..%2F..%2F..%2Fetc%2Fpasswd")

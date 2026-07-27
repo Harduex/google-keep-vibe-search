@@ -64,7 +64,7 @@ def test_ready_endpoint_returns_true(monkeypatch):
 
 
 def test_boot_defers_the_heavy_models(monkeypatch):
-    """T40: booting must not construct the reranker, the NLI model, grounding or chunks.
+    """Booting must not construct the reranker, the NLI model, grounding or chunks.
 
     An external spy, not the app's own bookkeeping: each heavy class is replaced in
     `app.core.lifespan` by a counting stand-in, so a construction anywhere on the boot

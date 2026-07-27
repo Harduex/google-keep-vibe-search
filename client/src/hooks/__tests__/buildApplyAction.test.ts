@@ -61,7 +61,7 @@ describe('buildApplyAction', () => {
   });
 
   it('tags a classic merge with the target name, never with its own name', () => {
-    // Regression for B8, both halves. First the Merge button dropped mergeTarget and
+    // Regression for both halves of an old bug. First the Merge button dropped mergeTarget and
     // tagged the notes with their own name (behaved as approve). Then the fix emitted
     // merge_tags for a source tag that was never applied, so the backend raised KeyError
     // and skipped it — the notes ended up with no tag at all. Merging a proposal means

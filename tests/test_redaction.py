@@ -1,10 +1,10 @@
-"""T41 — every raw exception string is redacted at the boundaries.
+"""Every raw exception string is redacted at the boundaries.
 
-Finding P1: LiteLLM/httpx provider exceptions quote the failed **request body**,
-and this app's request bodies embed sampled note text
-(``Title: … / Snippet: …``). So ``str(e)`` in an HTTP detail, a streamed
-``error`` frame, a ``print()``, or an ``AgentStep.reasoning`` is a note-text
-leak. T10 fixed the one site it owned; this sweep covers the rest.
+LiteLLM/httpx provider exceptions quote the failed **request body**, and this
+app's request bodies embed sampled note text (``Title: … / Snippet: …``). So
+``str(e)`` in an HTTP detail, a streamed ``error`` frame, a ``print()``, or an
+``AgentStep.reasoning`` is a note-text leak. These tests cover every such
+boundary, not just the one that originally leaked.
 
 These tests are hermetic: they never run a real model or send a real prompt.
 Each one feeds the boundary a **synthetic** exception whose message carries a
@@ -93,7 +93,7 @@ def test_safe_meta_short_string_passthrough():
 
 
 # --------------------------------------------------------------------------- #
-# Route boundaries — the response body is the leak surface for P1.
+# Route boundaries — the response body is the leak surface.
 # We override the route's service dependency with a stub that raises a
 # sentinel-carrying provider exception, then assert the sentinel never reaches
 # the HTTP detail.

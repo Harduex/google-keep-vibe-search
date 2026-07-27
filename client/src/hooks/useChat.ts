@@ -315,7 +315,7 @@ export const useChat = () => {
       setMessages((prev) => [...prev, assistantMessage]);
 
       // Prepare request data
-      // Scope (B13/Q3): omit both keys entirely when unset, so an empty chip row is not
+      // Scope: omit both keys entirely when unset, so an empty chip row is not
       // sent as an empty filter the backend would have to special-case.
       const scopedDates = dateRange.start || dateRange.end ? dateRange : undefined;
       const payload = {

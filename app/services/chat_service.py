@@ -247,7 +247,8 @@ class ChatService:
             )
         except LLM_CALL_ERRORS as e:
             # Suggestions are optional garnish, so a provider/transport failure degrades
-            # quietly. Programming errors are deliberately not caught here (see B1).
+            # quietly. Programming errors are deliberately not caught here: a bare
+            # `except Exception` once hid a NameError on this path for months.
             # Type name only: LiteLLM exception strings embed the request body.
             print(f"[suggestions] LLM call failed: {safe_exc(e)}")
             return []

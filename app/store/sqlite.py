@@ -4,8 +4,8 @@ Schema per ``docs/audit/ARCHITECTURE-PROPOSAL.md`` §1:
 
 - ``documents`` — PK ``id``, ``UNIQUE(source_key, external_id)``, ``deleted_at``
   for soft delete.
-- ``tags`` / ``doc_tags`` — tags as a join table (fixes A15). ``doc_tags`` rows
-  survive a soft delete; only a hard delete cascades.
+- ``tags`` / ``doc_tags`` — tags as a join table rather than a denormalised
+  column. ``doc_tags`` rows survive a soft delete; only a hard delete cascades.
 - ``imports`` — per-run history (added/updated/removed/unchanged/restored).
 - ``index_state`` — per-index staleness ledger plus ``schema_version``
   (migration hook; no data migration is performed here).
@@ -269,8 +269,8 @@ class SQLiteStore:
         A document is written only if it is new, if its ``content_hash``
         differs from the stored row, or if it was previously soft-deleted (in
         which case ``deleted_at`` is cleared). Re-upserting the same documents
-        returns ``written == 0`` — this is the A4 idempotence invariant the
-        benchmark measures.
+        returns ``written == 0`` — the idempotence invariant the benchmark
+        measures.
 
         Returns counts so callers can report per-bucket deltas without a second
         pass.
@@ -545,7 +545,7 @@ class SQLiteStore:
         content_hash: Optional[str] = None,
         row_count: Optional[int] = None,
     ) -> None:
-        """Upsert one index's staleness record (per-index invalidation, A3)."""
+        """Upsert one index's staleness record (per-index invalidation)."""
         with self._write_lock:
             conn = self._conn()
             existing = conn.execute("SELECT 1 FROM index_state WHERE name = ?", (name,)).fetchone()

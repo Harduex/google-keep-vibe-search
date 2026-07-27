@@ -1,20 +1,19 @@
-"""Contract tests for the diff/upsert ingestion pipeline (T24).
+"""Contract tests for the diff/upsert ingestion pipeline.
 
 Every test here uses synthetic SourceDocs built in memory plus a deterministic
 fake embedder (hash → fixed-dim vector). Nothing reads the real export, the
 real cache, or any real model weights — see AGENTS.md privacy boundary.
 
-These tests ARE the contract for the seven ingestion behaviours T24 names,
-in order:
+These tests ARE the contract for the seven ingestion behaviours, in order:
 
 1. import twice → second run reports all ``unchanged``, zero writes, zero
    embeddings;
 2. edit one note's body → exactly 1 ``updated``, and only that document is
    re-embedded;
-3. add 12 notes to a 2,000-note store → 12 embeddings, not 2,012 (A4);
+3. add 12 notes to a 2,000-note store → 12 embeddings, not 2,012;
 4. drop a note from the export → ``removed``, ``doc_tags`` survive, re-import
    restores it (round-trip);
-5. rename every source file → zero ``added`` (A5 regression guard);
+5. rename every source file → zero ``added`` (stable-identity regression guard);
 6. two ``source_key``s coexist and re-import independently;
 7. ``dry_run`` writes nothing (assert store mtime and row counts unchanged).
 """
@@ -44,7 +43,7 @@ class FakeEmbedder:
     """Hash the text into a fixed-dim float32 vector.
 
     Records every call so tests can assert exactly how many embeddings were
-    produced (the A4 assertion: 12 new notes → 12 embeddings, not 2,012).
+    produced (12 new notes → 12 embeddings, not 2,012).
     """
 
     def __init__(self, dim: int = 16):
@@ -171,16 +170,16 @@ def test_edit_one_note_yields_one_update_one_embedding(
 
 
 # --------------------------------------------------------------------------- #
-# 3. Add 12 notes to a 2,000-note store → 12 embeddings, not 2,012 (A4).
+# 3. Add 12 notes to a 2,000-note store → 12 embeddings, not 2,012.
 # --------------------------------------------------------------------------- #
 
 
 def test_add_12_to_2000_note_store_is_12_embeddings(service: IngestService, embedder: FakeEmbedder):
-    """Contract #3 / A4 fix: incremental import embeds only the deltas.
+    """Contract #3: incremental import embeds only the deltas.
 
     The store is seeded with 2,000 synthetic documents and their vectors
     directly (no importer involved), then a ChangeSet carrying 12 added +
-    2,000 unchanged is applied. The assertion is the A4 invariant: only the
+    2,000 unchanged is applied. The invariant asserted is that only the
     12 new content_hashes are embedded, not all 2,012.
     """
     base_docs = to_documents("keep", _srcs(2000))
@@ -201,7 +200,7 @@ def test_add_12_to_2000_note_store_is_12_embeddings(service: IngestService, embe
     )
     service._embed_new_hashes(cs)
 
-    # The A4 assertion: exactly 12 embeddings, not 2,012.
+    # The assertion: exactly 12 embeddings, not 2,012.
     assert embedder.embedded_count == 12
 
 
@@ -262,19 +261,19 @@ def test_drop_then_reimport_restores_with_tags_intact(service: IngestService, st
 
 
 # --------------------------------------------------------------------------- #
-# 5. Rename every source file → zero ``added`` (A5 regression guard).
+# 5. Rename every source file → zero ``added`` (stable-identity regression guard).
 # --------------------------------------------------------------------------- #
 
 
 def test_renaming_every_source_file_yields_zero_added(
     service: IngestService, embedder: FakeEmbedder
 ):
-    """Contract #5 / A5: identity is keyed on external_id, not filename.
+    """Contract #5: identity is keyed on external_id, not filename.
 
     The markdown importer derives ``external_id`` from the relative path, so
     renaming a file *does* change its external_id — and that is the
     deliberate, documented behaviour (renaming is a real identity change for
-    a markdown vault). To prove the stable_id half of the A5 fix in
+    a markdown vault). To prove the stable_id half of that behaviour in
     isolation, we instead feed the ingest pipeline a list of SourceDocs
     directly via ``compute_change_set``: the same external_ids with renamed
     surrounding filenames must produce zero ``added``.

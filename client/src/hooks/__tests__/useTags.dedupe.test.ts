@@ -7,7 +7,7 @@ import { useTags } from '../useTags';
 const originalFetch = global.fetch;
 
 /**
- * A11/T30: `useTags` is mounted by 7 components, and before the data layer it
+ * `useTags` is mounted by 7 components, and before the data layer it
  * fired its own `/api/tags` + `/api/tags/excluded` request on every mount.
  * Three mounts of `useTags` must now share a single request per endpoint.
  */

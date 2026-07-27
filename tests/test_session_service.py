@@ -172,7 +172,7 @@ class TestSessionService:
 
 
 # --------------------------------------------------------------------------- #
-# B16 — honest exception handling (regression: the old `except (..., Exception)`
+# Honest exception handling (regression: the old `except (..., Exception)`
 # caught programming errors and returned None, making a corrupt file and a bug
 # indistinguishable).
 # --------------------------------------------------------------------------- #
@@ -198,7 +198,7 @@ class TestHonestExceptionHandling:
 
     def test_load_session_propagates_unexpected_errors(self, session_service):
         # A programming error (AttributeError from a broken __init__) must NOT
-        # be swallowed into None — that is the bug B16 describes. We force an
+        # be swallowed into None — that is the bug this guards. We force an
         # unexpected exception inside the open/json.load path and assert it
         # raises rather than turning into a silent None.
         created = session_service.create_session("real")
@@ -228,7 +228,7 @@ class TestHonestExceptionHandling:
 
 
 # --------------------------------------------------------------------------- #
-# B14b — cheap listing: the sidebar needs id/title/message_count/updated_at
+# Cheap listing: the sidebar needs id/title/message_count/updated_at
 # only, so list_sessions must NOT decode message bodies.
 # --------------------------------------------------------------------------- #
 class TestCheapListing:
@@ -287,7 +287,7 @@ class TestCheapListing:
 
 
 # --------------------------------------------------------------------------- #
-# B14a — body-based rename, query param kept as a deprecated alias.
+# Body-based rename, query param kept as a deprecated alias.
 # --------------------------------------------------------------------------- #
 @pytest.fixture
 def app_with_router(session_service):

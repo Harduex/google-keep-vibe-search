@@ -1,7 +1,7 @@
 """Tests for VibeSearch's store-backed build/apply interface.
 
 The legacy whole-corpus embedding cache (``VibeSearch(notes, force_refresh=...)``
-→ ``embeddings.npz`` + ``notes_hash.json``) was deleted in T42. The only
+→ ``embeddings.npz`` + ``notes_hash.json``) has been deleted. The only
 construction path now is :meth:`VibeSearch.from_model` plus :meth:`build` /
 :meth:`apply` against an isolated :class:`VectorStore`. These tests pin that
 interface.
@@ -14,7 +14,7 @@ from app.search import VibeSearch
 from app.store import VectorStore
 
 # ---------------------------------------------------------------------- #
-# Store-backed build/apply interface (T25)
+# Store-backed build/apply interface
 # ---------------------------------------------------------------------- #
 
 
@@ -76,7 +76,7 @@ def test_build_indexes_all_documents_and_searches(tmp_path):
 
 
 def test_build_is_idempotent_when_vectors_already_stored(tmp_path):
-    """A second build with the same documents encodes nothing (A4 property)."""
+    """A second build with the same documents encodes nothing (idempotence)."""
     model = CountingModel()
     vs = VectorStore(tmp_path / "vibe", dim=model.dim)
     engine = VibeSearch.from_model(model, vector_store=vs)
@@ -90,7 +90,7 @@ def test_build_is_idempotent_when_vectors_already_stored(tmp_path):
 
 
 def test_apply_only_embeds_added_and_updated(tmp_path):
-    """apply() must embed only added∪updated — the A4 fix."""
+    """apply() must embed only added∪updated."""
     model = CountingModel()
     vs = VectorStore(tmp_path / "vibe", dim=model.dim)
     engine = VibeSearch.from_model(model, vector_store=vs)
@@ -132,7 +132,7 @@ def test_apply_drops_removed_vector_from_store(tmp_path):
 
 
 def test_search_does_not_mutate_shared_notes(tmp_path):
-    """A6 fix: search() must not write matched_image / has_matching_images
+    """search() must not write matched_image / has_matching_images
     into the shared ``self.notes`` dicts."""
     model = CountingModel()
     vs = VectorStore(tmp_path / "vibe", dim=model.dim)

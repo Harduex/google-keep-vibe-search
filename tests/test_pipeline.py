@@ -1,6 +1,6 @@
 """Tests for the merged tagging pipeline's manifest stability and incremental mode.
 
-These cover the v2 features that the wave-6 merge (T27) folded into the single
+These cover the features that were folded into the single
 ``CategorizationService``:
 
 - the tag-name/centroid manifest (``tag_manifest.json``) and its

@@ -46,7 +46,7 @@ export const buildApplyAction = (state: ProposalState): ApplyActionPayload | nul
     // A classic proposal staged for merge carries `mergeTarget` (set by `mergeProposals`
     // from the target proposal's tag_name). If it's missing there is nothing to merge
     // into, so drop the action rather than falling back to "approve", which would tag the
-    // notes with their own name (B8).
+    // notes with their own name.
     //
     // Merging a *proposal* means "tag this cluster's notes with the target name" — so it
     // is an approve under the target's name, not `merge_tags`. `merge_tags` renames a tag

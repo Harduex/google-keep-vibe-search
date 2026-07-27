@@ -44,7 +44,7 @@ def _count_clusters(labels: np.ndarray) -> int:
 
 
 def test_cluster_notes_specific_yields_more_clusters_than_broad():
-    """B4: the granularity selector must actually change clustering outcomes.
+    """The granularity selector must actually change clustering outcomes.
 
     ``specific`` requests smaller ``min_cluster_size`` / ``min_samples`` than
     ``broad`` (see ``_get_cluster_sizing``), so on a corpus with several
@@ -91,7 +91,7 @@ def test_cluster_notes_specific_yields_more_clusters_than_broad():
 
 
 def test_cluster_notes_with_precomputed_reduced_does_not_reduce_again():
-    """B4: passing ``reduced`` must skip the internal UMAP reduction entirely.
+    """Passing ``reduced`` must skip the internal UMAP reduction entirely.
 
     A pre-reduced array is the contract the categorization service uses to
     guarantee one UMAP pass per run. We spy on ``reduce_embeddings`` and
@@ -115,7 +115,7 @@ def test_cluster_notes_with_precomputed_reduced_does_not_reduce_again():
 
 
 def test_cluster_notes_without_reduced_reduces_exactly_once():
-    """B4: the default path (no pre-reduced array) reduces exactly once.
+    """The default path (no pre-reduced array) reduces exactly once.
 
     Backward-compat for callers like ``bench/run_tagging.py`` that call
     ``cluster_notes(embeddings)`` with no sizing context.

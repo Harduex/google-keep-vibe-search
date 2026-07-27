@@ -13,7 +13,7 @@ export interface ChatScopeProps {
 }
 
 /**
- * Tag + date scope for chat retrieval (B13/Q3), the replacement for the old Topic input.
+ * Tag + date scope for chat retrieval, the replacement for the old Topic input.
  *
  * Whatever is set here bounds every probe the agent makes, so an empty scope means "the
  * whole corpus" — the same default as before.

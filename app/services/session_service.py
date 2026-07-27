@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 # Summary fields the sidebar needs. ``messages`` is deliberately NOT here: the
 # listing path materialises only these scalars plus a count of messages, never
-# the message bodies (B14b).
+# the message bodies.
 _SUMMARY_FIELDS = ("id", "title", "updated_at")
 
 
@@ -201,7 +201,7 @@ class SessionService:
                 data = json.load(f)
             return ChatSession(**data)
         except (OSError, json.JSONDecodeError, ValidationError) as e:
-            # B16: catch only what we expect (IO, malformed JSON, schema
+            # Catch only what we expect (IO, malformed JSON, schema
             # mismatch) and log the exception *type* — never the message, which
             # may quote a session file's contents. Anything else is a bug and
             # must propagate, not be swallowed into a silent None.
@@ -227,7 +227,7 @@ class SessionService:
         return False
 
     def list_sessions(self) -> List[ChatSessionSummary]:
-        """Render the sidebar cheaply (B14b).
+        """Render the sidebar cheaply.
 
         Reads only the summary scalars (id, title, updated_at) and a count of
         messages; the message bodies are skipped over with a bracket counter
@@ -246,7 +246,7 @@ class SessionService:
                     text = f.read()
                 fields, message_count = _read_summary_fields(text)
             except (OSError, json.JSONDecodeError, ValidationError, KeyError, ValueError) as e:
-                # B16: same honest contract as load_session — log the type,
+                # Same honest contract as load_session — log the type,
                 # skip the file, let unexpected errors propagate.
                 logger.warning(f"[sessions] list skip: {safe_exc(e)} {safe_meta(file=filename)}")
                 continue

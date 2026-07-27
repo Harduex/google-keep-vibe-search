@@ -127,7 +127,7 @@ report it instead of working around it.
 | T34 | 6 S | 1 | Session service hygiene | B14, B16 | ¼ d | done |
 | T35 | 3 T | 1 | Benchmark corpora, scale generator, shared metrics | T4 | 1 d | done (loader fixed in review) |
 | T36 | 3 T | 2 | Signal ablation, tagging correctness, baseline gate | T4 | 1 d | done (rebuilt in review) |
-| T37 | 8 — | 1 | Production-readiness comment sweep + pre-push safety audit | — | ½ d | todo |
+| T37 | 8 — | 1 | Production-readiness comment sweep + pre-push safety audit | — | ½ d | done (`__T37SHA__`; AST-identical, 50 files; audit verdict SAFE TO PUBLISH) |
 | T39 | 7 U | 1 | Loopback-only posture: CORS, body cap, rate limit | H8 | ½ d | done (landed early in `a4588b5`) |
 | T40 | 7 V | 1 | Construct reranker/NLI/grounding models on first use | A7 (completion) | ½ d | done (`5736d27`; cold start −11% CPU / −5% GPU — boot now dominated by `EntityService`, see follow-ups) |
 | T41 | 7 W | 1 | Route every raw exception string through `safe_exc` | P1–P3 (completion) | ½ d | done (`63793cf`; 20 sites at the parent commit, not the spec's 22) |

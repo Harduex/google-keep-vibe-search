@@ -92,7 +92,7 @@ def build_rankers(
             return fused_ids
         window = [engine.notes[id_to_idx[nid]] for nid in fused_ids[:RERANK_WINDOW]]
         reranked = reranker.rerank(query, window, top_k=len(window))
-        # Keep the tail: the window is a reranking bound, not a result cap (B2).
+        # Keep the tail: the window is a reranking bound, not a result cap.
         return [note["id"] for note in reranked] + fused_ids[RERANK_WINDOW:]
 
     return {

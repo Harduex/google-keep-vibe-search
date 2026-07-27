@@ -234,7 +234,7 @@ describe('useOrganize proposal survival', () => {
   });
 
   it('keeps the proposals when an apply tagged nothing', async () => {
-    // The B8 experience: apply reported "Applied 0 tags to 0 notes" and the client cleared
+    // Regression: apply reported "Applied 0 tags to 0 notes" and the client cleared
     // the list anyway, discarding a generation that cost hundreds of LLM calls.
     applyResult = { message: 'Applied 0 tags to 0 notes', tags_created: 0, notes_tagged: 0 };
     const { result } = renderHook(() => useOrganize());
@@ -406,7 +406,7 @@ describe('useOrganize streamed proposals (T38)', () => {
   });
 
   it('a staged merge stays on its intended target after 50 more proposals arrive', async () => {
-    // The T38 bug (item 6): with positional indices, opening a merge dropdown and staging a
+    // Regression: with positional indices, opening a merge dropdown and staging a
     // merge onto target N, then having 50 more proposals stream in, shifted the index so the
     // staged merge silently retargeted. Keying by tag name keeps it on its target.
     const { result } = renderHook(() => useOrganize());

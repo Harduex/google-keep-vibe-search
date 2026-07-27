@@ -1,6 +1,6 @@
-"""T29 — reuse stored vectors on the chat hot path.
+"""Reuse stored vectors on the chat hot path.
 
-Regression coverage for A8: the orchestrator and the conflict detector must read
+The orchestrator and the conflict detector must read
 already-indexed note vectors out of the engine's ``VectorStore`` instead of
 re-encoding the same note text on every chat message, and ``detect_conflicts``
 must bound its O(N^2) + NLI cost.

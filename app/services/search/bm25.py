@@ -85,7 +85,7 @@ class BM25Index:
         self.tokens: List[List[str]] = []
         self.df: Dict[str, int] = {}
         self.avgdl: float = 0.0
-        # Precomputed at build() time (finding A9): per-doc term frequencies, doc
+        # Precomputed at build() time: per-doc term frequencies, doc
         # lengths, normalized text for the phrase bonus, and an inverted index
         # (term -> sorted doc indices) so search() only visits documents that share
         # a query term, instead of rescanning every note on every query.

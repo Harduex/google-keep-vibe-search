@@ -4,7 +4,7 @@ Runs the real embed → UMAP → HDBSCAN path over 20 Newsgroups and scores the 
 against the 20 known labels with ARI / NMI / V-measure, plus the share of documents left
 unclustered and the cluster count.
 
-This is the only measurement in the plan that can say tagging got *better* rather than
+This is the only measurement in the repo that can say tagging got *better* rather than
 merely more stable. It scores the grouping, not the tag names: naming is one LLM call per
 cluster and the label set here has no ground-truth names to score against, so the LLM is
 not called at all and `llm_calls` is reported as 0.

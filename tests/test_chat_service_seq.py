@@ -173,7 +173,7 @@ async def test_stream_agentic_seq_numbers(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_agentic_passes_configured_max_steps(monkeypatch):
-    """B7: AGENT_MAX_STEPS was ignored — the function default always won."""
+    """Regression: AGENT_MAX_STEPS was ignored — the function default always won."""
     monkeypatch.setattr(settings, "agent_max_steps", 3)
     calls = []
     monkeypatch.setattr(
@@ -190,7 +190,7 @@ async def test_agentic_passes_configured_max_steps(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_agentic_passes_tag_lookup_from_note_service(monkeypatch):
-    """B5: the agent needs an explicit note-id -> tags map; notes are never tag-enriched."""
+    """The agent needs an explicit note-id -> tags map; notes are never tag-enriched."""
 
     class StubNoteService:
         note_tags = {"n1": ["recipes"]}
@@ -210,10 +210,10 @@ async def test_agentic_passes_tag_lookup_from_note_service(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_stream_forwards_the_user_scope_to_the_agent(monkeypatch):
-    """B13/Q3: the route accepts tags/date_range and the stream path used to drop both.
+    """The route accepts tags/date_range and the stream path used to drop both.
 
-    T20 removed the only branch that forwarded them, so a scoped chat request searched the
-    whole corpus.
+    The only branch that forwarded them was removed with the legacy chat path, so a
+    scoped chat request searched the whole corpus.
     """
     calls = []
     monkeypatch.setattr(
@@ -236,7 +236,7 @@ async def test_stream_forwards_the_user_scope_to_the_agent(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_agentic_caps_prompt_notes_to_context_budget(monkeypatch):
-    """B6: agent mode injected every collected note (up to 250) into the prompt."""
+    """Regression: agent mode injected every collected note (up to 250) into the prompt."""
     collected = [{"id": f"n{i}", "title": f"Note {i}", "content": "Content"} for i in range(100)]
     calls = []
     monkeypatch.setattr(
@@ -269,11 +269,11 @@ async def test_agentic_caps_prompt_notes_to_context_budget(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_citations_outside_the_retrieved_set_are_stripped(monkeypatch):
-    """B11: `[Note #N]` markers pointing past the retrieved set used to reach the client.
+    """`[Note #N]` markers pointing past the retrieved set used to reach the client.
 
-    The path that skipped verification was deleted in T20, so this now guards the single
-    remaining stream path against the same regression. The agent loop is stubbed: since
-    T20 there is no non-agentic branch to fall back on, so a test that leaves it real
+    The path that skipped verification has been deleted, so this guards the single
+    remaining stream path against the same regression. The agent loop is stubbed:
+    there is no non-agentic branch to fall back on, so a test that leaves it real
     drives a live LLM call and blocks on the step timeout.
     """
     monkeypatch.setattr(
@@ -295,12 +295,12 @@ async def test_citations_outside_the_retrieved_set_are_stripped(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_stream_error_frame_carries_only_the_exception_type(capsys):
-    """P1: the generation prompt embeds note text, and LiteLLM quotes the failed request
+    """The generation prompt embeds note text, and LiteLLM quotes the failed request
     body in its exception message — so `str(e)` on this path can carry notes into the
     error frame and into anything capturing stdout. Only the type may cross.
 
     Asserts on a synthetic marker and a boolean, so a failure cannot itself print note
-    text (T10's methodology).
+    text.
     """
     marker = "SYNTHETIC-REQUEST-BODY-MARKER"
     llm = DummyLLM(stream_error=RuntimeError(f"provider rejected: {{'messages': ['{marker}']}}"))
@@ -320,7 +320,7 @@ async def test_stream_error_frame_carries_only_the_exception_type(capsys):
 
 @pytest.mark.asyncio
 async def test_generate_suggestions_returns_questions():
-    """B1: FOLLOW_UP_PROMPT was never imported, so this always returned []."""
+    """Regression: FOLLOW_UP_PROMPT was never imported, so this always returned []."""
     chat = _make_chat(DummyRetrieval(), DummyLLM(completion="What next?\nWhy that?"))
 
     suggestions = await chat._generate_suggestions("answer", [{"id": "n1"}])
@@ -330,7 +330,7 @@ async def test_generate_suggestions_returns_questions():
 
 @pytest.mark.asyncio
 async def test_generate_suggestions_does_not_swallow_programming_errors():
-    """Guard for B1: a bare `except Exception` hid the NameError for months."""
+    """A bare `except Exception` here once hid the NameError for months."""
     chat = _make_chat(DummyRetrieval(), DummyLLM(error=NameError("boom")))
 
     with pytest.raises(NameError):

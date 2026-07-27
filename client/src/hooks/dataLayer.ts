@@ -1,7 +1,7 @@
 /**
  * Minimal in-house data layer for non-streaming GET endpoints.
  *
- * Background (audit finding A11 / task T30): the four read hooks (`useTags`,
+ * Background: the four read hooks (`useTags`,
  * `useStats`, `useAllNotes`, `useEmbeddings`) each held their own `useState` +
  * raw `fetch`, with no cache, dedupe or invalidation. `useTags` is mounted by
  * 7 components and auto-fetched two endpoints on mount, so each mount fired a

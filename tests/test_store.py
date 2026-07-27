@@ -1,4 +1,4 @@
-"""Tests for the SQLite document store and the mmapped vector store (T22).
+"""Tests for the SQLite document store and the mmapped vector store.
 
 All data here is synthetic — random ids, hashes, and vectors generated inline.
 Nothing reads the real export or ``cache/`` (privacy boundary, AGENTS.md).
@@ -100,7 +100,7 @@ class TestUpsert:
         assert r1.updated == 0
         assert r1.unchanged == 0
 
-        # Re-upserting the same docs is a no-op — the A4 idempotence invariant.
+        # Re-upserting the same docs is a no-op — the idempotence invariant.
         r2 = store.upsert_many(docs)
         assert r2.written == 0
         assert r2.added == 0

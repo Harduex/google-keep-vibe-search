@@ -2,8 +2,8 @@
 
 Two implementations ship today:
 
-- :class:`KeepTakeoutImporter` (``key="keep-takeout"``) — today's ``parser.py``
-  logic, now yielding :class:`app.domain.SourceDoc`.
+- :class:`KeepTakeoutImporter` (``key="keep-takeout"``) — the Google Keep Takeout
+  reader, yielding :class:`app.domain.SourceDoc`.
 - :class:`MarkdownDirImporter` (``key="markdown-dir"``) — Obsidian-style vault.
 
 ``POST /api/imports`` looks an importer up here by ``key`` via

@@ -63,13 +63,13 @@ class TestScriptsImportBenchFirst:
     They protect `tests/` (autouse fixture) and `bench/` (import-time CACHE_DIR pin).
     Nothing protected `scripts/`, and that is where the live damage path was:
     `scripts/eval_categorization.py` imported `app.core.config` with no redirect, so
-    `settings` bound to the real `cache/`. Post-T26 `NoteService.load_notes` reads the
-    store rather than parsing `google_keep_path`, so `load_notes(force_refresh=True)`
+    `settings` bound to the real `cache/`. `NoteService.load_notes` reads the store
+    rather than parsing `google_keep_path`, so `load_notes(force_refresh=True)`
     ran IngestService against the real `store.db` and soft-deleted every document
     absent from the synthetic import — the entire corpus.
 
-    Redirecting `settings.google_keep_path` was sufficient isolation when T14 wrote
-    that script and silently stopped being sufficient when T26 landed. The lesson is
+    Redirecting `settings.google_keep_path` was sufficient isolation when that script
+    was written, and silently stopped being sufficient once the store landed. The lesson is
     structural, so this asserts the import order for *every* script, not just the one
     that broke: a runner that touches an app module must import `bench` first.
 

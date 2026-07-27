@@ -1,12 +1,11 @@
 """Content-hash embedding cache for note tagging, backed by the store vector layer.
 
-Per the wave-6 tagging unification (T27), the content-hash embedding cache is
-backed by :class:`app.store.VectorStore` (T22) instead of a hand-rolled JSON
-map. ``VectorStore`` is exactly the invariant this cache needs: vectors keyed
-by ``content_hash`` in one memory-mapped ``.npy`` matrix plus an id↔row map, so
-the same text never re-encodes and incremental runs reuse stored vectors. Vectors
-stay out of JSON, so a large vault no longer serialises megabytes of floats on
-every miss.
+The cache is backed by :class:`app.store.VectorStore` rather than a hand-rolled
+JSON map. ``VectorStore`` provides exactly the invariant this cache needs:
+vectors keyed by ``content_hash`` in one memory-mapped ``.npy`` matrix plus an
+id↔row map, so the same text never re-encodes and incremental runs reuse stored
+vectors. Vectors stay out of JSON, so a large vault does not serialise megabytes
+of floats on every miss.
 
 No note text is held here — only dense float vectors and the SHA-256 hashes
 that name them.

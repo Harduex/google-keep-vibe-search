@@ -84,7 +84,7 @@ def test_apply_classic_then_merge_then_assign_ordering():
 
 
 def test_apply_merge_of_a_classic_proposal_tags_the_notes_with_the_target():
-    # B8, second half. A classic proposal's own tag is never on disk, so emitting
+    # A classic proposal's own tag is never on disk, so emitting
     # merge_tags for it made rename_tag raise KeyError and the route skip the action:
     # the Merge button reported "Applied 0 tags to 0 notes" and left the notes untagged.
     # The client now sends the merge as an approve under the target's name — this is the
@@ -170,7 +170,7 @@ class TestPendingProposalSurvival:
         assert load_pending_proposals() is None
 
     def test_an_apply_that_tags_nothing_keeps_the_pending_set(self):
-        # The B8 shape: every action skipped server-side. Clearing here would throw away a
+        # Every action skipped server-side. Clearing here would throw away a
         # generation in exchange for nothing.
         svc = FakeNoteService()
         save_pending_proposals([{"tag_name": "Recipes", "note_ids": ["a"]}], "broad")
@@ -196,7 +196,7 @@ class TestPendingProposalSurvival:
 
 
 # --------------------------------------------------------------------------
-# T38 — staged actions store (the lock list) lives in the same artifact
+# Staged actions store (the lock list) lives in the same artifact
 # --------------------------------------------------------------------------
 
 
@@ -240,7 +240,7 @@ class TestStagedActionsStore:
 
 
 # --------------------------------------------------------------------------
-# T38 — streamed proposal frames: one per named cluster, correct shape/count
+# Streamed proposal frames: one per named cluster, correct shape/count
 # --------------------------------------------------------------------------
 
 
@@ -324,7 +324,7 @@ async def _collect_frames(service, fresh_manifest=True):
 
 @pytest.mark.asyncio
 async def test_one_proposal_frame_per_named_cluster_with_correct_shape():
-    """T38 Do-item 1: exactly one ``proposal`` frame per named cluster, and each frame's
+    """Exactly one ``proposal`` frame per named cluster, and each frame's
     payload matches one element of ``vocab.to_proposals()`` so the client keeps a single
     renderer."""
     embeddings, notes, note_indices = _two_cluster_corpus()
@@ -376,9 +376,8 @@ async def test_one_proposal_frame_per_named_cluster_with_correct_shape():
 
 @pytest.mark.asyncio
 async def test_empty_lock_list_is_byte_identical_to_baseline():
-    """T38 risk note: a run with an empty lock list must produce the SAME final vocabulary
-    as before the change. Consolidation with nothing staged is a no-op relative to the
-    pre-T38 path."""
+    """A run with an empty lock list must produce the SAME final vocabulary as a run
+    with no lock list at all: consolidation with nothing staged has to be a no-op."""
     embeddings, notes, note_indices = _two_cluster_corpus()
 
     def build():
@@ -420,7 +419,7 @@ async def test_empty_lock_list_is_byte_identical_to_baseline():
 
 @pytest.mark.asyncio
 async def test_a_locked_tag_survives_consolidation_while_unlocked_duplicates_merge():
-    """T38 Do-item 3 / design decision 1: a locked tag is excluded from consolidation in
+    """A locked tag is excluded from consolidation in
     both directions (never a source, never a target), so nothing the user decided can be
     undone by the machine. An unlocked duplicate is still consolidated.
 

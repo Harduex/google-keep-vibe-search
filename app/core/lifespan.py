@@ -40,7 +40,7 @@ class _Lazy:
     reference to each heavy service and guard it with `if self.<service>:`, so the
     placeholder forwards attribute access to the real object and is truthy *without*
     constructing anything. That keeps behaviour identical while moving the weight load
-    off the boot path (T40).
+    off the boot path, so startup stays fast and the models load on first request.
     """
 
     def __init__(self, factory: Callable[[], Any], label: str, counts: Counter):

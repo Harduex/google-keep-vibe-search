@@ -1,8 +1,8 @@
-"""Regression tests for the image route's path-traversal guard (audit finding B12).
+"""Regression tests for the image route's path-traversal guard.
 
 All fixtures are synthetic directory trees built under pytest's ``tmp_path`` —
 never the real Google Keep export or ``cache/`` — per the privacy boundary in
-AGENTS.md / EXECUTION-PROTOCOL.md.
+AGENTS.md.
 
 Traversal payloads are sent through the real HTTP layer (a `TestClient` against
 an app that only mounts `images.router`), with ".." segments percent-encoded
@@ -72,7 +72,7 @@ def test_legitimate_nested_image_returns_200(client):
 
 def test_sibling_prefix_escape_is_rejected(client):
     # base = .../data/Keep, target = .../data/Keep_other/secret.txt.
-    # This is the exact B12 payload: normpath+startswith admits it because
+    # This is the payload that broke the old guard: normpath+startswith admits it because
     # "/data/Keep_other" starts with the string "/data/Keep".
     resp = client.get("/api/image/%2e%2e/Keep_other/secret.txt")
     assert resp.status_code == 400

@@ -1,18 +1,18 @@
-"""Tests for the merged naming path (T27).
+"""Tests for the merged naming path.
 
-The wave-6 merge folded the v2 ``tagging/naming.py`` (PydanticAI-based, with
-the removed-API bug B15) into ``CategorizationService``. What survived is the
-shipped tool-calling naming prompt with its retry ladder, plus the
-``_sanitize_tag_name`` helper. This file covers:
+A second, PydanticAI-based ``tagging/naming.py`` was folded into
+``CategorizationService``; it called an API that no longer existed. What
+survived is the shipped tool-calling naming prompt with its retry ladder, plus
+the ``_sanitize_tag_name`` helper. This file covers:
 
-- the ``_sanitize_tag_name`` regression from the pre-wave audit (a real LLM
-  emitting ``Home_Improvement`` was silently dropped to ``""`` because the
-  char-set rejected underscores); and
+- the ``_sanitize_tag_name`` regression where a real LLM emitting
+  ``Home_Improvement`` was silently dropped to ``""`` because the char-set
+  rejected underscores; and
 - the naming retry ladder's contract on success, empty response and total
   failure — without exercising the LLM network path.
 
 The leak/privacy tests for the naming path live in
-``test_categorization_service.py`` (P1/P3) and are not duplicated here.
+``test_categorization_service.py`` and are not duplicated here.
 """
 
 import asyncio
@@ -28,12 +28,12 @@ async def _instant_sleep(*_args, **_kwargs):
 
 
 # --------------------------------------------------------------------------
-# _sanitize_tag_name — the pre-wave underscore regression
+# _sanitize_tag_name — the underscore regression
 # --------------------------------------------------------------------------
 
 
 def test_sanitize_allows_underscore_tag():
-    """Pre-wave audit: `Home_Improvement` was silently dropped to "".
+    """`Home_Improvement` was once silently dropped to "".
 
     The char-set now permits underscores, so a real LLM that emits an
     underscore-joined tag survives sanitization instead of producing an
@@ -178,7 +178,7 @@ async def test_get_llm_tag_name_returns_empty_after_max_retries(monkeypatch, tmp
 
 @pytest.mark.asyncio
 async def test_get_llm_tag_name_passes_existing_tags_to_prompt(monkeypatch):
-    """T07 wiring: the vault's existing tags seed the prompt so the LLM reuses them.
+    """The vault's existing tags seed the prompt so the LLM reuses them.
 
     Captures the messages handed to the LLM (structural shape only — never
     dumped) and asserts an EXISTING TAGS section is present when the caller
@@ -208,7 +208,7 @@ async def test_get_llm_tag_name_passes_existing_tags_to_prompt(monkeypatch):
         existing_tags=["Cooking", "Travel", "Work"],
     )
 
-    # The user message must carry the EXISTING TAGS marker we append for T07.
+    # The user message must carry the EXISTING TAGS marker the service appends.
     user_msgs = [m for m in captured["messages"] if m.get("role") == "user"]
     assert user_msgs, "no user message reached the LLM"
     assert "EXISTING TAGS" in user_msgs[-1]["content"]

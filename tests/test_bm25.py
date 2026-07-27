@@ -80,15 +80,15 @@ def test_tokenize_cyrillic_and_cjk():
     assert len(tokens_cjk) > 0
 
 
-# --- T05 (A9) parity guard -------------------------------------------------
+# --- Precomputed-index parity guard ----------------------------------------
 #
 # BM25Index.build() now precomputes per-doc term frequencies, doc lengths,
 # normalized text, and an inverted (term -> doc indices) index so search() no
 # longer rebuilds a Counter and re-runs clean_note()/normalize() for every note
-# on every query. This is the checkpoint the task requires: the ranked
-# (id, score) list must be IDENTICAL, not merely close, before and after.
+# on every query. The bar for that optimisation is exact parity: the ranked
+# (id, score) list must be IDENTICAL, not merely close.
 #
-# _brute_force_bm25_search below is a byte-for-byte copy of the pre-T05
+# _brute_force_bm25_search below is a byte-for-byte copy of the original
 # BM25Index.search algorithm (full doc scan, per-query Counter/clean_note
 # recompute). It is the recorded baseline this test compares against — do not
 # "fix" or optimize it, doing so would defeat the point of the guard.
@@ -140,7 +140,7 @@ def _make_synthetic_notes(n: int = 500, seed: int = 1234):
 
 
 def _brute_force_bm25_search(notes, query, k=8, k1=1.5, b=0.75):
-    """Faithful reproduction of BM25Index.search as it existed before T05."""
+    """Faithful reproduction of BM25Index.search before the index was precomputed."""
     tokens = [
         tokenize(
             n.get("cleaned_text") or clean_note(f"{n.get('title', '')} {n.get('content', '')}")
@@ -208,7 +208,7 @@ _PARITY_QUERIES = [
 
 
 def test_bm25_precomputed_index_matches_brute_force_baseline():
-    """Parity guard for T05: precomputed/inverted-index search must return the
+    """Parity guard: precomputed/inverted-index search must return the
     exact same ranked (id, score) list as the old brute-force scan, for every
     query — including float bit-identity, since operations are performed in the
     same order (ascending doc index) so summation and stable-sort tie-breaks

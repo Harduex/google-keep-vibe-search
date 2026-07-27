@@ -22,7 +22,7 @@ instead).
 
 One pass, one transaction, no full rebuild. Vectors are written through
 :class:`app.store.VectorStore` keyed by ``content_hash`` — that invariant is
-what makes "12 new notes → 12 embeddings, not 2,012" fall out for free (A4).
+what makes "12 new notes → 12 embeddings, not 2,012" fall out for free.
 
 This module logs only structural metadata: counts, ids, hashes, timings,
 exception types. It never logs note titles, bodies, or prompts.
@@ -75,7 +75,7 @@ def to_documents(source_key: str, docs: Iterable[SourceDoc]) -> list[Document]:
 
     ``id`` and ``content_hash`` are derived from ``source_key`` + the source
     doc's own fields, so two lifts of the same input produce byte-identical
-    documents — the property the idempotence and A5 regression tests assert.
+    documents — the property the idempotence regression tests assert.
     """
     out: list[Document] = []
     for d in docs:
@@ -294,7 +294,7 @@ class IngestService:
 
         Vectors are keyed by ``content_hash``: a doc whose hash is already in
         the :class:`VectorStore` is not re-embedded, which is what makes an
-        incremental import cheap regardless of corpus size (A4).
+        incremental import cheap regardless of corpus size.
         """
         # ---- documents: one writer transaction ----
         with self._store.transaction():

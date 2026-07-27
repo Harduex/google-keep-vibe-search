@@ -26,9 +26,9 @@ def reduce_embeddings(
 
     Single source of truth for the UMAP pass: the categorization service
     calls this once per run and reuses the result for both HDBSCAN and the
-    reduced-space centroids/MMR sampling, instead of fitting UMAP twice
-    (B4). Sizing-aware: ``n_components`` / ``n_neighbors`` come from the
-    user's granularity choice when the caller passes them through.
+    reduced-space centroids/MMR sampling, instead of fitting UMAP twice.
+    Sizing-aware: ``n_components`` / ``n_neighbors`` come from the user's
+    granularity choice when the caller passes them through.
 
     Clamps the UMAP parameters to what the corpus size supports (at least
     2 samples required; ``n_neighbors`` and ``n_components`` cannot exceed
@@ -70,9 +70,9 @@ def cluster_notes(
     The UMAP sizing parameters (``umap_components`` / ``umap_neighbors``) and
     the HDBSCAN sizing parameters (``min_cluster_size`` / ``min_samples``)
     are honoured from the granularity choice the caller computed via
-    ``CategorizationService._get_cluster_sizing`` — fixing B4, where the
-    granularity selector was inert because this function hardcoded the
-    ``tagging/constants.py`` defaults.
+    ``CategorizationService._get_cluster_sizing``. They must not be ignored:
+    hardcoding the ``tagging/constants.py`` defaults here once made the
+    granularity selector inert.
 
     To avoid fitting UMAP twice per run (once for centroids/MMR in the
     categorization service, once here), the caller may pass an already

@@ -123,7 +123,7 @@ describe('useChat NDJSON stream parser', () => {
   };
 
   it('sends the staged tag and date scope with the chat request', async () => {
-    // B13/Q3: the scope existed as hook state and was never put on the wire, so the
+    // Regression: the scope existed as hook state and was never put on the wire, so the
     // backend's tags/date_range parameters could not do anything.
     const { result } = renderHook(() => useChat());
 

@@ -3,8 +3,8 @@
 Field shapes match ``docs/audit/ARCHITECTURE-PROPOSAL.md`` §2 exactly. The two
 pure functions at the bottom are the load-bearing pieces:
 
-- :func:`stable_id` decouples identity from the export filename (fixes A5: a
-  renamed export no longer orphans every tag).
+- :func:`stable_id` decouples identity from the export filename, so a renamed
+  export does not orphan every tag.
 - :func:`content_hash` is the per-document invalidation key: indexes keyed by
   it stop re-embedding a 2,000-note corpus because one note gained a comma.
 
@@ -103,8 +103,8 @@ class ChangeSet:
 def stable_id(source_key: str, external_id: str) -> str:
     """Return the durable id for a document: ``f"{source_key}:{blake2s(external_id)[:16]}"``.
 
-    This is the fix for A5: identity stops being the export filename, so a
-    renamed export no longer orphans every tag, citation, and manifest entry.
+    Identity is deliberately not the export filename: a renamed export would
+    otherwise orphan every tag, citation, and manifest entry.
     ``source_key`` namespaces identity across sources (Keep vs. an Obsidian
     vault), and the 16-byte blake2s prefix keeps ids short while giving
     negligible collision probability for any realistic corpus.

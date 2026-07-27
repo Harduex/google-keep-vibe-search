@@ -1,8 +1,9 @@
 """Hardcoded tuning constants for the store.
 
-Per ``EXECUTION-PROTOCOL.md`` §5 (frozen configuration) no env vars are added;
-each constant here carries a one-line trade-off comment so a future reader can
-see what it trades off without grepping the proposal.
+These are deliberately hardcoded rather than exposed as environment variables:
+they are internal tuning knobs, not deployment configuration. Each one carries a
+one-line comment saying what it trades off, so a future reader can retune it
+without having to reverse-engineer the intent.
 """
 
 # SQLite schema version. Bump on any breaking schema change; a migration reads

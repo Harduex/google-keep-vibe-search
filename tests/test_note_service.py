@@ -63,7 +63,7 @@ class _TruncatingStubEngine(_StubEngine):
 
 
 class TestSeedTagsFromLabels:
-    """B3b/T07: Keep labels become tags -- additive and idempotent."""
+    """Keep labels become tags -- additive and idempotent."""
 
     def test_seeds_new_tags_from_labels(self, tmp_path):
         settings.cache_dir = str(tmp_path)
@@ -71,7 +71,7 @@ class TestSeedTagsFromLabels:
         service.notes = [
             {"id": "n1", "labels": ["Recipes", "Family"]},
             {"id": "n2", "labels": []},
-            {"id": "n3"},  # no labels key at all (T06: unlabeled notes omit it)
+            {"id": "n3"},  # no labels key at all (unlabeled notes omit it)
         ]
         service.note_tags = {}
 
@@ -125,7 +125,7 @@ class TestSeedTagsFromLabels:
 
 
 class TestSearchServiceExcludedTags:
-    """B10: excluded tags must not leak into any SearchService.search() caller
+    """Excluded tags must not leak into any SearchService.search() caller
     (routes, the chat orchestrator, agent tools all go through this one method).
     """
 
@@ -145,7 +145,7 @@ class TestSearchServiceExcludedTags:
     def test_search_filters_out_excluded_tag_notes(self):
         # Before the fix, SearchService.search() ignored the note service entirely and
         # returned all three notes, including "b" -- the note the user explicitly
-        # excluded. That is B10: excluded notes reaching chat retrieval.
+        # excluded -- i.e. excluded notes reaching chat retrieval.
         engine = _StubEngine([{"id": "a"}, {"id": "b"}, {"id": "c"}])
         note_service = self._note_service(note_tags={"b": ["Private"]}, excluded_tags={"Private"})
         service = SearchService(engine, note_service=note_service)
@@ -197,15 +197,15 @@ class TestSearchServiceExcludedTags:
 
 
 class TestB5LiveWiring:
-    """B5 (agent's filter_by_tag tool always returning 0 notes) was fixed in T03 but
-    was inert in production because nothing wired a tag map through
-    retrieval -> search_service -> ChatService._tag_lookup(). This asserts a
+    """The agent's filter_by_tag tool once returned 0 notes for every query. The tool
+    itself was fixed, but stayed inert in production because nothing wired a tag map
+    through retrieval -> search_service -> ChatService._tag_lookup(). This asserts a
     ChatService built exactly the way app/core/lifespan.py builds it can resolve a
-    tag lookup, so B5 cannot silently regress to inert without a visible test
+    tag lookup, so the tool cannot silently regress to inert without a visible test
     failure.
 
     Wiring chosen: SearchService is given the note service under the exact
-    attribute name `note_service` (needed anyway for B10's exclusion filtering), and
+    attribute name `note_service` (needed anyway for exclusion filtering), and
     ChatService is NOT given a `note_service=` kwarg directly -- resolution goes
     through ChatService._tag_lookup()'s fallback:
     `getattr(self.retrieval.search_service, "note_service", None)`.
@@ -234,7 +234,7 @@ class TestB5LiveWiring:
 
 
 class TestSearchServiceScope:
-    """B13/Q3: tag + date scoping, enforced at the same choke point as B10's exclusions."""
+    """Tag + date scoping, enforced at the same choke point as the tag exclusions."""
 
     NOTES = [
         {"id": "n1", "created": "2024-03-01 10:00:00"},

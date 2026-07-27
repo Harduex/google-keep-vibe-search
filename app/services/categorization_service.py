@@ -243,7 +243,8 @@ class CategorizationService:
 
         # Locked tags: the user already staged a decision on them, so the machine must not
         # merge them away (source) or fold anything into them (target). Empty by default —
-        # when nothing is locked this method is byte-identical to its pre-T38 behaviour.
+        # with an empty lock set this method must behave exactly as if the parameter did
+        # not exist, so locking can never change the outcome of an unlocked run.
         locked_tags = locked or set()
 
         prop_map = {lbl.name: lbl for lbl in vocab.labels}
@@ -531,11 +532,11 @@ class CategorizationService:
         user_prompt = TAG_NAMING_USER_PROMPT.format(
             notes_text=notes_text, keywords=keywords, neighbor_keywords=neighbor_keywords
         )
-        # Seed the prompt with the tags already in the user's vault (T07 imports
-        # Keep labels as tags) so the LLM reuses the user's vocabulary instead
-        # of inventing parallel names. Appended to the formatted prompt so this
-        # stays self-contained in the service — the shared system_prompts module
-        # is not in this lane's write set and has no existing_tags slot.
+        # Seed the prompt with the tags already in the user's vault (Keep's own
+        # labels are imported as tags on load) so the LLM reuses the user's
+        # vocabulary instead of inventing parallel names. Appended to the
+        # formatted prompt rather than baked into the shared template, which has
+        # no slot for existing tags.
         if existing_tags:
             shown = ", ".join(existing_tags[:40])
             user_prompt += f"\n\nEXISTING TAGS in this vault (reuse one if it fits well): {shown}"
@@ -745,7 +746,7 @@ class CategorizationService:
                 }
             )
 
-            # One UMAP pass per run (B4). The previous code fit UMAP here for
+            # One UMAP pass per run. An earlier version fit UMAP here for
             # the reduced-space centroids/MMR and then fit it *again* inside
             # ``cluster_notes``, which ignored the granularity-derived sizing
             # and used ``tagging/constants.py`` defaults — making the
@@ -779,7 +780,7 @@ class CategorizationService:
                 }
             )
 
-            # Granularity is honoured here (B4): the sizing params computed
+            # Granularity is honoured here: the sizing params computed
             # from the user's choice flow into HDBSCAN, and the UMAP
             # reduction above is reused instead of being refit inside.
             labels, probabilities = cluster_notes(
@@ -810,8 +811,8 @@ class CategorizationService:
             reused_count = 0
 
             # Seed the naming prompt with the tags already in the user's vault
-            # (T07 imports Keep labels as tags) so the LLM reuses the user's
-            # vocabulary. Tag names only — never note text.
+            # (Keep's own labels are imported as tags on load) so the LLM reuses
+            # the user's vocabulary. Tag names only — never note text.
             try:
                 existing_vault_tags = [t["name"] for t in self.note_service.get_all_tags()]
             except Exception:
@@ -1109,9 +1110,10 @@ class CategorizationService:
                         # Lock list: tags the user already staged a decision on are excluded
                         # from consolidation entirely — never a merge source, never a merge
                         # target. Read from the shared pending-proposals artifact the client
-                        # writes its staged actions to. Empty when nothing is staged, which
-                        # makes this step byte-identical to its pre-T38 behaviour (the
-                        # parity invariant the eval asserts).
+                        # writes its staged actions to. Empty when nothing is staged, and an
+                        # empty lock list must leave the final vocabulary exactly as it would
+                        # have been without locking at all — the parity invariant the eval
+                        # asserts.
                         try:
                             locked_tags = set(load_pending_actions().keys())
                         except Exception:

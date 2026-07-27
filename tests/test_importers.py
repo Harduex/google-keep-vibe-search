@@ -42,8 +42,8 @@ def _make_keep_folder(tmp_path: Path, n: int = 30) -> Path:
     """Build a 30-file synthetic Keep folder with the cases that matter.
 
     Composition (sums to 30, deterministic):
-      - 5 checklist notes (listContent only)           — exercises B3 flattening
-      - 3 labeled notes                                 — exercises B3 labels
+      - 5 checklist notes (listContent only)           — exercises list flattening
+      - 3 labeled notes                                 — exercises label import
       - 2 trashed notes                                 — counted as skips
       - 1 malformed JSON file                           — counted as skips
       - 1 JSON file that isn't a Keep note              — counted as not-a-note
@@ -206,7 +206,7 @@ def test_detect_rejects_missing_dir(tmp_path):
 
 
 # --------------------------------------------------------------------------- #
-# Keep importer — T06/T07 fixes preserved
+# Keep importer — label/tag seeding behaviour preserved
 # --------------------------------------------------------------------------- #
 
 
@@ -216,7 +216,7 @@ def test_keep_scan_30_file_folder_counts(tmp_path):
     Composition of _make_keep_folder: 5 checklist + 3 labeled + 18 plain +
     1 non-Keep-but-valid JSON + 2 trashed + 1 malformed = 30 files.
     Imported: 5 + 3 + 18 + 1 (the non-Keep JSON yields an empty SourceDoc,
-    matching parser.py which read every *.json that parsed) = 27 docs.
+    since the importer reads every *.json that parses) = 27 docs.
     Skipped: 2 trashed + 1 malformed = 3 skips. Every file is either a doc
     or an explicit skip — no silent drops.
     """
@@ -271,7 +271,7 @@ def test_keep_textcontent_and_listcontent_both_in_body(tmp_path):
     doc = next(KeepTakeoutImporter().read(d))
     assert "Free text" in doc.body
     assert "- [ ] Item" in doc.body
-    # Free text precedes the checklist, matching parser.py precedence.
+    # Free text precedes the checklist.
     assert doc.body.index("Free text") < doc.body.index("- [ ] Item")
 
 
@@ -318,8 +318,8 @@ def test_keep_malformed_counted_not_raised(tmp_path):
 
 
 def test_keep_external_id_is_basename(tmp_path):
-    """external_id must match parser.py's legacy ``id`` (basename incl. .json)
-    so T26's migration can map old ids to stable_ids losslessly."""
+    """external_id must match the legacy ``id`` (basename incl. .json)
+    so the store migration can map old ids to stable_ids losslessly."""
     d = tmp_path / "keep"
     d.mkdir()
     _write_keep_note(
@@ -447,7 +447,7 @@ def test_md_inline_hashtags_become_labels(tmp_path):
 
 
 def test_md_frontmatter_and_inline_tags_both_land_in_labels(tmp_path):
-    """The B3 parity assertion for markdown: both tag sources merge."""
+    """The parity assertion for markdown: both tag sources merge."""
     d = tmp_path / "v"
     d.mkdir()
     (d / "a.md").write_text(
@@ -593,17 +593,16 @@ def test_base_scan_helper_partitions_docs_and_skips(tmp_path):
 
 
 def test_markdown_vault_real_corpus(tmp_path):
-    """Run the markdown importer over T35's markdown_vault corpus.
+    """Run the markdown importer over the benchmark markdown_vault corpus.
 
-    Asserts the contract the wave-5 spec names: every file is either imported
-    or explicitly skipped with a reason (no silent drops), and both frontmatter
-    tags and inline #tags land in ``labels``.
+    Asserts the importer contract: every file is either imported or explicitly
+    skipped with a reason (no silent drops), and both frontmatter tags and
+    inline #tags land in ``labels``.
 
     ``bench/corpora.py:load_markdown_vault`` currently ships as a stub that
-    returns ``None`` ("No verified CC-licensed markdown vault available"). That
-    is a Lane-R / T35 blocker, not a T23 failure: this test skips cleanly until
-    the accessor returns real data, and the count is reported as a blocker in
-    the task report rather than fabricated.
+    returns ``None`` ("No verified CC-licensed markdown vault available"), so
+    this test skips cleanly until that accessor returns real data rather than
+    asserting against a fabricated count.
     """
     try:
         from bench.corpora import load_markdown_vault
@@ -618,7 +617,7 @@ def test_markdown_vault_real_corpus(tmp_path):
             "Not a T23 defect; reported as a blocker."
         )
 
-    # If/when T35 ships real data, it must expose it as files on disk the
+    # If/when that accessor ships real data, it must expose it as files on disk the
     # importer can read, or as a directory path — BenchCorpus.docs is a list of
     # pre-loaded strings, which does not fit a folder-reading importer. Until
     # there is a directory accessor, materialise the strings to a tmp vault.
@@ -641,6 +640,6 @@ def test_markdown_vault_real_corpus(tmp_path):
     # At least one imported doc carries a label sourced from either tag form,
     # which is what proves the importer is useful beyond Keep. (If the real
     # vault happened to have no tags at all this would be the wrong assertion;
-    # the spec explicitly wants proof that both tag forms land in labels.)
+    # the point is proof that both tag forms land in labels.)
     labelled = [d_ for d_ in result.docs if d_.labels]
     assert labelled, "expected at least one labelled doc in the real vault"

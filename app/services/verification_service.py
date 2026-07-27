@@ -15,7 +15,7 @@ from sklearn.metrics.pairwise import cosine_similarity as sklearn_cosine_similar
 
 from app.services.retrieval_orchestrator import STORED_VECTOR_KEY
 
-# A8: bounds on detect_conflicts. It is O(N^2) similarity plus one NLI forward pass per
+# Bounds on detect_conflicts. It is O(N^2) similarity plus one NLI forward pass per
 # pair above the threshold, run on every chat turn. Conflict detection is a quality
 # garnish, not a correctness gate, so on a large context set (the agent loop can collect
 # up to MAX_COLLECTED_NOTES) we skip it entirely rather than spend seconds in the cross-encoder.
@@ -160,7 +160,7 @@ class VerificationService:
         Returns:
             List of conflict dicts with note indices, titles, and contradiction scores.
 
-        A8: the orchestrator hands each note's already-computed vector in
+        The orchestrator hands each note's already-computed vector in
         ``note[STORED_VECTOR_KEY]`` (read from the VectorStore, so the same note text is
         not re-encoded on every chat turn). When that key is absent — a bare call with no
         orchestrator in front of it, or a unit test double — we fall back to encoding the
@@ -229,7 +229,7 @@ class VerificationService:
         return conflicts
 
     # ------------------------------------------------------------------ #
-    # A8 helpers — vector reuse + note-text basis
+    # Helpers — vector reuse + note-text basis
     # ------------------------------------------------------------------ #
 
     @staticmethod

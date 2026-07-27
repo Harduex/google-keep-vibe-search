@@ -13,7 +13,7 @@ from app.services.tagging.cluster import reduce_embeddings
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
-# T10 / findings P1-P3. A synthetic marker standing in for sampled note text.
+# A synthetic marker standing in for sampled note text.
 # It must never appear in stdout, stderr, any file, or any client stream frame.
 SENTINEL = "SENTINEL_NOTE_TEXT_7f3a91"
 
@@ -21,8 +21,8 @@ SENTINEL = "SENTINEL_NOTE_TEXT_7f3a91"
 def _leaky_exception_message() -> str:
     """A LiteLLM/httpx-shaped message that embeds the request body.
 
-    This is the whole point of P1: provider exceptions quote the failed request,
-    so `str(e)` carries the prompt — which carries sampled note text.
+    This is the whole point of the redaction rule: provider exceptions quote the
+    failed request, so `str(e)` carries the prompt — which carries sampled note text.
     """
     return (
         "litellm.APIConnectionError: POST /v1/chat/completions failed - "
@@ -85,7 +85,7 @@ def _files_containing(directory: Path, needle: str):
 
 @pytest.mark.asyncio
 async def test_llm_naming_failure_never_leaks_note_text(tmp_path, monkeypatch, capsys):
-    """P1/P3: a failing naming call must leak nothing to stdout, stderr or disk.
+    """A failing naming call must leak nothing to stdout, stderr or disk.
 
     The service writes its failure log relative to the CWD, so the test runs in a
     tmp CWD: that keeps the real repo root clean (an existing llm_failures.log
@@ -179,7 +179,7 @@ async def test_empty_llm_response_never_leaks_prompt(tmp_path, monkeypatch, caps
 
 @pytest.mark.asyncio
 async def test_categorize_error_frame_never_leaks_note_text(monkeypatch, capsys):
-    """P3: the client stream frame must carry a redacted exception, not `str(e)`.
+    """The client stream frame must carry a redacted exception, not `str(e)`.
 
     This one leaves the machine, so it matters more than the log.
     """
@@ -428,7 +428,7 @@ def test_tf_idf_keyword_extraction():
 
 
 # --------------------------------------------------------------------------
-# T28 / B4 — one UMAP pass per categorize run, granularity honoured
+# One UMAP pass per categorize run, granularity honoured
 # --------------------------------------------------------------------------
 
 
@@ -485,9 +485,9 @@ class _StubSearchForCategorize:
 
 @pytest.mark.asyncio
 async def test_categorize_fits_umap_exactly_once_per_run(monkeypatch):
-    """B4 checkpoint: a full ``categorize`` run must fit UMAP exactly once.
+    """A full ``categorize`` run must fit UMAP exactly once.
 
-    Before T28 the service fit UMAP once for the reduced-space centroids/MMR
+    An earlier version fit UMAP once for the reduced-space centroids/MMR
     and a second time inside ``cluster_notes`` (which also ignored the
     granularity-derived sizing). The merged pipeline now reduces once via
     ``reduce_embeddings`` and reuses that array for HDBSCAN. This spies on

@@ -135,7 +135,7 @@ class TagDecisionAgent:
 
 @pytest.mark.asyncio
 async def test_filter_by_tag_uses_injected_tag_lookup():
-    """B5: raw search_service.notes are never tag-enriched, so the tool always found 0.
+    """Raw search_service.notes are never tag-enriched, so the tool once always found 0.
 
     The tag map has to arrive as an explicit parameter; a tag query must then return the
     tagged note even though the note dict itself carries no `tags` key.
@@ -213,7 +213,7 @@ class SearchDecisionAgent:
 
 @pytest.mark.asyncio
 async def test_search_probes_carry_the_user_scope():
-    """B13/Q3: every probe the agent makes is bound by the user's scope, not just the first."""
+    """Every probe the agent makes is bound by the user's scope, not just the first."""
     notes = [{"id": "n1", "title": "Pasta", "content": "Boil water"}]
     orchestrator = ScopeRecordingOrchestrator(notes)
 

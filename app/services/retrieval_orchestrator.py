@@ -5,7 +5,7 @@ from sklearn.metrics.pairwise import cosine_similarity as sklearn_cosine_similar
 
 # Private note-dict key under which the orchestrator hands a precomputed vector to
 # VerificationService.detect_conflicts, so the conflict pass does not re-encode notes
-# whose vectors already live in the engine's VectorStore (A8). The key is namespaced
+# whose vectors already live in the engine's VectorStore. The key is namespaced
 # and is popped before any note dict is serialized to the client (see detect_conflicts),
 # so it never reaches the NDJSON stream or the prompt.
 STORED_VECTOR_KEY = "__stored_vector__"
@@ -38,7 +38,7 @@ class RetrievalOrchestrator:
         date_range: Optional[Dict[str, str]] = None,
     ) -> List[Dict[str, Any]]:
         max_notes = max_notes or self.max_context_notes
-        # SearchService.search enforces the scope (B13/Q3) — passed unconditionally. This
+        # SearchService.search enforces the scope — passed unconditionally. This
         # used to be guarded by a signature sniff that never fired, because
         # SearchService.search took no tags/date_range at all, so scoping was silently
         # dropped on every path.
@@ -117,7 +117,7 @@ class RetrievalOrchestrator:
 
         # The scope has to be re-applied after fusion, not only pushed into the note-level
         # searches: the chunk signal and the entity signal reach the corpus directly, so an
-        # out-of-scope note can enter the fused list through either of them (B13/Q3).
+        # out-of-scope note can enter the fused list through either of them.
         merged = self._apply_scope(merged, tags, date_range)
 
         # Coverage saturation
@@ -138,7 +138,7 @@ class RetrievalOrchestrator:
             )
             result = self._apply_scope(result, tags, date_range)
 
-        # A8: attach stored vectors to the notes we are about to hand back, so the
+        # Attach stored vectors to the notes we are about to hand back, so the
         # downstream conflict-detection pass can reuse them instead of re-encoding the
         # same note text. Notes whose vectors are absent from the store (e.g. a bare
         # test double with no VectorStore) are simply left unannotated, and detect_conflicts
@@ -245,7 +245,7 @@ class RetrievalOrchestrator:
     def _note_vectors(self, notes: List[Dict[str, Any]]) -> Optional[np.ndarray]:
         """Return an embedding matrix aligned to ``notes``, reusing stored vectors.
 
-        A8: notes returned from retrieval are already indexed, so their vectors live in
+        Notes returned from retrieval are already indexed, so their vectors live in
         the engine's :class:`~app.store.vectors.VectorStore` keyed by ``content_hash``.
         Reading them by id avoids re-encoding the same note text on every chat message.
         Only notes whose vector is genuinely missing (no store attached, or an
@@ -313,7 +313,7 @@ class RetrievalOrchestrator:
     ) -> List[Dict[str, Any]]:
         """Coverage saturation: if top results are all redundant, cap the list.
 
-        A8: vectors are read from the store (or computed once via :meth:`_note_vectors`)
+        Vectors are read from the store (or computed once via :meth:`_note_vectors`)
         instead of encoding 10 note texts on every chat message.
         """
         if len(notes) <= cap:

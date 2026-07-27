@@ -13,42 +13,32 @@ yourself (§2.5).
 ## 1. Dispatch order
 
 1. **Waves are hard barriers.** Never start wave *n+1* until every task in wave *n* is committed and
-   `make check` is green on `master`. Rationale: wave 2 changes behaviour that wave 3 asserts;
-   wave 3's harness is what makes waves 4–6 refactors instead of rewrites.
+   `make check` is green on `master`. State each wave's rationale in `PLANS.md` § Wave graph — if you
+   cannot name what would break by starting the next wave early, it is probably not a wave.
 2. **Inside a lane, tasks are serial** and run in the order listed. Never skip ahead within a lane.
 3. **Inside a wave, lanes run concurrently — but not always from t=0.** Some tasks depend on a task
    in *another* lane of the same wave. A lane blocked that way waits; it does not reach across
-   (§2.2). The dispatch rounds below are derived from the `Depends on:` lines in the wave files and
-   are authoritative:
+   (§2.2). Derive a dispatch-round table from the `Depends on:` lines in the wave spec and record it
+   here — it is authoritative once written:
 
-   | Wave | Round 1 | Round 2 | Round 3 | Round 4 |
-   |---|---|---|---|---|
-   | 1 | T01 | T02 | | |
-   | 2 | T03 · T04 · T06 · T08 · T10 | T05 · T07 · T09 | | |
-   | 3 | **T11** · T33 · T35 | T12 · T13 · T36 | T14 | |
-   | 4 | T15 · T16 · T17 · T19 | T18 | **T20** | |
-   | 5 | **T21** | T22 · T23 | T24 · T25 | **T26** |
-   | 6 | T27 · T29 · T30 · T31 · T32 · T34 | T28 | **T38** | |
-   | 7 | **T37** | | | |
+   | Wave | Round 1 | Round 2 | Round 3 |
+   |---|---|---|---|
+   | 1 | T01 · T02 | T03 | |
 
-   Bold = must run alone in its round; everything else in a round is concurrent.
-   Round *n+1* of a wave starts when round *n* is committed — a soft barrier, not a CI gate.
-   Rounds 2+ of waves 2, 4 and 6 are same-lane continuations, so those lanes simply keep working.
+   Bold a task that must run **alone** in its round. Round *n+1* starts when round *n* is committed —
+   a soft barrier, not a CI gate. Rounds that are same-lane continuations need no re-dispatch; that
+   lane simply keeps working.
 
-   Two rounds are stricter than the `Depends on:` line in the spec, deliberately:
-   - **T13/T14** are lane G's serial pair, so T14 follows T13. T13 additionally waits on T35, which
-     owns the one implementation of recall@k / MRR / nDCG that both tiers import.
-   - **T25** names only T21, but its `Do` routes all vector reads/writes through `store/vectors.py`,
-     which T22 creates. It therefore runs in round 3, after T22 — not concurrently with it.
-   - **T20** depends only on T19 and could run in round 2, but is deliberately held to round 3, alone:
-     it is the wave's riskiest deletion (the legacy chat path), and it lands last on an otherwise
-     quiet tree.
-   - **T38** names T27/T28 but also waits for T30: its write set crosses Lane M, Lane O and the
-     Organize components, so it runs alone once every other wave-6 lane has landed. Running it
-     concurrently would need a lane row that overlaps Lane O — a plan bug, not a workaround (see
-     the matrix footnote in `PLANS.md`).
-4. **Cross-wave dependencies are already satisfied** by the wave barrier — e.g. T27 and T29 read
-   `store/vectors.py` from T22 (wave 5). Do not re-verify; do not vendor a copy.
+   **Make a round stricter than the spec's `Depends on:` line whenever the dependency is real but
+   unstated**, and write down why. The three shapes that recurred across the last plan:
+   - a task whose `Do` section routes through a module another lane *creates*, even though its
+     `Depends on:` names only the task that designed it;
+   - the wave's riskiest deletion, held to a round of its own so it lands last on an otherwise quiet
+     tree;
+   - a task whose write set crosses two other lanes, so it runs alone after both have landed —
+     running it concurrently would need overlapping lane rows, which is a plan bug, not a workaround.
+4. **Cross-wave dependencies are already satisfied** by the wave barrier. Do not re-verify them; do
+   not vendor a copy of something an earlier wave shipped.
 
 ## 2. Lane ownership — the rule that makes parallelism safe
 
@@ -56,9 +46,9 @@ yourself (§2.5).
    `PLANS.md`'s ownership matrix is the cross-lane overlap summary, not the authority.
 2. **Never edit a file you do not own** — not a one-line fix, not an obvious breakage. If you need a
    change in another lane's file, **stop and report a blocker** naming the file and the exact change.
-   Do not work around it with a shim, a duplicate, or a monkeypatch. Several specs already anticipate
-   this and tell you which side blinks (T03→B5's tag lookup, T10→`pydantic_agent`, T16→`chat_service`,
-   T30→`package.json`, T34→`useChat`) — follow the spec's instruction there.
+   Do not work around it with a shim, a duplicate, or a monkeypatch. Where two lanes predictably
+   contend over one file, the wave spec should say in advance which side blinks — follow that
+   instruction rather than negotiating it at runtime.
 3. The **status table is the one shared file every lane touches.** Edit only your own task's row in
    `PLANS.md` § Task index, in that task's commit. Update the wave's row in § Status only when your
    lane's last task in that wave lands.
@@ -111,27 +101,26 @@ because a *claim* about a gate was accepted in place of its *output*. So:
 
 Three levels, all mandatory in this order:
 
-1. **The floor — `make check`** (lint + format check + typecheck + both test suites, non-mutating)
-   must pass on top of your change. *T01 creates this target*; until T01 lands the floor is
-   `GOOGLE_KEEP_PATH=. uv run pytest -q` plus `cd client && npx tsc -b && npx vitest run`.
-   Never use `make lint` to satisfy the floor — before T01 it **rewrites your files**.
+1. **The floor — `GOOGLE_KEEP_PATH=. make check`** (lint + format check + typecheck + both test
+   suites, non-mutating) must pass on top of your change. Never use `make lint` to satisfy the
+   floor — it **rewrites your files**, so it can only ever tell you that it succeeded in editing
+   them.
 2. **The task checkpoint** — every spec ends in a machine-checkable Checkpoint. Run it and paste its
    output (redacted, §6) into the commit body. If it fails, fix it *inside the same task*. Never
    proceed past a red checkpoint.
 3. **The parity gates** — where a spec says results must be unchanged, that claim is the checkpoint,
-   not a comment: `make eval-retrieval` for T19, T25, T26; `make eval` for T27, T28. Both targets are
-   created in wave 3 (T13, T14) and record the baseline every later wave is measured against. T19's
-   parity gate is a **stop-and-report** gate, and it is two-tiered: mode-vs-mode ranking is exactly
-   the question tier 1 cannot answer, so T19 also runs `bench/run_retrieval.py` (T36) in both modes.
-   If agent mode does not match or beat legacy on both the golden set and the real-corpus bench, do
-   not start T20.
+   not a comment. `make eval-retrieval` (ranking) and `make eval` (tagging) hold the recorded
+   baselines every later change is measured against. **If the numbers move at all on a task that
+   claims to be a pure refactor, stop and report** — that is the whole value of the gate. Where
+   mode-vs-mode ranking is the question, tier 1 cannot answer it; run the tier-2 bench in both
+   modes.
 
 **Measurement is two-tiered, and the tiers are not interchangeable.** Do not substitute one for the
 other, and do not quote one as if it were the other:
 
 | | Tier 1 — `make check`, `make eval*` | Tier 2 — `make bench*` |
 |---|---|---|
-| Data | 30 synthetic notes (T11) | real public corpora with ground truth (T35) |
+| Data | a small synthetic fixture corpus | real public corpora with ground truth |
 | Models | deterministic stubs | the real embedding model / LLM |
 | Runtime | seconds | minutes, wants a GPU |
 | Runs | every commit, gates CI | on demand; **never wired into CI or `make check`** |
@@ -143,11 +132,10 @@ an **improvement**, that claim needs tier 2 (`make bench-compare` against the co
 `bench/baselines/`). Re-baselining is a deliberate act in its own commit (`make bench-accept`), never
 a side effect of a benchmark run.
 
-**There is no committed tier-2 baseline yet.** The ones T36 shipped were fabricated — round numbers
-its runners reproduced verbatim — and are deleted along with those runners. `make bench-compare`
-exits non-zero while no baseline exists, because an unmeasured run is not a passing run. Any task
-whose checkpoint needs tier 2 (T19's parity gate, and the "results unchanged" claims in T25, T26,
-T27, T28) must first establish one: `make bench` on a quiet machine, read the tables, then
+**There is no committed tier-2 baseline.** An earlier set was fabricated — round numbers the
+runners reproduced verbatim — and was deleted along with them. `make bench-compare` exits non-zero
+while no baseline exists, because an unmeasured run is not a passing run. Any task whose checkpoint
+needs tier 2 must first establish one: `make bench` on a quiet machine, read the tables, then
 `make bench-accept` in its own commit. See `bench/README.md`.
 
 **Every bug-fix task ships a regression test that fails before the fix and passes after.** State
@@ -160,32 +148,29 @@ real export (§6).
 Do not add environment variables. Do not modify `.env` or `.env.example`. New tuning values are
 hardcoded constants in the relevant `constants.py` with a one-line comment saying what they trade off.
 
-Two sanctioned exceptions, both called out in their own specs:
-- **T20** removes `ENABLE_AGENT_MODE` (and its `.env.example`, README and `/api/chat/model` mentions).
-- **T24** may add exactly **one** setting, for the default import source.
+A task may only add or remove a setting when its own spec says so explicitly, and the spec must say
+why. Removing a setting means removing its `.env.example`, README and API mentions too.
 
 ## 6. Privacy boundary — non-negotiable
 
-`AGENTS.md` governs and is not weakened by anything here. Additionally, for this plan:
+`AGENTS.md` governs and is not weakened by anything here. Additionally:
 
-- **Never read the real export or `cache/`.** Use `tests/fixtures/` (synthetic, from T11). Before T11
-  exists, write throwaway synthetic data inside your own test.
+- **Never read the real export or `cache/`.** Use the synthetic fixtures under `tests/fixtures/`, or
+  write throwaway synthetic data inside your own test.
 - **Public benchmark corpora under `bench/corpora/` are the one exception — an agent may read them
   freely, and quote from them.** They are published datasets, not personal notes; that is exactly why
-  they exist (T35). The boundary is directional: benchmark code must never read `$GOOGLE_KEEP_PATH` or
+  they exist. The boundary is directional: benchmark code must never read `$GOOGLE_KEEP_PATH` or
   `settings.resolved_cache_dir`, never write into `cache/`, and never mix a real note into a
-  benchmark run. T35 asserts all three at import time. A benchmark result is publishable; an eval over
-  the real corpus is not.
-- **Never `print`/log note or prompt text.** After T10, route anything adjacent to an LLM call
-  through `app/core/redact.py` (`safe_exc`, `safe_meta`). Log structural metadata only: counts,
-  shapes, ids, hashes, timings, exception **types** and status codes.
-- Raw exception strings from LiteLLM/httpx **contain the request body** — that is finding P1. Never
-  log `str(e)`.
+  benchmark run — `bench/__init__.py` asserts all three at import time. A benchmark result is
+  publishable; an eval over the real corpus is not.
+- **Never `print`/log note or prompt text.** Route anything adjacent to an LLM call through
+  `app/core/redact.py` (`safe_exc`, `safe_meta`). Log structural metadata only: counts, shapes, ids,
+  hashes, timings, exception **types** and status codes.
+- Raw exception strings from LiteLLM/httpx **contain the request body**. Never log `str(e)`.
 - **Never paste command output that could contain note text** into a commit body, a report, or a
   chat message. Redact first.
-- Two checkpoints must be run by the repo owner, not an agent, because they touch real data:
-  T26's `scripts/migrate_to_store.py --dry-run` over a copy of the real cache dir, and T32's
-  `docker compose` bring-up. An agent prepares them and stops.
+- **A checkpoint that touches real data is the owner's to run, not an agent's** — anything over the
+  real cache dir or a full `docker compose` bring-up. An agent prepares it and stops.
 
 ## 7. No scope creep
 
@@ -194,8 +179,8 @@ Implement exactly the task spec. Non-goals for the whole plan: no LangChain / La
 editing or deletion from the UI, no new retry loops beyond those specified, no new client dependency.
 
 Found something worth doing that is not in your spec? Add it to `PLANS.md` § Proposed follow-ups in
-your commit — do not build it. Several specs already require this (T10's `_log_agent_step` decision,
-T15's `nltk`, T34's dropped citations).
+your commit — do not build it. That list is where a plan stays honest about what it noticed and
+chose not to do.
 
 ## 8. Reporting back
 

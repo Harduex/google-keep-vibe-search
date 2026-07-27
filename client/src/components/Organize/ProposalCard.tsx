@@ -17,33 +17,43 @@ interface ProposalCardProps {
   onMerge: (sourceTagName: string, targetTagName: string) => void;
 }
 
-/** Approve / reject controls shared by the gray-zone merge and review cards. */
+/** Approve / reject controls shared by the gray-zone merge and review cards.
+ *
+ * `labels` makes the two outcomes explicit in words. A merge card needs it: with a bare
+ * check and cross, "reject" reads as *discard these tags*, when it actually means *keep
+ * them as two separate tags*. Naming the outcome is the whole difference between a
+ * reversible-looking choice and a destructive-looking one. Icon-only cards keep the
+ * tooltips they had. */
 const ApproveRejectActions = memo(
   ({
     id,
     action,
     onApprove,
     onReject,
+    labels,
   }: {
     id: string | number;
     action: ProposalState['action'];
     onApprove: (id: string | number) => void;
     onReject: (id: string | number) => void;
+    labels?: { approve: string; reject: string };
   }) => (
     <div className="proposal-actions">
       <button
         className={`proposal-action-btn approve ${action === 'approve' ? 'active' : ''}`}
         onClick={() => onApprove(id)}
-        title="Approve"
+        title={labels?.approve ?? 'Approve'}
       >
         <span className="material-icons">check</span>
+        {labels && <span className="proposal-action-label">{labels.approve}</span>}
       </button>
       <button
         className={`proposal-action-btn reject ${action === 'reject' ? 'active' : ''}`}
         onClick={() => onReject(id)}
-        title="Reject"
+        title={labels?.reject ?? 'Reject'}
       >
         <span className="material-icons">close</span>
+        {labels && <span className="proposal-action-label">{labels.reject}</span>}
       </button>
     </div>
   ),
@@ -142,6 +152,7 @@ export const ProposalCard = memo(
             action={state.action}
             onApprove={onApprove}
             onReject={onReject}
+            labels={{ approve: 'Merge', reject: 'Keep separate' }}
           />
         </div>
       );

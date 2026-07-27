@@ -270,6 +270,72 @@ describe('useOrganize proposal survival', () => {
     expect(result.current.proposals).toHaveLength(0);
     expect(result.current.error).toBeNull();
   });
+
+  it('keeps what was applied on screen instead of leaving the panel blank', async () => {
+    // Applying emptied the review list and showed nothing in its place, so a successful
+    // apply was indistinguishable from losing the whole run. The proposals are correctly
+    // no longer pending; they move to a read-only summary of what was written.
+    applyResult = { message: 'Applied 1 tags to 1 notes', tags_created: 1, notes_tagged: 1 };
+    const { result } = renderHook(() => useOrganize());
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    act(() => {
+      result.current.approveProposal(0);
+    });
+    await act(async () => {
+      await result.current.applyProposals();
+    });
+
+    expect(result.current.proposals).toHaveLength(0);
+    expect(result.current.appliedProposals).toHaveLength(1);
+    expect(result.current.appliedProposals[0].proposal.tag_name).toBe('Recipes');
+  });
+
+  it('lists only what was written, not everything that was on screen', async () => {
+    // The summary is a receipt. A rejected proposal sits in the list at Apply time but
+    // sends no action, so it must not appear. Two proposals, because with a single
+    // rejected one `applyProposals` returns early and the filter never runs — the test
+    // would pass without proving anything.
+    applyResult = { message: 'Applied 1 tags to 1 notes', tags_created: 1, notes_tagged: 1 };
+    global.fetch = vi.fn((input: any, options?: any) => {
+      if (input === API_ROUTES.ORGANIZE_PENDING && options?.method !== 'DELETE') {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              proposals: [
+                { tag_name: 'Recipes', note_ids: ['a'] },
+                { tag_name: 'Travel', note_ids: ['b'] },
+              ],
+              generated_at: 1700000000,
+              granularity: 'broad',
+            }),
+        } as Response);
+      }
+      if (input === API_ROUTES.ORGANIZE_APPLY) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(applyResult) } as Response);
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response);
+    }) as any;
+
+    const { result } = renderHook(() => useOrganize());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(result.current.proposals).toHaveLength(2);
+
+    act(() => {
+      result.current.approveProposal(0);
+      result.current.rejectProposal(1);
+    });
+    await act(async () => {
+      await result.current.applyProposals();
+    });
+
+    expect(result.current.appliedProposals.map((p) => p.proposal.tag_name)).toEqual(['Recipes']);
+  });
 });
 
 describe('useOrganize streamed proposals', () => {

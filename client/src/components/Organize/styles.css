@@ -761,3 +761,60 @@
   color: var(--text-secondary);
   font-size: 0.9rem;
 }
+
+/* Text beside the icon on cards whose two outcomes are not self-evident (merge). */
+.proposal-action-label {
+  margin-left: 6px;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.proposal-action-btn:has(.proposal-action-label) {
+  width: auto;
+  padding: 4px 10px;
+}
+
+/* Receipt for the last apply. Uses the token layer so it reads in both themes. */
+.applied-summary {
+  margin: 16px 0 24px;
+  padding: 14px 16px;
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--accent-green, var(--primary-color));
+  border-radius: 8px;
+}
+
+.applied-summary-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  color: var(--text-color);
+}
+
+.applied-summary-header .material-icons {
+  color: var(--accent-green, var(--primary-color));
+  font-size: 1.2rem;
+}
+
+.applied-summary-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.applied-summary-tag {
+  padding: 3px 10px;
+  background-color: var(--light-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  font-size: 0.8rem;
+  color: var(--text-color);
+}
+
+.applied-summary-hint {
+  margin: 10px 0 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}

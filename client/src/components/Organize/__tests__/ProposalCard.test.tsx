@@ -30,7 +30,7 @@ describe('ProposalCard proposal types', () => {
     expect(screen.queryByTitle('Reject')).not.toBeInTheDocument();
   });
 
-  it('renders a gray-zone merge proposal with approve/reject only', () => {
+  it('names the two merge outcomes instead of showing a bare check and cross', () => {
     const onApprove = vi.fn();
     renderCard(
       {
@@ -44,11 +44,19 @@ describe('ProposalCard proposal types', () => {
       { onApprove },
     );
 
-    expect(screen.getByText(/Merge/)).toHaveTextContent('Merge ‘Gym’ into ‘Fitness’?');
+    expect(screen.getByText('Merge ‘Gym’ into ‘Fitness’?')).toBeInTheDocument();
     // No rename button for merge proposals.
     expect(screen.queryByTitle('Rename')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByTitle('Approve'));
+    // The outcomes are spelled out. With a bare check and cross, "reject" reads as
+    // *discard these tags* when it means *keep them as two separate tags* — the reason
+    // rejecting a merge felt destructive.
+    expect(screen.getByTitle('Merge')).toBeInTheDocument();
+    expect(screen.getByTitle('Keep separate')).toBeInTheDocument();
+    expect(screen.queryByTitle('Approve')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Reject')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTitle('Merge'));
     expect(onApprove).toHaveBeenCalledWith(0);
   });
 

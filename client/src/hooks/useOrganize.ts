@@ -156,6 +156,10 @@ export const useOrganize = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState<CategorizationProgress | null>(null);
   const [proposals, setProposals] = useState<ProposalState[]>([]);
+  // What the last apply actually wrote, kept so the panel can show it instead of going
+  // blank. Applied proposals are no longer *pending*, so they must leave `proposals` —
+  // but emptying the screen made a successful apply look like the run had been discarded.
+  const [appliedProposals, setAppliedProposals] = useState<ProposalState[]>([]);
   const [isApplying, setIsApplying] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -264,6 +268,7 @@ export const useOrganize = () => {
 
   const discardProposals = useCallback(async () => {
     setProposals([]);
+    setAppliedProposals([]);
     setProgress(null);
     setRestoredAt(null);
     stagedActionsRef.current = {};
@@ -275,6 +280,9 @@ export const useOrganize = () => {
   }, []);
 
   const startCategorization = useCallback(async () => {
+    // A new run supersedes the previous one's summary; keeping it would attribute old
+    // tags to this run.
+    setAppliedProposals([]);
     setIsProcessing(true);
     setError(null);
     setProposals([]);
@@ -565,6 +573,9 @@ export const useOrganize = () => {
         invalidate(QUERY_KEYS.NOTES);
         invalidate(QUERY_KEYS.ALL_NOTES);
         invalidate(QUERY_KEYS.STATS);
+        // Exactly the proposals that produced an action — the same filter that built the
+        // request — so the summary reflects what was written, not what was on screen.
+        setAppliedProposals(current.filter((p) => buildApplyAction(p) !== null));
         setProposals([]);
         setProgress(null);
         stagedActionsRef.current = {};
@@ -596,6 +607,7 @@ export const useOrganize = () => {
     isProcessing,
     progress,
     proposals,
+    appliedProposals,
     isApplying,
     error,
     hasProposals,

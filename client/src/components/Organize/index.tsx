@@ -3,6 +3,7 @@ import { useCallback } from 'react';
 import { useOrganize } from '@/hooks/useOrganize';
 import { useTags } from '@/hooks/useTags';
 
+import { AppliedSummary } from './AppliedSummary';
 import { CategorizationProgress } from './CategorizationProgress';
 import { GranularitySelector } from './GranularitySelector';
 import { ProposalDashboard } from './ProposalDashboard';
@@ -29,6 +30,7 @@ export const Organize = () => {
     approveAll,
     resetProposals,
     applyProposals,
+    appliedProposals,
   } = useOrganize();
 
   const {
@@ -115,6 +117,8 @@ export const Organize = () => {
           onRecategorize={startCategorization}
         />
       )}
+
+      <AppliedSummary applied={appliedProposals} />
 
       <div className="tag-manager-section">
         <div className="organize-header">

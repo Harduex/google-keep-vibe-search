@@ -96,7 +96,11 @@ export const Organize = () => {
         </div>
       )}
 
-      {hasProposals && !isProcessing && (
+      {/* The review list shows while the run is in progress: proposals stream in as each
+          cluster is named, so the user can start reviewing immediately instead of staring
+          at a progress bar for minutes. The progress bar stays above it; the list appends
+          in arrival order (most important clusters first) and never re-sorts. */}
+      {hasProposals && (
         <ProposalDashboard
           proposals={proposals}
           actionableCount={actionablCount}

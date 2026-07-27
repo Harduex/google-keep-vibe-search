@@ -14,6 +14,7 @@ from app.models.label import Label, LabelVocabulary
 from app.prompts.system_prompts import TAG_NAMING_SYSTEM_PROMPT, TAG_NAMING_USER_PROMPT
 from app.services.llm_client import LLMClient
 from app.services.note_service import NoteService
+from app.services.proposal_store import load_pending_actions
 from app.services.search_service import SearchService
 from app.services.tagging.assign import assign_tags_to_notes, compute_assignment_stats
 from app.services.tagging.cluster import cluster_notes, compute_centroids, reduce_embeddings
@@ -228,13 +229,22 @@ class CategorizationService:
         return pairs
 
     @staticmethod
-    def _apply_merge_map(vocab: LabelVocabulary, merge_map: Dict[str, Any]) -> None:
+    def _apply_merge_map(
+        vocab: LabelVocabulary,
+        merge_map: Dict[str, Any],
+        locked: Optional[set] = None,
+    ) -> None:
         if not merge_map or not isinstance(merge_map, dict):
             return
 
         merges = merge_map.get("merges", [])
         if not isinstance(merges, list):
             return
+
+        # Locked tags: the user already staged a decision on them, so the machine must not
+        # merge them away (source) or fold anything into them (target). Empty by default —
+        # when nothing is locked this method is byte-identical to its pre-T38 behaviour.
+        locked_tags = locked or set()
 
         prop_map = {lbl.name: lbl for lbl in vocab.labels}
 
@@ -251,7 +261,12 @@ class CategorizationService:
             if not into_sanitized:
                 continue
 
-            valid_froms = [f for f in from_list if f in prop_map]
+            # Never merge INTO a locked tag — folding another cluster into a tag the user
+            # already decided on would change its membership out from under them.
+            if into_sanitized in locked_tags:
+                continue
+
+            valid_froms = [f for f in from_list if f in prop_map and f not in locked_tags]
             if not valid_froms:
                 continue
 
@@ -1006,37 +1021,67 @@ class CategorizationService:
                                 f"for cluster ──► '{reused_tag}'"
                             )
                             lbl.name = reused_tag
-                            continue
-                        real_name = await self._get_llm_tag_name(
-                            n_text,
-                            kw_str,
-                            neighbor_kw,
-                            existing_tags=existing_vault_tags,
-                        )
-                        print(
-                            f"          └─ [{i+1}/{total_llm}] Cluster '{lbl.name}' ──► '{real_name}'"
-                        )
-
-                        denylist = {
-                            "misc",
-                            "miscellaneous",
-                            "various",
-                            "general",
-                            "other",
-                            "notes",
-                            "undefined",
-                            "unknown",
-                            "uncategorized",
-                        }
-                        if real_name and real_name.lower() not in denylist:
-                            lbl.name = real_name
                         else:
-                            if not real_name:
-                                lbl.name = (
-                                    " ".join(kw_str.split(", ")[:2]).title() if kw_str else "Misc"
-                                )
+                            real_name = await self._get_llm_tag_name(
+                                n_text,
+                                kw_str,
+                                neighbor_kw,
+                                existing_tags=existing_vault_tags,
+                            )
+                            print(
+                                f"          └─ [{i+1}/{total_llm}] Cluster '{lbl.name}' ──► '{real_name}'"
+                            )
+
+                            denylist = {
+                                "misc",
+                                "miscellaneous",
+                                "various",
+                                "general",
+                                "other",
+                                "notes",
+                                "undefined",
+                                "unknown",
+                                "uncategorized",
+                            }
+                            if real_name and real_name.lower() not in denylist:
+                                lbl.name = real_name
                             else:
-                                lbl.name = "DROP_ME"
+                                if not real_name:
+                                    lbl.name = (
+                                        " ".join(kw_str.split(", ")[:2]).title()
+                                        if kw_str
+                                        else "Misc"
+                                    )
+                                else:
+                                    lbl.name = "DROP_ME"
+
+                        # Stream one proposal per named cluster so the user can start
+                        # reviewing while naming continues. Naming is size-descending,
+                        # so the most important clusters arrive first; the client
+                        # appends in arrival order (no re-sort). The payload matches
+                        # one element of ``vocab.to_proposals()`` exactly, so the
+                        # existing renderer handles it. ``DROP_ME`` clusters (the LLM
+                        # returned a denylisted name) are not streamed: they are
+                        # removed before consolidation and would otherwise flash a
+                        # card that vanishes at reconciliation. Names only — the
+                        # cluster's sample notes are tag proposals, not raw notes.
+                        if lbl.name and lbl.name != "DROP_ME":
+                            await queue.put(
+                                self._line(
+                                    {
+                                        "type": "proposal",
+                                        "proposal": {
+                                            "tag_name": lbl.name,
+                                            "note_ids": lbl.seed_note_ids,
+                                            "note_count": len(lbl.seed_note_ids),
+                                            "sample_notes": lbl.sample_notes,
+                                            "confidence": lbl.confidence,
+                                        },
+                                        "current": i + 1,
+                                        "total": total_llm,
+                                    }
+                                )
+                            )
 
                     # Remove dropped labels
                     vocab.labels = [lbl for lbl in vocab.labels if lbl.name != "DROP_ME"]
@@ -1061,6 +1106,17 @@ class CategorizationService:
                             for lbl in vocab.labels
                             if lbl.name != "Uncategorized" and lbl.prototype_vector is not None
                         ]
+                        # Lock list: tags the user already staged a decision on are excluded
+                        # from consolidation entirely — never a merge source, never a merge
+                        # target. Read from the shared pending-proposals artifact the client
+                        # writes its staged actions to. Empty when nothing is staged, which
+                        # makes this step byte-identical to its pre-T38 behaviour (the
+                        # parity invariant the eval asserts).
+                        try:
+                            locked_tags = set(load_pending_actions().keys())
+                        except Exception:
+                            locked_tags = set()
+
                         merged_into = {lbl.name: lbl.name for lbl in valid_labels}
 
                         def find_root(x):
@@ -1085,7 +1141,13 @@ class CategorizationService:
                                 sim = float(np.dot(v1, v2) / norm) if norm > 0 else 0
 
                                 if sim > 0.85:
-                                    union_roots(valid_labels[i].name, valid_labels[j].name)
+                                    ni = valid_labels[i].name
+                                    nj = valid_labels[j].name
+                                    # A locked tag is never auto-merged, in either direction:
+                                    # folding it into a neighbour (source) or a neighbour
+                                    # into it (target) would both undo the user's decision.
+                                    if ni not in locked_tags and nj not in locked_tags:
+                                        union_roots(ni, nj)
                                 elif sim > 0.70:
                                     borderline_pairs.append((valid_labels[i], valid_labels[j]))
 
@@ -1103,17 +1165,18 @@ class CategorizationService:
 
                         if auto_merges["merges"]:
                             applied_merges.extend(self._merge_pairs(auto_merges))
-                            self._apply_merge_map(vocab, auto_merges)
+                            self._apply_merge_map(vocab, auto_merges, locked_tags)
 
                         remaining_labels = [
                             lbl for lbl in vocab.labels if lbl.name != "Uncategorized"
                         ]
 
-                        # Only send borderline pairs to LLM
+                        # Only send borderline pairs to LLM. Drop pairs touching a locked
+                        # tag — the LLM is not allowed to propose merging those either.
                         active_borderline = []
                         for a, b in borderline_pairs:
                             ra, rb = find_root(a.name), find_root(b.name)
-                            if ra != rb:
+                            if ra != rb and a.name not in locked_tags and b.name not in locked_tags:
                                 active_borderline.append((a, b))
 
                         if active_borderline or len(remaining_labels) > MAX_TAGS:
@@ -1204,18 +1267,26 @@ class CategorizationService:
 
                             merge_map = json.loads(raw_stripped)
                             applied_merges.extend(self._merge_pairs(merge_map))
-                            self._apply_merge_map(vocab, merge_map)
+                            self._apply_merge_map(vocab, merge_map, locked_tags)
 
                             # Fallback aggressive merge if still over max_tags
                             remaining_labels = [
                                 lbl for lbl in vocab.labels if lbl.name != "Uncategorized"
                             ]
                             while len(remaining_labels) > MAX_TAGS:
-                                # Find closest pair
+                                # Find closest pair among non-locked tags only. A locked tag
+                                # cannot be merged in either direction, so including it in the
+                                # search would either no-op (and loop forever on the same pair)
+                                # or violate the lock. When no unlocked pair remains, give up:
+                                # honouring the user's decisions outranks the MAX_TAGS cap.
                                 best_sim = -1
                                 best_pair = None
                                 for i in range(len(remaining_labels)):
                                     for j in range(i + 1, len(remaining_labels)):
+                                        ni = remaining_labels[i].name
+                                        nj = remaining_labels[j].name
+                                        if ni in locked_tags or nj in locked_tags:
+                                            continue
                                         v1 = remaining_labels[i].prototype_vector
                                         v2 = remaining_labels[j].prototype_vector
                                         if v1 is None or v2 is None:
@@ -1233,7 +1304,12 @@ class CategorizationService:
                                         "merges": [{"into": best_pair[0], "from": [best_pair[1]]}]
                                     }
                                     applied_merges.extend(self._merge_pairs(fallback_map))
-                                    self._apply_merge_map(vocab, fallback_map)
+                                    # Locked tags survive the fallback too — `_apply_merge_map`
+                                    # skips a locked source or target, so the merge is a no-op
+                                    # and the locked tag is left intact (possibly still over
+                                    # MAX_TAGS, which is the correct trade-off: the user's
+                                    # decision outranks the count cap).
+                                    self._apply_merge_map(vocab, fallback_map, locked_tags)
                                     remaining_labels = [
                                         lbl for lbl in vocab.labels if lbl.name != "Uncategorized"
                                     ]

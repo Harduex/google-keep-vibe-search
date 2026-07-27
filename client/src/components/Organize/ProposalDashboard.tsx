@@ -8,10 +8,10 @@ interface ProposalDashboardProps {
   proposals: ProposalState[];
   actionableCount: number;
   isApplying: boolean;
-  onApprove: (index: number) => void;
-  onReject: (index: number) => void;
-  onRename: (index: number, newName: string) => void;
-  onMerge: (sourceIndex: number, targetIndex: number) => void;
+  onApprove: (id: string | number) => void;
+  onReject: (id: string | number) => void;
+  onRename: (id: string | number, newName: string) => void;
+  onMerge: (sourceTagName: string, targetTagName: string) => void;
   onApproveAll: () => void;
   onReset: () => void;
   onApply: () => void;
@@ -99,18 +99,30 @@ export const ProposalDashboard = memo(
         </div>
 
         <div className="proposals-list">
-          {proposals.map((state, index) => (
-            <ProposalCard
-              key={`${state.proposal.tag_name ?? state.proposal.action ?? state.proposal.type}-${index}`}
-              state={state}
-              index={index}
-              allProposals={proposals}
-              onApprove={onApprove}
-              onReject={onReject}
-              onRename={onRename}
-              onMerge={onMerge}
-            />
-          ))}
+          {proposals.map((state, index) => {
+            // Stable key so React does not reuse the wrong card as the list grows
+            // underneath the user. Classic proposals key on tag_name (unique within a
+            // vocabulary); dashboard cards key on their distinguishing fields, falling
+            // back to index only for read-only info cards.
+            const p = state.proposal;
+            const key =
+              p.tag_name ??
+              (p.action
+                ? `${p.action}:${p.source_tag ?? ''}:${p.target_tag ?? ''}:${p.note_id ?? ''}`
+                : `info-${index}`);
+            return (
+              <ProposalCard
+                key={key}
+                state={state}
+                index={index}
+                allProposals={proposals}
+                onApprove={onApprove}
+                onReject={onReject}
+                onRename={onRename}
+                onMerge={onMerge}
+              />
+            );
+          })}
         </div>
       </div>
     );

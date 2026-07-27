@@ -133,7 +133,7 @@ report it instead of working around it.
 | T41 | 7 W | 1 | Route every raw exception string through `safe_exc` | P1–P3 (completion) | ½ d | todo |
 | T42 | 7 X | 1 | Delete the legacy whole-corpus embedding cache | A1 (third impl) | ½ d | todo |
 | T43 | 8 — | 2 | ~~Rewrite the unpushed commit messages for a public reader~~ | — | — | **retired** (branch published 2026-07-26 — see § Superseded) |
-| T38 | 6 M | 3 | Stream proposals as they are named, actionable mid-run (serial, after T30) | — | 1 d | todo |
+| T38 | 6 M | 3 | Stream proposals as they are named, actionable mid-run (serial, after T30) | — | 1 d | done |
 
 **Totals:** 43 tasks, one retired · ~23½ developer-days serial · ~9 wall-clock days at the lane
 parallelism above. **29 done, 13 remaining, 1 retired** (wave 6: T27–T32, T34, T38 · wave 7: T39–T42

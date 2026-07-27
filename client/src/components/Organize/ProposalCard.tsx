@@ -6,36 +6,41 @@ interface ProposalCardProps {
   state: ProposalState;
   index: number;
   allProposals: ProposalState[];
-  onApprove: (index: number) => void;
-  onReject: (index: number) => void;
-  onRename: (index: number, newName: string) => void;
-  onMerge: (sourceIndex: number, targetIndex: number) => void;
+  /** Approve/reject take the card's stable id: a tag name for classic proposals (the list
+   * grows underneath the user, so an index would shift), or an array index for dashboard
+   * cards (info/merge/assign), which arrive together at the end of the run. */
+  onApprove: (id: string | number) => void;
+  onReject: (id: string | number) => void;
+  onRename: (id: string | number, newName: string) => void;
+  /** Merge is keyed by tag name only — classic proposals. Dashboard cards are never merge
+   * sources or targets, so this never receives an index. */
+  onMerge: (sourceTagName: string, targetTagName: string) => void;
 }
 
 /** Approve / reject controls shared by the gray-zone merge and review cards. */
 const ApproveRejectActions = memo(
   ({
-    index,
+    id,
     action,
     onApprove,
     onReject,
   }: {
-    index: number;
+    id: string | number;
     action: ProposalState['action'];
-    onApprove: (index: number) => void;
-    onReject: (index: number) => void;
+    onApprove: (id: string | number) => void;
+    onReject: (id: string | number) => void;
   }) => (
     <div className="proposal-actions">
       <button
         className={`proposal-action-btn approve ${action === 'approve' ? 'active' : ''}`}
-        onClick={() => onApprove(index)}
+        onClick={() => onApprove(id)}
         title="Approve"
       >
         <span className="material-icons">check</span>
       </button>
       <button
         className={`proposal-action-btn reject ${action === 'reject' ? 'active' : ''}`}
-        onClick={() => onReject(index)}
+        onClick={() => onReject(id)}
         title="Reject"
       >
         <span className="material-icons">close</span>
@@ -53,19 +58,25 @@ export const ProposalCard = memo(
 
     const proposal = state.proposal;
 
+    // The stable id for approve/reject/rename: tag name for classic proposals, index for
+    // dashboard cards (which arrive together at the end, so an index is stable for them).
+    // Classic proposals stream in one at a time, so a positional index would shift when
+    // new cards arrive and silently retarget a click.
+    const cardId: string | number = proposal.tag_name ?? index;
+
     const handleRenameSubmit = useCallback(() => {
       if (renameValue.trim() && renameValue !== proposal.tag_name) {
-        onRename(index, renameValue.trim());
+        onRename(cardId, renameValue.trim());
       }
       setIsRenaming(false);
-    }, [renameValue, proposal.tag_name, index, onRename]);
+    }, [renameValue, proposal.tag_name, cardId, onRename]);
 
     const handleMergeSelect = useCallback(
-      (targetIndex: number) => {
-        onMerge(index, targetIndex);
+      (targetTagName: string) => {
+        onMerge(proposal.tag_name ?? '', targetTagName);
         setIsMerging(false);
       },
-      [index, onMerge],
+      [proposal.tag_name, onMerge],
     );
 
     const confidence = proposal.confidence ?? 1;
@@ -127,7 +138,7 @@ export const ProposalCard = memo(
             </div>
           </div>
           <ApproveRejectActions
-            index={index}
+            id={cardId}
             action={state.action}
             onApprove={onApprove}
             onReject={onReject}
@@ -156,7 +167,7 @@ export const ProposalCard = memo(
             </div>
           </div>
           <ApproveRejectActions
-            index={index}
+            id={cardId}
             action={state.action}
             onApprove={onApprove}
             onReject={onReject}
@@ -166,8 +177,16 @@ export const ProposalCard = memo(
     }
 
     // Classic cluster tag proposal — full approve / rename / merge / reject.
+    // Merge targets are the classic proposals that have already arrived, keyed by tag name.
+    // Not positional: in a list that grows underneath the user, indices shift and a staged
+    // merge would silently retarget (item 6). Tag names are unique within a vocabulary.
     const mergeTargets = allProposals.filter(
-      (p, i) => i !== index && p.proposal.tag_name !== undefined,
+      (p) =>
+        p.proposal.tag_name !== undefined &&
+        p.proposal.tag_name !== proposal.tag_name &&
+        !isInfoProposal(p.proposal) &&
+        !isMergeProposal(p.proposal) &&
+        !isAssignProposal(p.proposal),
     );
 
     return (
@@ -231,7 +250,7 @@ export const ProposalCard = memo(
         <div className="proposal-actions">
           <button
             className={`proposal-action-btn approve ${state.action === 'approve' ? 'active' : ''}`}
-            onClick={() => onApprove(index)}
+            onClick={() => onApprove(cardId)}
             title="Approve"
           >
             <span className="material-icons">check</span>
@@ -255,7 +274,7 @@ export const ProposalCard = memo(
           </button>
           <button
             className={`proposal-action-btn reject ${state.action === 'reject' ? 'active' : ''}`}
-            onClick={() => onReject(index)}
+            onClick={() => onReject(cardId)}
             title="Reject"
           >
             <span className="material-icons">close</span>
@@ -265,18 +284,15 @@ export const ProposalCard = memo(
         {isMerging && (
           <div className="merge-selector">
             <span className="merge-label">Merge into:</span>
-            {mergeTargets.map((p) => {
-              const originalIndex = allProposals.findIndex((ap) => ap === p);
-              return (
-                <button
-                  key={originalIndex}
-                  className="merge-target-btn"
-                  onClick={() => handleMergeSelect(originalIndex)}
-                >
-                  {p.proposal.tag_name}
-                </button>
-              );
-            })}
+            {mergeTargets.map((p) => (
+              <button
+                key={p.proposal.tag_name}
+                className="merge-target-btn"
+                onClick={() => handleMergeSelect(p.proposal.tag_name!)}
+              >
+                {p.proposal.tag_name}
+              </button>
+            ))}
           </div>
         )}
 

@@ -2,6 +2,7 @@ import json
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 from app.core.dependencies import get_categorization_service, get_note_service
 from app.models.organize import ApplyProposalsRequest, CategorizeRequest
@@ -9,25 +10,51 @@ from app.services.categorization_service import CategorizationService
 from app.services.note_service import NoteService
 from app.services.proposal_store import (
     clear_pending_proposals,
+    load_pending_actions,
     load_pending_proposals,
+    save_pending_actions,
     save_pending_proposals,
 )
 
 router = APIRouter(prefix="/api/organize", tags=["organize"])
 
+# Persist the partial proposal set at most this often during a run, so a crash or a killed
+# stream leaves the generated proposals on disk without writing on every single frame. The
+# authoritative end-of-run frame (label_updates) always persists, regardless of throttle.
+PARTIAL_PERSIST_EVERY = 5
+
 
 async def _persisting_stream(source, granularity):
-    """Pass the categorization stream through, persisting any proposal frame it carries.
+    """Pass the categorization stream through, persisting proposals as they arrive.
 
     Wrapping the stream at the route means every producer is covered — the frames are the
     contract the client already consumes, so nothing inside the service has to know that
     proposals are now crash-proof.
+
+    Individual ``proposal`` frames (one per named cluster, arriving mid-run) are accumulated
+    and persisted on a throttle so a crash mid-naming leaves the partial set on disk. The
+    final ``proposals`` / ``label_updates`` frame is authoritative and always persists,
+    replacing the partial set.
     """
+    partial: list = []
+    since_persist = 0
     async for chunk in source:
         try:
             frame = json.loads(chunk.decode() if isinstance(chunk, bytes) else chunk)
-            if frame.get("type") in ("proposals", "label_updates") and frame.get("proposals"):
+            ftype = frame.get("type")
+            if ftype == "proposal" and frame.get("proposal"):
+                # Append in arrival order — naming is size-descending, so the most
+                # important clusters arrive first; the client renders in this order too.
+                partial.append(frame["proposal"])
+                since_persist += 1
+                if since_persist >= PARTIAL_PERSIST_EVERY:
+                    save_pending_proposals(list(partial), granularity)
+                    since_persist = 0
+            elif ftype in ("proposals", "label_updates") and frame.get("proposals"):
                 save_pending_proposals(frame["proposals"], granularity)
+                # The authoritative frame supersedes the partial set.
+                partial = list(frame["proposals"])
+                since_persist = 0
         except (json.JSONDecodeError, AttributeError, UnicodeDecodeError):
             pass  # Not a frame we persist; the client still gets it verbatim.
         yield chunk
@@ -49,10 +76,15 @@ async def categorize(
 
 @router.get("/pending")
 def get_pending_proposals():
-    """Proposals generated earlier and not yet applied, so a reload does not lose them."""
+    """Proposals generated earlier and not yet applied, so a reload does not lose them.
+
+    Also returns the staged ``actions`` map (tag name -> action) so a remount restores both
+    the proposals and the decisions the user made against them.
+    """
     payload = load_pending_proposals()
     if payload is None:
-        return {"proposals": [], "generated_at": None, "granularity": None}
+        return {"proposals": [], "generated_at": None, "granularity": None, "actions": {}}
+    payload.setdefault("actions", load_pending_actions())
     return payload
 
 
@@ -61,6 +93,25 @@ def discard_pending_proposals():
     """Explicitly throw away the pending set (the previous file is kept as `.bak`)."""
     clear_pending_proposals()
     return {"discarded": True}
+
+
+class PendingActionsRequest(BaseModel):
+    # Tag name -> staged action (approve / reject / rename / merge). The whole map is sent
+    # each time so the server has the complete staged state; stored verbatim.
+    actions: dict
+
+
+@router.put("/pending/actions")
+def put_pending_actions(request: PendingActionsRequest):
+    """Record the client's staged decisions so consolidation skips the tags the user acted on.
+
+    Stored as an ``actions`` map (tag name -> action) in the same ``pending_proposals.json``
+    that serves crash-safety. The consolidation step reads these tag names and treats them as
+    *locked*: never a merge source, never a merge target — nothing the user decided can be
+    undone by the machine.
+    """
+    save_pending_actions(request.actions if isinstance(request.actions, dict) else {})
+    return {"stored": True}
 
 
 @router.post("/apply")

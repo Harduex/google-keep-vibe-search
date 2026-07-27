@@ -1,13 +1,34 @@
+import json
 import os
+
+import numpy as np
+import pytest
 
 from app.core.config import settings
 from app.models.organize import ApplyAction, ApplyProposalsRequest
 from app.routes.organize import apply_proposals
+from app.services.categorization_service import CategorizationService, _default_manifest_path
 from app.services.proposal_store import (
     clear_pending_proposals,
+    load_pending_actions,
     load_pending_proposals,
+    save_pending_actions,
     save_pending_proposals,
 )
+
+
+def _clear_manifest():
+    """Remove the tag-name/centroid manifest so a categorize run does fresh naming.
+
+    ``categorize`` reuses a stored manifest's tag names when a centroid matches (manifest
+    stability), and saves a fresh manifest at the end of each run. Within a test that runs
+    categorize twice and compares vocabularies, the second run would otherwise reuse the
+    first run's names instead of naming from the LLM stub — masking exactly the
+    consolidation behaviour under test.
+    """
+    path = _default_manifest_path()
+    if os.path.exists(path):
+        os.remove(path)
 
 
 class FakeNoteService:
@@ -172,3 +193,314 @@ class TestPendingProposalSurvival:
 
         assert load_pending_proposals() is None
         assert os.path.exists(f"{path}.bak")
+
+
+# --------------------------------------------------------------------------
+# T38 — staged actions store (the lock list) lives in the same artifact
+# --------------------------------------------------------------------------
+
+
+class TestStagedActionsStore:
+    """The client's staged decisions are stored as an ``actions`` map (tag name -> action)
+    in the same ``pending_proposals.json``. Consolidation reads these tag names and treats
+    them as locked: never a merge source, never a merge target. One artifact serves
+    crash-safety and the exemption — there is no second transport for the actions."""
+
+    def test_actions_round_trip_alongside_proposals(self):
+        save_pending_proposals([{"tag_name": "Recipes", "note_ids": ["a"]}], "broad")
+        save_pending_actions({"Recipes": "approve", "Travel": "reject"})
+
+        actions = load_pending_actions()
+        assert actions == {"Recipes": "approve", "Travel": "reject"}
+
+        # Proposals still load from the same artifact.
+        payload = load_pending_proposals()
+        assert payload is not None
+        assert payload["proposals"] == [{"tag_name": "Recipes", "note_ids": ["a"]}]
+
+    def test_re_persisting_proposals_preserves_the_actions(self):
+        # A throttled partial save during the run re-persists proposals and must not drop
+        # the staged decisions the user made mid-run.
+        save_pending_actions({"Recipes": "approve"})
+        save_pending_proposals([{"tag_name": "Recipes", "note_ids": ["a", "b"]}], "broad")
+
+        assert load_pending_actions() == {"Recipes": "approve"}
+
+    def test_nothing_staged_is_an_empty_map(self):
+        assert load_pending_actions() == {}
+
+    def test_clear_drops_actions_too(self):
+        save_pending_actions({"Recipes": "approve"})
+        save_pending_proposals([{"tag_name": "Recipes", "note_ids": ["a"]}], "broad")
+
+        clear_pending_proposals()
+
+        assert load_pending_actions() == {}
+        assert load_pending_proposals() is None
+
+
+# --------------------------------------------------------------------------
+# T38 — streamed proposal frames: one per named cluster, correct shape/count
+# --------------------------------------------------------------------------
+
+
+class _StreamingDeterministicLLM:
+    """Stub LLM that routes every call without touching a provider.
+
+    Returns empty classifications / no merges for the prefix and consolidation prompts,
+    and a fixed, cluster-indexed tag for the naming tool-call, so a full ``categorize``
+    run completes deterministically with no network and each cluster gets a distinct name.
+    """
+
+    def __init__(self):
+        self.call_count = 0
+
+    async def complete(self, *args, **kwargs):
+        self.call_count += 1
+        return '{"classifications": []}'
+
+    async def complete_with_tools(self, *args, **kwargs):
+        self.call_count += 1
+        # Distinct name per naming call so clusters do not collide.
+        name = f"Topic {self.call_count}"
+
+        class MockFunction:
+            arguments = json.dumps({"tag": name})
+
+        class MockToolCall:
+            function = MockFunction()
+
+        return {"content": name, "tool_calls": [MockToolCall()]}
+
+
+class _StreamingStubEngine:
+    """Embedding stub: encode() returns a zero vector of the right width."""
+
+    class _Model:
+        def encode(self, texts):
+            return np.zeros((len(texts), 384), dtype=np.float32)
+
+    model = _Model()
+
+
+class _StreamingStubSearch:
+    """Minimal SearchService surface used by ``CategorizationService.categorize``."""
+
+    def __init__(self, embeddings, notes, note_indices):
+        self.embeddings = embeddings
+        self.notes = notes
+        self.note_indices = note_indices
+        self.engine = _StreamingStubEngine()
+
+
+def _two_cluster_corpus():
+    """Two tight 20-vec blobs so HDBSCAN forms >= 2 clusters at broad sizing
+    (min_cluster_size = max(15, ...) at n=40 -> 15, just under a blob)."""
+    rng = np.random.RandomState(7)
+    blob_a = (rng.randn(20, 384) + 5.0).astype(np.float32)
+    blob_b = (rng.randn(20, 384) - 5.0).astype(np.float32)
+    embeddings = np.vstack([blob_a, blob_b])
+    notes = [{"id": f"note_{i}.json", "title": "", "content": ""} for i in range(40)]
+    note_indices = list(range(40))
+    return embeddings, notes, note_indices
+
+
+async def _collect_frames(service, fresh_manifest=True):
+    """Drive one ``categorize`` run to completion, returning every parsed frame.
+
+    Clears the manifest first by default so the run names from the LLM stub instead of
+    reusing a previous run's names (which would mask the consolidation under test).
+    """
+    if fresh_manifest:
+        _clear_manifest()
+    frames = []
+    async for line in service.categorize(granularity="broad"):
+        data = json.loads(line)
+        frames.append(data)
+        if data.get("type") in ("done", "error"):
+            break
+    return frames
+
+
+@pytest.mark.asyncio
+async def test_one_proposal_frame_per_named_cluster_with_correct_shape():
+    """T38 Do-item 1: exactly one ``proposal`` frame per named cluster, and each frame's
+    payload matches one element of ``vocab.to_proposals()`` so the client keeps a single
+    renderer."""
+    embeddings, notes, note_indices = _two_cluster_corpus()
+    service = CategorizationService(
+        search_service=_StreamingStubSearch(embeddings, notes, note_indices),
+        note_service=None,
+        llm=_StreamingDeterministicLLM(),
+    )
+
+    frames = await _collect_frames(service)
+
+    assert (
+        frames and frames[-1]["type"] == "done"
+    ), f"categorize did not terminate cleanly; last frame={frames[-1] if frames else None}"
+
+    proposal_frames = [f for f in frames if f.get("type") == "proposal"]
+    assert proposal_frames, "expected at least one streamed proposal frame"
+
+    # Each frame must carry the exact to_proposals() element shape plus current/total.
+    for f in proposal_frames:
+        assert set(f.keys()) >= {"type", "proposal", "current", "total"}
+        p = f["proposal"]
+        assert set(p.keys()) == {
+            "tag_name",
+            "note_ids",
+            "note_count",
+            "sample_notes",
+            "confidence",
+        }, f"proposal payload shape mismatch: {p.keys()}"
+        assert p["note_count"] == len(p["note_ids"])
+
+    # current/total reflect naming progress and arrive in order.
+    currents = [f["current"] for f in proposal_frames]
+    assert currents == sorted(currents), "proposal frames must arrive in current order"
+    total = proposal_frames[0]["total"]
+    assert total > 0
+    assert all(f["total"] == total for f in proposal_frames)
+    assert currents[-1] == total, "last proposal frame must report current == total"
+
+    # Frame count == number of clusters that went through the naming loop. The final
+    # authoritative label_updates frame carries the consolidated vocabulary; the streamed
+    # frames are the unconsolidated per-cluster names.
+    label_updates = [f for f in frames if f.get("type") == "label_updates"]
+    assert label_updates, "expected an authoritative label_updates frame at the end"
+    assert (
+        len(proposal_frames) == total
+    ), f"frame count {len(proposal_frames)} != naming total {total}"
+
+
+@pytest.mark.asyncio
+async def test_empty_lock_list_is_byte_identical_to_baseline():
+    """T38 risk note: a run with an empty lock list must produce the SAME final vocabulary
+    as before the change. Consolidation with nothing staged is a no-op relative to the
+    pre-T38 path."""
+    embeddings, notes, note_indices = _two_cluster_corpus()
+
+    def build():
+        return CategorizationService(
+            search_service=_StreamingStubSearch(embeddings, notes, note_indices),
+            note_service=None,
+            llm=_StreamingDeterministicLLM(),
+        )
+
+    # Nothing staged → empty lock list.
+    assert load_pending_actions() == {}
+
+    frames = await _collect_frames(build())
+    label_updates = [f for f in frames if f.get("type") == "label_updates"]
+    assert label_updates
+    # Final vocabulary is the set of classic tag names (excluding Uncategorized/dashboard
+    # proposals). Record it as the baseline; the locked-tag test below re-runs and asserts
+    # an unlocked run reproduces this exactly.
+    final_names = {
+        p["tag_name"]
+        for p in label_updates[-1]["proposals"]
+        if p.get("tag_name") and p["tag_name"] != "Uncategorized" and not p.get("type")
+    }
+    assert final_names, "expected at least one final tag"
+
+    # Re-run on an identical corpus: the final vocabulary must match exactly.
+    frames2 = await _collect_frames(build())
+    label_updates2 = [f for f in frames2 if f.get("type") == "label_updates"]
+    assert label_updates2
+    final_names2 = {
+        p["tag_name"]
+        for p in label_updates2[-1]["proposals"]
+        if p.get("tag_name") and p["tag_name"] != "Uncategorized" and not p.get("type")
+    }
+    assert (
+        final_names == final_names2
+    ), f"empty-lock run not deterministic/baseline: {final_names} vs {final_names2}"
+
+
+@pytest.mark.asyncio
+async def test_a_locked_tag_survives_consolidation_while_unlocked_duplicates_merge():
+    """T38 Do-item 3 / design decision 1: a locked tag is excluded from consolidation in
+    both directions (never a source, never a target), so nothing the user decided can be
+    undone by the machine. An unlocked duplicate is still consolidated.
+
+    Two near-identical clusters (centroid cosine ~0.95, well above the 0.85 auto-merge
+    threshold) would auto-merge. Locking one tag's name must prevent the merge; locking
+    neither must still merge them.
+    """
+    # Two tight blobs centred close together so their centroids have cosine > 0.85
+    # (auto-merge threshold) but HDBSCAN still sees them as separate clusters.
+    rng = np.random.RandomState(11)
+    blob_a = (rng.randn(20, 384) + 1.0).astype(np.float32)
+    blob_b = (rng.randn(20, 384) + 1.01).astype(np.float32)
+    embeddings = np.vstack([blob_a, blob_b])
+    notes = [{"id": f"note_{i}.json", "title": "", "content": ""} for i in range(40)]
+    note_indices = list(range(40))
+
+    def build():
+        return CategorizationService(
+            search_service=_StreamingStubSearch(embeddings, notes, note_indices),
+            note_service=None,
+            llm=_StreamingDeterministicLLM(),
+        )
+
+    def classic_names(label_updates_frames):
+        last = label_updates_frames[-1]
+        return {
+            p["tag_name"]
+            for p in last["proposals"]
+            if p.get("tag_name") and p["tag_name"] != "Uncategorized" and not p.get("type")
+        }
+
+    # --- Unlocked run: the two duplicate clusters consolidate to one tag. ---
+    clear_pending_proposals()
+    assert load_pending_actions() == {}
+    frames = await _collect_frames(build())
+    label_updates = [f for f in frames if f.get("type") == "label_updates"]
+    assert label_updates
+    unlocked_names = classic_names(label_updates)
+    assert (
+        len(unlocked_names) == 1
+    ), f"unlocked duplicates should consolidate to 1 tag, got {unlocked_names}"
+
+    # --- Locked run: the user staged a decision on one cluster's name, so the machine
+    # must not merge it (nor fold it into the other). Both survive. ---
+    streamed = [f for f in frames if f.get("type") == "proposal"]
+    assert len(streamed) >= 2
+    locked_name = streamed[0]["proposal"]["tag_name"]
+    save_pending_proposals(
+        [
+            {
+                "tag_name": locked_name,
+                "note_ids": ["x"],
+                "note_count": 1,
+                "sample_notes": [],
+                "confidence": 1.0,
+            }
+        ],
+        "broad",
+    )
+    save_pending_actions({locked_name: "approve"})
+    assert load_pending_actions() == {locked_name: "approve"}
+
+    frames_locked = await _collect_frames(build())
+    label_updates_locked = [f for f in frames_locked if f.get("type") == "label_updates"]
+    assert label_updates_locked
+    locked_final_names = classic_names(label_updates_locked)
+
+    # The locked tag survived: it is still in the final vocabulary.
+    assert locked_name in locked_final_names, (
+        f"locked tag '{locked_name}' was merged away by consolidation; "
+        f"final vocabulary={locked_final_names}"
+    )
+
+    # Locking prevented the merge the unlocked run performed: the locked run keeps both
+    # clusters, the unlocked run kept one. The user's decision outranks the machine.
+    assert (
+        len(locked_final_names) == 2
+    ), f"locking should keep both clusters (2 tags), got {locked_final_names}"
+    assert len(locked_final_names) > len(
+        unlocked_names
+    ), "locking did not prevent the merge the unlocked run performed"
+
+    clear_pending_proposals()

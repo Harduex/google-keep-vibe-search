@@ -272,7 +272,7 @@ describe('useOrganize proposal survival', () => {
   });
 });
 
-describe('useOrganize streamed proposals (T38)', () => {
+describe('useOrganize streamed proposals', () => {
   beforeEach(() => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     global.fetch = vi.fn(() => {

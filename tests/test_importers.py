@@ -613,8 +613,8 @@ def test_markdown_vault_real_corpus(tmp_path):
     if corpus is None or not getattr(corpus, "docs", None):
         pytest.skip(
             "markdown_vault corpus accessor is a stub (returns None) — "
-            "blocked on T35 providing a real CC-licensed vault. "
-            "Not a T23 defect; reported as a blocker."
+            "it needs a real CC-licensed vault before this can run. "
+            "Not an importer defect."
         )
 
     # If/when that accessor ships real data, it must expose it as files on disk the

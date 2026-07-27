@@ -196,7 +196,7 @@ class TestSearchServiceExcludedTags:
         assert engine.last_kwargs == {"max_results": settings.max_results + 1}
 
 
-class TestB5LiveWiring:
+class TestTagFilterLiveWiring:
     """The agent's filter_by_tag tool once returned 0 notes for every query. The tool
     itself was fixed, but stayed inert in production because nothing wired a tag map
     through retrieval -> search_service -> ChatService._tag_lookup(). This asserts a

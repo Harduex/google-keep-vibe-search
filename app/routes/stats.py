@@ -1,5 +1,3 @@
-import os
-
 from fastapi import APIRouter, Depends, Request
 
 from app.core.config import settings
@@ -26,7 +24,6 @@ def stats(
         "total_notes": len(notes),
         "archived_notes": sum(1 for n in notes if n.get("archived", False)),
         "pinned_notes": sum(1 for n in notes if n.get("pinned", False)),
-        "using_cached_embeddings": os.path.exists(settings.embeddings_cache_file),
         "image_search": image_search_status,
     }
 

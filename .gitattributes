@@ -1,0 +1,22 @@
+# Line endings are normalised to LF in the repository, regardless of the platform
+# a contributor checks out on. Without this, files authored on Windows land in the
+# index with CRLF and any later whole-file edit produces a diff where every line
+# appears changed, hiding the real change inside it.
+* text=auto eol=lf
+
+# Windows-only scripts are the exception: PowerShell tolerates LF, but a .ps1 that
+# a user opens in Notepad should not appear as one long line.
+*.ps1 text eol=crlf
+
+# Never touch binary payloads.
+*.npz binary
+*.npy binary
+*.pt binary
+*.safetensors binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary

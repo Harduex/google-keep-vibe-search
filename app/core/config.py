@@ -86,14 +86,6 @@ class Settings(BaseSettings):
         )
 
     @property
-    def embeddings_cache_file(self) -> str:
-        return os.path.join(self.resolved_cache_dir, "embeddings.npz")
-
-    @property
-    def notes_hash_file(self) -> str:
-        return os.path.join(self.resolved_cache_dir, "notes_hash.json")
-
-    @property
     def notes_cache_file(self) -> str:
         return os.path.join(self.resolved_cache_dir, "notes_cache.json")
 

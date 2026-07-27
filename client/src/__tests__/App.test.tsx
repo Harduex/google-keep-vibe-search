@@ -31,7 +31,6 @@ describe('App loading behavior', () => {
         total_notes: 0,
         archived_notes: 0,
         pinned_notes: 0,
-        using_cached_embeddings: false,
         image_search: { enabled: false },
       },
       isLoading: false,

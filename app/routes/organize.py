@@ -35,29 +35,36 @@ async def _persisting_stream(source, granularity):
     and persisted on a throttle so a crash mid-naming leaves the partial set on disk. The
     final ``proposals`` / ``label_updates`` frame is authoritative and always persists,
     replacing the partial set.
+
+    Closing this generator (the client cancelled the run) must close ``source`` too, or the
+    inner generator's cleanup — which cancels the naming task still calling the LLM — would
+    wait on garbage collection instead of happening now.
     """
     partial: list = []
     since_persist = 0
-    async for chunk in source:
-        try:
-            frame = json.loads(chunk.decode() if isinstance(chunk, bytes) else chunk)
-            ftype = frame.get("type")
-            if ftype == "proposal" and frame.get("proposal"):
-                # Append in arrival order — naming is size-descending, so the most
-                # important clusters arrive first; the client renders in this order too.
-                partial.append(frame["proposal"])
-                since_persist += 1
-                if since_persist >= PARTIAL_PERSIST_EVERY:
-                    save_pending_proposals(list(partial), granularity)
+    try:
+        async for chunk in source:
+            try:
+                frame = json.loads(chunk.decode() if isinstance(chunk, bytes) else chunk)
+                ftype = frame.get("type")
+                if ftype == "proposal" and frame.get("proposal"):
+                    # Append in arrival order — naming is size-descending, so the most
+                    # important clusters arrive first; the client renders in this order too.
+                    partial.append(frame["proposal"])
+                    since_persist += 1
+                    if since_persist >= PARTIAL_PERSIST_EVERY:
+                        save_pending_proposals(list(partial), granularity)
+                        since_persist = 0
+                elif ftype in ("proposals", "label_updates") and frame.get("proposals"):
+                    save_pending_proposals(frame["proposals"], granularity)
+                    # The authoritative frame supersedes the partial set.
+                    partial = list(frame["proposals"])
                     since_persist = 0
-            elif ftype in ("proposals", "label_updates") and frame.get("proposals"):
-                save_pending_proposals(frame["proposals"], granularity)
-                # The authoritative frame supersedes the partial set.
-                partial = list(frame["proposals"])
-                since_persist = 0
-        except (json.JSONDecodeError, AttributeError, UnicodeDecodeError):
-            pass  # Not a frame we persist; the client still gets it verbatim.
-        yield chunk
+            except (json.JSONDecodeError, AttributeError, UnicodeDecodeError):
+                pass  # Not a frame we persist; the client still gets it verbatim.
+            yield chunk
+    finally:
+        await source.aclose()
 
 
 @router.post("/categorize")

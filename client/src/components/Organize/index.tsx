@@ -30,6 +30,7 @@ export const Organize = () => {
     approveAll,
     resetProposals,
     applyProposals,
+    discardProposals,
     appliedProposals,
   } = useOrganize();
 
@@ -114,6 +115,7 @@ export const Organize = () => {
           onApproveAll={approveAll}
           onReset={resetProposals}
           onApply={handleApplyProposals}
+          onDiscard={discardProposals}
           onRecategorize={startCategorization}
         />
       )}

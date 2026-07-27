@@ -526,8 +526,18 @@ export const useOrganize = () => {
     );
   }, [stageDecision]);
 
+  /** Un-stage every decision: back to pending, and drop the rename/merge targets with it —
+   *  leaving those behind made Reset look like a no-op, because a renamed card kept
+   *  displaying its new name. */
   const resetProposals = useCallback(() => {
-    stageDecision((prev) => prev.map((p) => ({ ...p, action: 'pending' as ProposalAction })));
+    stageDecision((prev) =>
+      prev.map((p) => ({
+        ...p,
+        action: 'pending' as ProposalAction,
+        newName: undefined,
+        mergeTarget: undefined,
+      })),
+    );
   }, [stageDecision]);
 
   const applyProposals = useCallback(async () => {

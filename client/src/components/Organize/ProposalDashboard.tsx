@@ -14,6 +14,8 @@ interface ProposalDashboardProps {
   onMerge: (sourceTagName: string, targetTagName: string) => void;
   onApproveAll: () => void;
   onReset: () => void;
+  /** Throw the whole pending set away, server-side file included. */
+  onDiscard: () => void;
   onApply: () => void;
   onRecategorize: () => void;
 }
@@ -29,6 +31,7 @@ export const ProposalDashboard = memo(
     onMerge,
     onApproveAll,
     onReset,
+    onDiscard,
     onApply,
     onRecategorize,
   }: ProposalDashboardProps) => {
@@ -74,9 +77,22 @@ export const ProposalDashboard = memo(
               <span className="material-icons">done_all</span>
               Approve All
             </button>
-            <button className="dashboard-btn secondary" onClick={onReset}>
+            <button
+              className="dashboard-btn secondary"
+              onClick={onReset}
+              disabled={pending === proposals.length}
+              title="Clear every staged decision, back to pending"
+            >
               <span className="material-icons">restart_alt</span>
               Reset
+            </button>
+            <button
+              className="dashboard-btn secondary"
+              onClick={onDiscard}
+              title="Throw away these proposals entirely, including the saved pending set"
+            >
+              <span className="material-icons">delete_sweep</span>
+              Discard All
             </button>
             <button
               className="dashboard-btn primary"

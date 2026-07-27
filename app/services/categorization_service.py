@@ -1455,14 +1455,24 @@ class CategorizationService:
                     print(f"[TAGGING] Naming task failed: {safe_exc(e)}")
                     await queue.put(self._line({"type": "error", "error": safe_exc(e)}))
 
-            asyncio.create_task(_name_labels_async())
-
-            while True:
-                line = await queue.get()
-                yield line
-                data = json.loads(line)
-                if data.get("type") in ["done", "error"]:
-                    break
+            # The naming task must be cancelled when the consumer goes away (the client hit
+            # Cancel, so Starlette closes this generator). A detached create_task() kept
+            # naming — and calling the LLM — long after the UI had cleared the run.
+            naming_task = asyncio.create_task(_name_labels_async())
+            try:
+                while True:
+                    line = await queue.get()
+                    yield line
+                    data = json.loads(line)
+                    if data.get("type") in ["done", "error"]:
+                        break
+            finally:
+                if not naming_task.done():
+                    naming_task.cancel()
+                    # Deliberately not awaited: this finally can run while the generator is
+                    # being closed on disconnect, where awaiting is unsafe. cancel() is
+                    # enough — the task stops at its next await, i.e. the next LLM call.
+                    print("[TAGGING] Run cancelled — naming task stopped.")
 
         except Exception as e:
             print(f"[TAGGING] Categorization failed: {safe_exc(e)}")

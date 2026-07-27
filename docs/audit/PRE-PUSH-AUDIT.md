@@ -1,20 +1,43 @@
 # Pre-Push Safety Audit
 
-**Range audited:** `origin/master..HEAD` — 16 commits, `9adc290` (oldest) .. `abc753b` (newest)
-**`origin/master` at audit time:** `4862b6c` (fetched 2026-07-27)
+**Range audited:** `9adc290..2f9c6ef` — 21 commits. Named by SHA, not by `HEAD`: a range written as
+`HEAD` silently means something different every time a commit lands, which is how the stale
+`origin/master` value in advisory **A1** came about.
+**`origin/master` when the audit ran:** `4862b6c`. **This range has since been published** —
+`origin/master` is now `2f9c6ef`.
 **Date:** 2026-07-27
 **Scanner:** gitleaks 8.21.2, self-test **PASS** (planted `AKIA…` / `ghp_…` key detected before any
 clean result was trusted)
 
 ## Verdict
 
-> **SAFE TO PUBLISH** — commit range `origin/master..HEAD` (`9adc290..abc753b`, 16 commits), as
-> audited on **2026-07-27**. Zero hard findings. Nine advisories below, none publish-blocking, none
-> requiring a history rewrite.
+> **SAFE TO PUBLISH** — commit range `9adc290..2f9c6ef`, 21 commits, audited on **2026-07-27**.
+> Zero hard findings. Nine advisories below, none publish-blocking, none requiring a history rewrite.
 
-The verdict covers **committed objects only** — diffs *and* all 16 commit messages. It does not cover
-the working tree, which was dirty at audit time, nor any commit made after `abc753b`. Re-run before
-publishing if further commits land.
+The verdict covers **committed objects only** — diffs *and* every commit message in the range. It
+does not cover the working tree, which was dirty at audit time, nor any commit after `2f9c6ef`.
+Re-run before publishing if further commits land.
+
+**The range was audited in two passes**, and the difference between them matters to anyone relying
+on this verdict:
+
+| Pass | Commits | Coverage |
+|---|---|---|
+| Original | `9adc290..abc753b` (16) | gitleaks — self-test PASS, over the range, per-commit, and over full branch history — **plus** the pattern batteries and a full manual read of all 653 lines of commit messages |
+| Delta | `abc753b..2f9c6ef` (5) | pattern batteries and a read of all five commit messages. **gitleaks was not on PATH**, so this pass has no scanner result behind it |
+
+The five delta commits are a comment sweep, two documentation resets, a dead-field removal and a
+line-ending normalisation — no new dependency, no new credential surface, no new data file — and
+their checks returned three hits, all self-referential: the README's literal `/home/user`
+placeholder, this document's own prose naming the note-sample shape it searches for, and
+`tests/test_redaction.py`'s docstring (already recorded as **A5**). Zero real findings. Anyone
+wanting scanner coverage of the delta should run
+`gitleaks git --log-opts="abc753b..2f9c6ef"`; note that the range is already public, so a finding
+now would require a history rewrite *and* would not un-publish anything.
+
+**The commit carrying this correction is outside the audited range**, by construction — a commit
+cannot audit itself. It changes this file only. The earlier attempt to extend the range "to cover
+`HEAD`" was dropped for exactly that circularity; naming an explicit SHA range instead avoids it.
 
 ---
 

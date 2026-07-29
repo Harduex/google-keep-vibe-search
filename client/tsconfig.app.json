@@ -23,10 +23,12 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
 
-    /* Path aliases */
-    "baseUrl": "src",
+    /* Path aliases. No `baseUrl` — it is deprecated and stops working in
+       TypeScript 7.0. Without it, `paths` resolves relative to this file's
+       directory, so the alias carries the `src/` segment itself. Keep in sync
+       with the `@` alias in vite.config.ts. */
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./src/*"]
     }
   }
 }

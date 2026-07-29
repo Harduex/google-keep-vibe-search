@@ -1621,8 +1621,97 @@ mark .refinement-highlight,
   margin-top: 4px;
 }
 
-/* A tag chip whose tag is currently in the notes-list include filter. Green so it reads as
-   "applied"; clicking it again removes it from the filter. */
+/* Filter state on a chip: green = only this tag's notes are shown, red + struck through =
+   its notes are hidden. Mirrors the filter panel, so one visual language covers both. */
 .note-badge.badge-tag.filtering {
   background: var(--accent-green);
+}
+
+.note-badge.badge-tag.excluding {
+  background: var(--accent-red);
+}
+
+.note-badge.badge-tag.excluding .tag-filter-button {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+/* One hover-revealed group for every chip control — filter, rename, remove. The chips read
+   as labels at rest; the controls appear for the chip under the pointer.
+
+   Collapsed with max-width, NOT `display: none`: a display-none child cannot be tabbed to, so
+   it can never trigger the `:focus-within` that would reveal it — the controls would simply
+   be unreachable by keyboard. Zero-width children stay in the tab order, so focus reveals
+   the group. `pointer-events` is off while collapsed so an invisible button cannot be
+   clicked by accident. */
+.tag-chip-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transition:
+    max-width 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.note-badge.badge-tag:hover .tag-chip-actions,
+.note-badge.badge-tag:focus-within .tag-chip-actions,
+.note-badge.badge-tag.filtering .tag-chip-actions,
+.note-badge.badge-tag.excluding .tag-chip-actions {
+  max-width: 8rem;
+  opacity: 1;
+  pointer-events: auto;
+  margin-left: 3px;
+  padding-left: 4px;
+  border-left: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* Touch has no hover, and nothing else there would reveal the group. */
+@media (hover: none) {
+  .tag-chip-actions {
+    max-width: 8rem;
+    opacity: 1;
+    pointer-events: auto;
+    margin-left: 3px;
+    padding-left: 4px;
+    border-left: 1px solid rgba(255, 255, 255, 0.3);
+  }
+}
+
+.tag-include-button:focus-visible,
+.tag-exclude-button:focus-visible,
+.tag-edit-button:focus-visible,
+.tag-remove-button:focus-visible,
+.tag-filter-button:focus-visible {
+  outline: 2px solid white;
+  outline-offset: 1px;
+}
+
+.tag-include-button,
+.tag-exclude-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.75);
+  padding: 1px 2px;
+  display: flex;
+  align-items: center;
+  border-radius: 3px;
+  transition: all 0.15s;
+}
+
+.tag-include-button:hover,
+.tag-exclude-button:hover,
+.tag-include-button.active,
+.tag-exclude-button.active {
+  color: white;
+  background-color: rgba(255, 255, 255, 0.28);
+}
+
+.tag-include-button .material-icons,
+.tag-exclude-button .material-icons {
+  font-size: 15px;
 }

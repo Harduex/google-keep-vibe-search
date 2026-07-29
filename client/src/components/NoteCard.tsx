@@ -4,6 +4,7 @@ import ImageGallery from '@/components/ImageGallery';
 import { NoteContent } from '@/components/NoteContent';
 import { API_ROUTES } from '@/const';
 import { calculateScorePercentage, highlightMatches } from '@/helpers';
+import { TagFilterState, tagFilterMode } from '@/tagFilter';
 import { Note } from '@/types/index';
 
 interface NoteCardProps {
@@ -19,9 +20,12 @@ interface NoteCardProps {
   /** Toggle this tag in the notes-list include filter. Omitted where filtering makes no
    *  sense, in which case the chip stays plain text. */
   onTagClick?: (tagName: string) => void;
-  /** Tags currently in the include filter — those chips render green, so it is obvious
-   *  which tags the list is filtered by and which click will switch the filter off. */
-  activeTags?: string[];
+  /** Toggle this tag in the notes-list exclude filter. Only passed alongside `onTagClick`;
+   *  without it the chip offers include only. */
+  onTagExclude?: (tagName: string) => void;
+  /** The notes-list filter, read only to colour the chips: green for a shown tag, red and
+   *  struck through for a hidden one, so a chip states what a click will undo. */
+  tagFilter?: TagFilterState;
 }
 
 export const NoteCard = memo(
@@ -36,7 +40,8 @@ export const NoteCard = memo(
     onRemoveTag,
     onRenameTag,
     onTagClick,
-    activeTags,
+    onTagExclude,
+    tagFilter,
   }: NoteCardProps) => {
     const scorePercentage = calculateScorePercentage(note.score);
     const highlightedTitle = highlightMatches(note.title, query, refinementKeywords);
@@ -68,6 +73,14 @@ export const NoteCard = memo(
         onTagClick?.(tagName);
       },
       [onTagClick],
+    );
+
+    const handleTagExclude = useCallback(
+      (e: React.MouseEvent, tagName: string) => {
+        e.stopPropagation();
+        onTagExclude?.(tagName);
+      },
+      [onTagExclude],
     );
 
     const handleRemoveTag = useCallback(
@@ -168,13 +181,15 @@ export const NoteCard = memo(
             {note.pinned && <span className="note-badge badge-pinned">Pinned</span>}
             {note.archived && <span className="note-badge badge-archived">Archived</span>}
             {note.tags?.map((tagName) => {
-              const isFiltering = activeTags?.includes(tagName) ?? false;
+              const mode = tagFilter ? tagFilterMode(tagFilter, tagName) : 'neutral';
+              const isIncluded = mode === 'included';
+              const isExcluded = mode === 'excluded';
               return (
                 <span
                   key={tagName}
                   className={`note-badge badge-tag${editingTag === tagName ? ' editing' : ''}${
-                    isFiltering ? ' filtering' : ''
-                  }`}
+                    isIncluded ? ' filtering' : ''
+                  }${isExcluded ? ' excluding' : ''}`}
                   title={`Tagged: ${tagName}`}
                 >
                   {editingTag === tagName ? (
@@ -196,12 +211,12 @@ export const NoteCard = memo(
                           className="tag-filter-button"
                           onClick={(e) => handleTagClick(e, tagName)}
                           title={
-                            isFiltering
-                              ? `Stop filtering by "${tagName}"`
-                              : `Show all notes tagged "${tagName}"`
+                            isIncluded
+                              ? `Stop showing only "${tagName}"`
+                              : `Show only notes tagged "${tagName}"`
                           }
                           aria-label={
-                            isFiltering
+                            isIncluded
                               ? `Stop filtering by tag ${tagName}`
                               : `Filter notes by tag ${tagName}`
                           }
@@ -215,26 +230,69 @@ export const NoteCard = memo(
                           {tagName}
                         </>
                       )}
-                      {onRenameTag && (
-                        <button
-                          className="tag-edit-button"
-                          onClick={(e) => handleStartEditTag(e, tagName)}
-                          title="Rename tag"
-                          aria-label={`Rename tag ${tagName}`}
-                        >
-                          <span className="material-icons">edit</span>
-                        </button>
-                      )}
-                      {onRemoveTag && (
-                        <button
-                          className="tag-remove-button"
-                          onClick={(e) => handleRemoveTag(e, tagName)}
-                          title="Remove tag"
-                          aria-label={`Remove tag ${tagName}`}
-                        >
-                          <span className="material-icons">close</span>
-                        </button>
-                      )}
+                      {/* Every control on a chip lives in one hover-revealed group: filter,
+                          rename, remove. The eye pair mirrors the filter panel's segmented
+                          control, so the same gesture means the same thing in both places —
+                          and neither is a cross, which on a chip already means "remove this
+                          tag from the note". */}
+                      <span className="tag-chip-actions">
+                        {onTagClick && onTagExclude && (
+                          <>
+                            <button
+                              className={`tag-include-button${isIncluded ? ' active' : ''}`}
+                              onClick={(e) => handleTagClick(e, tagName)}
+                              title={
+                                isIncluded
+                                  ? `Stop showing only "${tagName}"`
+                                  : `Show only notes tagged "${tagName}"`
+                              }
+                              aria-label={
+                                isIncluded
+                                  ? `Stop including tag ${tagName}`
+                                  : `Include tag ${tagName}`
+                              }
+                            >
+                              <span className="material-icons">visibility</span>
+                            </button>
+                            <button
+                              className={`tag-exclude-button${isExcluded ? ' active' : ''}`}
+                              onClick={(e) => handleTagExclude(e, tagName)}
+                              title={
+                                isExcluded
+                                  ? `Stop hiding "${tagName}"`
+                                  : `Hide notes tagged "${tagName}"`
+                              }
+                              aria-label={
+                                isExcluded
+                                  ? `Stop excluding tag ${tagName}`
+                                  : `Exclude tag ${tagName}`
+                              }
+                            >
+                              <span className="material-icons">visibility_off</span>
+                            </button>
+                          </>
+                        )}
+                        {onRenameTag && (
+                          <button
+                            className="tag-edit-button"
+                            onClick={(e) => handleStartEditTag(e, tagName)}
+                            title="Rename tag"
+                            aria-label={`Rename tag ${tagName}`}
+                          >
+                            <span className="material-icons">edit</span>
+                          </button>
+                        )}
+                        {onRemoveTag && (
+                          <button
+                            className="tag-remove-button"
+                            onClick={(e) => handleRemoveTag(e, tagName)}
+                            title="Remove tag"
+                            aria-label={`Remove tag ${tagName}`}
+                          >
+                            <span className="material-icons">close</span>
+                          </button>
+                        )}
+                      </span>
                     </>
                   )}
                 </span>

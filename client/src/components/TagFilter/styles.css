@@ -118,6 +118,90 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px 8px 16px;
+  transition:
+    background-color 0.2s,
+    opacity 0.2s;
+}
+
+.tag-item-row:hover {
+  background: var(--hover-color, var(--light-bg));
+}
+
+.tag-item-row.included {
+  background: rgba(15, 157, 88, 0.08);
+  box-shadow: inset 3px 0 0 var(--accent-green);
+}
+
+/* An excluded tag reads as struck off the list — the notes are hidden, so the row is too,
+   visually, without disappearing and stranding the control that would bring it back. */
+.tag-item-row.excluded {
+  box-shadow: inset 3px 0 0 var(--accent-red);
+  opacity: 0.6;
+}
+
+.tag-item-row.excluded .tag-name {
+  text-decoration: line-through;
+  text-decoration-color: var(--accent-red);
+  text-decoration-thickness: 2px;
+}
+
+.tag-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+/* Segmented show/hide control: one control for one decision, so neither half reads as a
+   button bolted onto the other. Shape follows `.view-toggle`, the app's existing segmented
+   control, so this is a familiar widget in new clothes; only the active colours differ,
+   because show and hide carry meaning that a neutral accent would throw away. */
+.tag-state-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 32px;
+  background-color: var(--light-bg);
+}
+
+.tag-state-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  border: none;
+  border-radius: 28px;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tag-state-option .material-icons {
+  font-size: 18px;
+}
+
+.tag-state-option.include:hover {
+  background: rgba(15, 157, 88, 0.12);
+  color: var(--accent-green);
+}
+
+.tag-state-option.exclude:hover {
+  background: rgba(234, 67, 53, 0.12);
+  color: var(--accent-red);
+}
+
+.tag-state-option.include.active {
+  background: var(--accent-green);
+  color: white;
+}
+
+.tag-state-option.exclude.active {
+  background: var(--accent-red);
+  color: white;
 }
 
 .tag-rename-button {
@@ -126,7 +210,6 @@
   cursor: pointer;
   color: var(--text-secondary);
   padding: 4px;
-  margin-right: 12px;
   border-radius: 4px;
   transition: all 0.2s;
   display: flex;
@@ -154,7 +237,6 @@
   cursor: pointer;
   color: var(--text-secondary);
   padding: 4px;
-  margin-right: 12px;
   border-radius: 4px;
   transition: all 0.2s;
   display: flex;
@@ -224,51 +306,6 @@
   font-size: 20px;
 }
 
-.tag-checkbox {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-  width: 100%;
-}
-
-.tag-checkbox:hover {
-  background: var(--hover-color);
-}
-
-.tag-checkbox input[type='checkbox'] {
-  display: none;
-}
-
-.checkmark {
-  width: 18px;
-  height: 18px;
-  border: 2px solid var(--border-color);
-  border-radius: 4px;
-  position: relative;
-  transition: all 0.2s;
-  flex-shrink: 0;
-  background: var(--bg-color);
-}
-
-.tag-checkbox input[type='checkbox']:checked + .checkmark {
-  background: var(--accent-color);
-  border-color: var(--accent-color);
-}
-
-.tag-checkbox input[type='checkbox']:checked + .checkmark::after {
-  content: '✓';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  color: white;
-  font-size: 12px;
-  font-weight: bold;
-}
-
 .tag-info {
   display: flex;
   align-items: center;
@@ -329,7 +366,103 @@
   border-color: var(--border-color);
 }
 
-[data-theme='dark'] .checkmark {
+/* With a filter applied the panel follows the viewport: the filtered list runs long, and
+   switching a tag back off used to mean scrolling all the way back up to this control.
+   Offset from the very top so it reads as a floating bar rather than clinging to the edge. */
+.tag-filter.sticky {
+  position: sticky;
+  top: 40px;
+  z-index: 20;
+  background-color: var(--card-bg);
+  box-shadow: var(--hover-shadow);
+}
+
+/* Active filters, shown in the header so they stay reachable while the panel is collapsed. */
+.active-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  justify-content: flex-end;
+  margin: 0 12px;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.filter-chip .material-icons {
+  font-size: 15px;
+}
+
+.filter-chip .chip-dismiss {
+  font-size: 14px;
+  opacity: 0.6;
+}
+
+.filter-chip:hover .chip-dismiss {
+  opacity: 1;
+}
+
+.filter-chip.include {
+  background: rgba(15, 157, 88, 0.14);
+  border-color: rgba(15, 157, 88, 0.4);
+  color: var(--accent-green);
+}
+
+.filter-chip.exclude {
+  background: rgba(234, 67, 53, 0.12);
+  border-color: rgba(234, 67, 53, 0.4);
+  color: var(--accent-red);
+}
+
+/* Struck through on the label only — striking the whole chip would cross out its icons. */
+.filter-chip.exclude .chip-label {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.filter-chip.clear-all {
+  background: none;
   border-color: var(--border-color);
-  background: var(--bg-secondary);
+  color: var(--text-secondary);
+}
+
+.filter-chip.clear-all:hover {
+  color: var(--text-color);
+  background: var(--light-bg);
+}
+
+/* Keyboard reach. The row's rename/export buttons are revealed by hover, which leaves a
+   keyboard user tabbing onto controls they cannot see — so focus reveals them too. */
+.tag-item-row:focus-within .tag-rename-button,
+.tag-item-row:focus-within .export-tag-button {
+  opacity: 1;
+}
+
+.tag-state-option:focus-visible,
+.tag-rename-button:focus-visible,
+.export-tag-button:focus-visible,
+.filter-chip:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 1px;
+}
+
+/* Touch has no hover: reveal the row controls unconditionally where hovering is impossible,
+   rather than making them unreachable on a phone. */
+@media (hover: none) {
+  .tag-rename-button,
+  .export-tag-button {
+    opacity: 1;
+  }
 }

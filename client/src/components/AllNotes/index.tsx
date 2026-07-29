@@ -10,18 +10,31 @@ import { VIEW_MODES } from '@/const';
 import { exportNotes, todayDateStr } from '@/exportUtils';
 import { useAllNotes } from '@/hooks/useAllNotes';
 import { useTags } from '@/hooks/useTags';
+import {
+  TagFilterState,
+  applyTagFilter,
+  clearTagFilter,
+  describeTagFilter,
+  isFiltering,
+  renameTagInFilter,
+  setIncluded,
+  toggleExcluded,
+  toggleIncluded,
+} from '@/tagFilter';
 import { ViewMode } from '@/types';
 import './styles.css';
 
 interface AllNotesProps {
   onShowRelated: (content: string) => void;
-  /** Include filter, owned by App: a tag chip in the search results or Explore in the
-   *  Organize tab points this list at a single tag, so the state cannot live here. */
-  selectedTags: string[];
-  setSelectedTags: Dispatch<SetStateAction<string[]>>;
+  /** Which tags the list shows and hides. Owned by App: a tag chip in the search results or
+   *  Explore in the Organize tab points this list at a single tag, so it cannot live here.
+   *  Every transition goes through the calculations in `@/tagFilter`, which is what keeps
+   *  the shown and hidden sets from ever holding the same tag. */
+  tagFilter: TagFilterState;
+  onTagFilterChange: Dispatch<SetStateAction<TagFilterState>>;
 }
 
-export const AllNotes = memo(({ onShowRelated, selectedTags, setSelectedTags }: AllNotesProps) => {
+export const AllNotes = memo(({ onShowRelated, tagFilter, onTagFilterChange }: AllNotesProps) => {
   const { notes, isLoading, error, refetch } = useAllNotes();
   const { tags, removeTagFromNote, renameTag } = useTags(refetch);
   const [viewMode, setViewMode] = useState<ViewMode>(VIEW_MODES.LIST);
@@ -33,12 +46,7 @@ export const AllNotes = memo(({ onShowRelated, selectedTags, setSelectedTags }: 
 
   // Sort and filter notes
   const filteredNotes = useMemo(() => {
-    let filtered = [...notes];
-
-    // Apply tag filter (if any tags are selected, show only notes with those tags)
-    if (selectedTags.length > 0) {
-      filtered = filtered.filter((note) => note.tags?.some((tag) => selectedTags.includes(tag)));
-    }
+    let filtered = [...applyTagFilter(notes, tagFilter)];
 
     // Apply other filters
     if (filterArchived) {
@@ -57,7 +65,7 @@ export const AllNotes = memo(({ onShowRelated, selectedTags, setSelectedTags }: 
     });
 
     return filtered;
-  }, [notes, sortBy, filterArchived, filterPinned, selectedTags]);
+  }, [notes, sortBy, filterArchived, filterPinned, tagFilter]);
 
   const visibleNotes = useMemo(
     () => filteredNotes.slice(0, visibleNotesCount),
@@ -97,44 +105,56 @@ export const AllNotes = memo(({ onShowRelated, selectedTags, setSelectedTags }: 
 
   const handleTagsChange = useCallback(
     (newSelectedTags: string[]) => {
-      setSelectedTags(newSelectedTags);
+      onTagFilterChange((prev) => setIncluded(prev, newSelectedTags));
     },
-    [setSelectedTags],
+    [onTagFilterChange],
   );
 
-  /** Clicking a tag chip toggles that tag in the include filter — the list is already on
-   *  screen, so this filters in place instead of navigating. Clicking a green (currently
-   *  applied) chip switches it back off. Membership toggles rather than replacing, which
-   *  matches the OR semantics of the checkbox filter. */
-  const handleExploreTagInList = useCallback(
+  /** A tag chip on a note filters in place — the list is already on screen, so there is
+   *  nothing to navigate to. Both directions reset paging: the first page of a different
+   *  result set is what the user asked to see. */
+  const handleIncludeTagInList = useCallback(
     (tagName: string) => {
-      setSelectedTags((prev) =>
-        prev.includes(tagName) ? prev.filter((t) => t !== tagName) : [...prev, tagName],
-      );
+      onTagFilterChange((prev) => toggleIncluded(prev, tagName));
       setVisibleNotesCount(20);
     },
-    [setSelectedTags],
+    [onTagFilterChange],
   );
+
+  const handleExcludeTagInList = useCallback(
+    (tagName: string) => {
+      onTagFilterChange((prev) => toggleExcluded(prev, tagName));
+      setVisibleNotesCount(20);
+    },
+    [onTagFilterChange],
+  );
+
+  const handleClearFilter = useCallback(() => {
+    onTagFilterChange(clearTagFilter());
+    setVisibleNotesCount(20);
+  }, [onTagFilterChange]);
 
   const handleRenameTag = useCallback(
     async (oldName: string, newName: string) => {
       await renameTag(oldName, newName);
-      setSelectedTags((prev) => prev.map((t) => (t === oldName ? newName : t)));
+      // Keep the filter pointing at the tag the user renamed, not at a name that no
+      // longer exists.
+      onTagFilterChange((prev) => renameTagInFilter(prev, oldName, newName));
     },
-    [renameTag, setSelectedTags],
+    [renameTag, onTagFilterChange],
   );
 
   const handleMergeSelectedTags = useCallback(
     async (targetTag: string) => {
-      const sourceTags = selectedTags.filter((tag) => tag !== targetTag);
+      const sourceTags = tagFilter.included.filter((tag) => tag !== targetTag);
 
       for (const sourceTag of sourceTags) {
         await renameTag(sourceTag, targetTag);
       }
 
-      setSelectedTags([targetTag]);
+      onTagFilterChange((prev) => setIncluded(prev, [targetTag]));
     },
-    [renameTag, selectedTags, setSelectedTags],
+    [renameTag, tagFilter, onTagFilterChange],
   );
 
   const handleNoteSelection = useCallback((noteId: string, isSelected: boolean) => {
@@ -198,8 +218,10 @@ export const AllNotes = memo(({ onShowRelated, selectedTags, setSelectedTags }: 
       {tags.length > 0 && (
         <TagFilter
           tags={tags}
-          selectedTags={selectedTags}
+          filter={tagFilter}
           onUpdateSelectedTags={handleTagsChange}
+          onToggleExcluded={handleExcludeTagInList}
+          onClearFilter={handleClearFilter}
           onRenameTag={handleRenameTag}
           onMergeTags={handleMergeSelectedTags}
           onExportTag={handleExportByTag}
@@ -209,11 +231,8 @@ export const AllNotes = memo(({ onShowRelated, selectedTags, setSelectedTags }: 
       <div className="all-notes-header">
         <div className="all-notes-count">
           {filteredNotes.length} note{filteredNotes.length === 1 ? '' : 's'}
-          {selectedTags.length > 0 && (
-            <span className="tag-filter-status">
-              {' '}
-              (filtered by {selectedTags.length} tag{selectedTags.length === 1 ? '' : 's'})
-            </span>
+          {isFiltering(tagFilter) && (
+            <span className="tag-filter-status"> ({describeTagFilter(tagFilter)})</span>
           )}
         </div>
 
@@ -287,8 +306,9 @@ export const AllNotes = memo(({ onShowRelated, selectedTags, setSelectedTags }: 
                   onSelectNote={handleNoteSelection}
                   onRemoveTag={removeTagFromNote}
                   onRenameTag={renameTag}
-                  onTagClick={handleExploreTagInList}
-                  activeTags={selectedTags}
+                  onTagClick={handleIncludeTagInList}
+                  onTagExclude={handleExcludeTagInList}
+                  tagFilter={tagFilter}
                 />
               </div>
             ))

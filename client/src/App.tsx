@@ -18,6 +18,7 @@ import { useBackendReady } from '@/hooks/useBackendReady';
 import { useSearch } from '@/hooks/useSearch';
 import { useStats } from '@/hooks/useStats';
 import { useTheme } from '@/hooks/useTheme';
+import { EMPTY_TAG_FILTER, focusTag } from '@/tagFilter';
 
 import './App.css';
 import { Note } from './types';
@@ -55,9 +56,10 @@ const App = () => {
   const [activeTab, setActiveTab] = useState<TabId>('search');
   // Add state for search mode
   const [searchMode, setSearchMode] = useState<SearchMode>('text');
-  // The All Notes include filter. Owned here, not by AllNotes, so a tag chip in the search
-  // results or Explore in the Organize tab can point the notes list at a single tag.
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  // Which tags the notes list shows and hides. Owned here, not by AllNotes, so a tag chip in
+  // the search results or Explore in the Organize tab can point the notes list at one tag.
+  // Purely a view filter — unrelated to the search-wide exclusion behind /api/tags/excluded.
+  const [tagFilter, setTagFilter] = useState(EMPTY_TAG_FILTER);
 
   const handleSearch = useCallback(
     (searchQuery: string) => {
@@ -117,7 +119,7 @@ const App = () => {
    *  three places outside it: a tag chip in the search results, a tag chip in the notes
    *  list, and Explore in the Organize tag manager. */
   const handleExploreTag = useCallback((tagName: string) => {
-    setSelectedTags([tagName]);
+    setTagFilter((prev) => focusTag(prev, tagName));
     setActiveTab('all-notes');
     scrollToElement('.tab-navigation', UI_ELEMENTS.SEARCH_OFFSET);
   }, []);
@@ -207,8 +209,8 @@ const App = () => {
           <ErrorBoundary fallbackLabel="All Notes">
             <AllNotes
               onShowRelated={handleSearch}
-              selectedTags={selectedTags}
-              setSelectedTags={setSelectedTags}
+              tagFilter={tagFilter}
+              onTagFilterChange={setTagFilter}
             />
           </ErrorBoundary>
         )}

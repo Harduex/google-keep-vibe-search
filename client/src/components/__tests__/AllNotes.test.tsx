@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AllNotes } from '@/components/AllNotes';
 import { useAllNotes } from '@/hooks/useAllNotes';
 import { useTags } from '@/hooks/useTags';
+import { EMPTY_TAG_FILTER } from '@/tagFilter';
 import { Note, Tag } from '@/types';
 
 vi.mock('@/hooks/useAllNotes');
@@ -67,15 +68,17 @@ const notes: Note[] = [
   },
 ];
 
+/** Row controls in the filter panel: one segmented show/hide pair per tag. */
+const showOnly = (tagName: string) =>
+  screen.getByRole('button', { name: `Show only notes tagged "${tagName}"` });
+const hide = (tagName: string) =>
+  screen.getByRole('button', { name: `Hide notes tagged "${tagName}"` });
+
 /** The include filter is owned by App, so a test needs a state owner of its own. */
 const StatefulAllNotes = () => {
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [tagFilter, setTagFilter] = useState(EMPTY_TAG_FILTER);
   return (
-    <AllNotes
-      onShowRelated={vi.fn()}
-      selectedTags={selectedTags}
-      setSelectedTags={setSelectedTags}
-    />
+    <AllNotes onShowRelated={vi.fn()} tagFilter={tagFilter} onTagFilterChange={setTagFilter} />
   );
 };
 
@@ -116,11 +119,11 @@ describe('AllNotes tag merge from filter', () => {
 
     expect(screen.queryByRole('button', { name: 'Merge Selected' })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('checkbox', { name: /work/i }));
+    await user.click(showOnly('Work'));
 
     expect(screen.queryByRole('button', { name: 'Merge Selected' })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('checkbox', { name: /ideas/i }));
+    await user.click(showOnly('Ideas'));
 
     expect(screen.getByRole('button', { name: 'Merge Selected' })).toBeInTheDocument();
   });
@@ -130,8 +133,8 @@ describe('AllNotes tag merge from filter', () => {
     render(<StatefulAllNotes />);
 
     await user.click(screen.getByText('Filter by Tags'));
-    await user.click(screen.getByRole('checkbox', { name: /work/i }));
-    await user.click(screen.getByRole('checkbox', { name: /ideas/i }));
+    await user.click(showOnly('Work'));
+    await user.click(showOnly('Ideas'));
     await user.click(screen.getByRole('button', { name: 'Merge Selected' }));
 
     expect(screen.getByText('Keep this tag:')).toBeInTheDocument();
@@ -151,10 +154,47 @@ describe('AllNotes tag merge from filter', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('(1 selected)')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Stop showing only "Work"' })).toBeInTheDocument();
     });
 
-    expect(screen.getByRole('checkbox', { name: /work/i })).toBeChecked();
-    expect(screen.getByRole('checkbox', { name: /ideas/i })).not.toBeChecked();
+    expect(showOnly('Work')).toHaveAttribute('aria-pressed', 'true');
+    expect(showOnly('Ideas')).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('excluding a tag hides its notes and clears any selection of it', async () => {
+    const user = userEvent.setup();
+    render(<StatefulAllNotes />);
+
+    await user.click(screen.getByText('Filter by Tags'));
+    await user.click(showOnly('Work'));
+    expect(screen.getByRole('button', { name: 'Stop showing only "Work"' })).toBeInTheDocument();
+
+    await user.click(hide('Work'));
+
+    // The include of the same tag is dropped: holding both would hide the very notes the
+    // include asked for.
+    expect(showOnly('Work')).toHaveAttribute('aria-pressed', 'false');
+    expect(
+      screen.queryByRole('button', { name: 'Stop showing only "Work"' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Stop hiding "Work"' })).toBeInTheDocument();
+    // Note 1 is tagged Work and is now hidden; note 2 (Ideas) remains.
+    expect(screen.getAllByTestId('note-card')).toHaveLength(1);
+  });
+
+  it('makes the filter panel sticky only while a filter is applied', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<StatefulAllNotes />);
+
+    expect(container.querySelector('.tag-filter')).not.toHaveClass('sticky');
+
+    await user.click(screen.getByText('Filter by Tags'));
+    await user.click(showOnly('Work'));
+
+    expect(container.querySelector('.tag-filter')).toHaveClass('sticky');
+
+    await user.click(showOnly('Work'));
+
+    expect(container.querySelector('.tag-filter')).not.toHaveClass('sticky');
   });
 });

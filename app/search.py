@@ -506,7 +506,10 @@ class VibeSearch:
 
 def _model_dim(model) -> int:
     """Best-effort embedding dimension lookup across SentenceTransformer / stubs."""
-    for attr in ("get_sentence_embedding_dimension",):
+    # sentence-transformers 5.x renamed this to `get_embedding_dimension` and the old
+    # name now raises a FutureWarning, so try the new one first. The old name stays in
+    # the list for the test stubs, which only implement that spelling.
+    for attr in ("get_embedding_dimension", "get_sentence_embedding_dimension"):
         fn = getattr(model, attr, None)
         if callable(fn):
             try:

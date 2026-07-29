@@ -61,8 +61,7 @@ class Embedder(Protocol):
     least surface that satisfies the contract.
     """
 
-    def embed(self, texts: list[str]) -> np.ndarray:
-        ...
+    def embed(self, texts: list[str]) -> np.ndarray: ...
 
 
 # --------------------------------------------------------------------------- #

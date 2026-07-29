@@ -4,7 +4,7 @@ import os
 import warnings
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-# Import CLIP model (installed via requirements.txt)
+# OpenAI CLIP, installed from git — see the `clip` entry in pyproject.toml.
 import clip
 import numpy as np
 import torch

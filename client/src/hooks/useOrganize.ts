@@ -121,14 +121,48 @@ type StreamMessage =
   | StreamDoneMessage
   | StreamErrorMessage;
 
-/** Map of tag name -> staged action, the shape PUT /pending/actions expects. */
+/** Map keyed by either a proposal's identity (internal) or its tag name (server contract). */
 type StagedActions = Record<string, ProposalAction>;
 
 /**
- * Build the staged-actions map from the current proposal states.
- * Keyed by the proposal's tag name — unique within a vocabulary — so the server's lock
- * list (which keys on tag names) and the client's staged state stay aligned even as the
- * list grows underneath the user.
+ * The identity a review decision targets: `proposal_id` when the card has one, else its
+ * tag name. Every identity comparison in this hook goes through this helper, so a card is
+ * never confused with another same-named card once ids exist (Task 1-2 backend work; older
+ * persisted sets fall back to the name they always had).
+ */
+const proposalKey = (p: TagProposal): string | undefined => p.proposal_id ?? p.tag_name;
+
+/**
+ * Build the internal staged-actions map from the current proposal states, keyed by
+ * `proposalKey` — so a decision always targets one specific card, even when two cards
+ * share a display name.
+ */
+const toKeyedActionsMap = (states: ProposalState[]): StagedActions => {
+  const out: StagedActions = {};
+  for (const s of states) {
+    if (s.action === 'pending') {
+      continue;
+    }
+    // Info/dashboard proposals have no stable key and are not actionable in a way the
+    // consolidation lock cares about; skip them.
+    if (isInfoProposal(s.proposal)) {
+      continue;
+    }
+    const key = proposalKey(s.proposal);
+    if (!key) {
+      continue;
+    }
+    out[key] = s.action;
+  }
+  return out;
+};
+
+/**
+ * Convert the current proposal states to the server's PUT /pending/actions contract, which
+ * is keyed by tag name — unique within a vocabulary after Task 2 — so the lock list stays
+ * aligned even as the list grows underneath the user. This is the boundary conversion: the
+ * client stages decisions by `proposalKey` internally but still speaks tag names to the
+ * server.
  */
 const toActionsMap = (states: ProposalState[]): StagedActions => {
   const out: StagedActions = {};
@@ -169,7 +203,13 @@ export const useOrganize = () => {
 
   // Keep the latest staged decisions in a ref so the debounced PUT (a setInterval-free
   // timeout callback) always reads current state without re-subscribing on every change.
+  // Keyed by `proposalKey` (id-first) — the client's internal source of truth for "what did
+  // the user decide on this specific card". Converted to the server's name-keyed contract
+  // only at the PUT boundary, in `persistStagedActions`.
   const stagedActionsRef = useRef<StagedActions>({});
+  // Mirrors the latest proposals array so the debounced PUT can rebuild the name-keyed body
+  // without re-subscribing the timeout callback on every decision.
+  const latestProposalsRef = useRef<ProposalState[]>([]);
   const actionsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /**
@@ -184,10 +224,10 @@ export const useOrganize = () => {
       clearTimeout(actionsTimerRef.current);
     }
     actionsTimerRef.current = setTimeout(() => {
-      const actions = stagedActionsRef.current;
       // Send even when empty: clearing the last staged decision must propagate so a
-      // subsequent consolidation does not keep a stale lock. Shallow copy so the body is a
-      // plain JSON object, not a live ref.
+      // subsequent consolidation does not keep a stale lock. Built fresh from the latest
+      // proposals so the wire body stays name-keyed regardless of the internal key shape.
+      const actions = toActionsMap(latestProposalsRef.current);
       fetch(`${API_ROUTES.ORGANIZE_PENDING}/actions`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -204,7 +244,8 @@ export const useOrganize = () => {
     (mutator: (prev: ProposalState[]) => ProposalState[]) => {
       setProposals((prev) => {
         const next = mutator(prev);
-        stagedActionsRef.current = toActionsMap(next);
+        latestProposalsRef.current = next;
+        stagedActionsRef.current = toKeyedActionsMap(next);
         return next;
       });
       persistStagedActions();
@@ -213,11 +254,13 @@ export const useOrganize = () => {
   );
 
   /**
-   * Re-attach previously staged decisions to a fresh proposal list, by tag name. Used at
-   * two points: when the authoritative end-of-run frame replaces the growing list (so a
-   * decision the user made on cluster X survives the final consolidation that may have
-   * renamed neighbours), and when the tab remounts and restores from the persisted
-   * artifact. Tag-name keyed because the list can change shape/order under the user.
+   * Re-attach previously staged decisions to a fresh proposal list. Used at two points: when
+   * the authoritative end-of-run frame replaces the growing list (so a decision the user
+   * made on cluster X survives the final consolidation that may have renamed neighbours),
+   * and when the tab remounts and restores from the persisted artifact. Matches by
+   * `proposal_id` first, falling back to `tag_name` for pre-fix persisted sets whose staged
+   * map is still name-keyed — that ambiguity is inherent to old sets and harmless once new
+   * decisions are id-keyed.
    */
   const reattachActions = (
     fresh: TagProposal[],
@@ -225,9 +268,11 @@ export const useOrganize = () => {
     extra: Partial<Record<string, ProposalState>> = {},
   ): ProposalState[] =>
     fresh.map((p) => {
+      const id = p.proposal_id;
       const name = p.tag_name;
-      if (name && staged[name] && staged[name] !== 'pending') {
-        return { proposal: p, action: staged[name], ...extra[name] };
+      const key = id && staged[id] !== undefined ? id : name;
+      if (key && staged[key] && staged[key] !== 'pending') {
+        return { proposal: p, action: staged[key], ...extra[key] };
       }
       return { proposal: p, action: 'pending' as ProposalAction };
     });
@@ -250,7 +295,20 @@ export const useOrganize = () => {
         }
         const staged: StagedActions =
           data.actions && typeof data.actions === 'object' ? data.actions : {};
-        setProposals((prev) => (prev.length > 0 ? prev : reattachActions(data.proposals, staged)));
+        // Assign synthetic ids to any proposal lacking one, so even a pending set persisted
+        // before proposal_id existed — including one with duplicate tag names — becomes
+        // individually addressable.
+        const proposalsWithIds: TagProposal[] = data.proposals.map(
+          (p: TagProposal, index: number) => ({
+            ...p,
+            proposal_id: p.proposal_id ?? `restored-${index}`,
+          }),
+        );
+        setProposals((prev) => {
+          const next = prev.length > 0 ? prev : reattachActions(proposalsWithIds, staged);
+          latestProposalsRef.current = next;
+          return next;
+        });
         stagedActionsRef.current = staged;
         setRestoredAt(data.generated_at ?? null);
       } catch {
@@ -272,6 +330,7 @@ export const useOrganize = () => {
     setProgress(null);
     setRestoredAt(null);
     stagedActionsRef.current = {};
+    latestProposalsRef.current = [];
     try {
       await fetch(API_ROUTES.ORGANIZE_PENDING, { method: 'DELETE' });
     } catch {
@@ -287,6 +346,7 @@ export const useOrganize = () => {
     setError(null);
     setProposals([]);
     stagedActionsRef.current = {};
+    latestProposalsRef.current = [];
     setProgress(null);
 
     abortControllerRef.current = new AbortController();
@@ -429,15 +489,23 @@ export const useOrganize = () => {
   }, []);
 
   /**
-   * Resolve a ProposalState by an identifier that is either a tag name (classic proposals —
-   * the streaming list grows underneath the user, so an index would shift) or an array
-   * index (dashboard cards: info/merge/assign arrive together at the end of the run, so an
-   * index is stable for them). Classic cards pass their tag_name; dashboard cards pass
-   * their numeric index. Tag name is matched first so a classic card is never confused with
-   * a positional lookup.
+   * Resolve a ProposalState by an identifier that is either a card identity (classic
+   * proposals — the streaming list grows underneath the user, so an index would shift) or
+   * an array index (dashboard cards: info/merge/assign arrive together at the end of the
+   * run, so an index is stable for them). Classic cards pass their `proposalKey`
+   * (`proposal_id`, falling back to `tag_name`); dashboard cards pass their numeric index.
+   * The id match is tried first — by `proposalKey`, then by bare tag name for sets persisted
+   * before `proposal_id` existed — so a classic card is never confused with a positional
+   * lookup, and an id match always wins over a numeric coincidence.
    */
   const resolveById = useCallback((states: ProposalState[], id: string | number): number => {
     if (typeof id === 'string') {
+      const byKey = states.findIndex((s) => proposalKey(s.proposal) === id);
+      if (byKey !== -1) {
+        return byKey;
+      }
+      // Fallback for pre-fix persisted sets, or a caller still holding a bare tag name for
+      // a card that now has a proposal_id.
       const byName = states.findIndex((s) => s.proposal.tag_name === id);
       if (byName !== -1) {
         return byName;
@@ -490,30 +558,36 @@ export const useOrganize = () => {
   );
 
   const mergeProposals = useCallback(
-    // Keyed by tag name (item 6): a staged merge records the target's tag_name, which is
+    // Keyed by proposalKey (item 6): a staged merge targets one specific card, which stays
     // stable as the list grows, instead of a positional index that shifts when more
-    // proposals arrive. Both arguments are tag names — classic proposals only, since
-    // dashboard cards have no tag_name and are never merge sources/targets.
-    (sourceTagName: string, targetTagName: string) => {
+    // proposals arrive — or a bare tag name, which two independently-named clusters can
+    // share. Both arguments are card ids — classic proposals only, since dashboard cards
+    // are never merge sources/targets. Resolved via `resolveById` (not `.map` over name
+    // matches), so each id targets exactly one card even when tag names collide.
+    (sourceId: string, targetId: string) => {
       stageDecision((prev) => {
-        const target = prev.find(
-          (s) =>
-            s.proposal.tag_name === targetTagName &&
-            !isInfoProposal(s.proposal) &&
-            !isMergeProposal(s.proposal) &&
-            !isAssignProposal(s.proposal),
-        );
-        if (!target) {
+        const targetIdx = resolveById(prev, targetId);
+        if (targetIdx === -1) {
           return prev;
         }
-        return prev.map((p) =>
-          p.proposal.tag_name === sourceTagName
-            ? { ...p, action: 'merge', mergeTarget: target.proposal.tag_name }
-            : p,
+        const target = prev[targetIdx];
+        if (
+          isInfoProposal(target.proposal) ||
+          isMergeProposal(target.proposal) ||
+          isAssignProposal(target.proposal)
+        ) {
+          return prev;
+        }
+        const sourceIdx = resolveById(prev, sourceId);
+        if (sourceIdx === -1) {
+          return prev;
+        }
+        return prev.map((p, i) =>
+          i === sourceIdx ? { ...p, action: 'merge', mergeTarget: target.proposal.tag_name } : p,
         );
       });
     },
-    [stageDecision],
+    [stageDecision, resolveById],
   );
 
   const approveAll = useCallback(() => {
@@ -589,6 +663,7 @@ export const useOrganize = () => {
         setProposals([]);
         setProgress(null);
         stagedActionsRef.current = {};
+        latestProposalsRef.current = [];
       } else {
         setError(
           'Nothing was applied, so your proposals have been kept. ' +

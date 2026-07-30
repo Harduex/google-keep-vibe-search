@@ -101,6 +101,11 @@ export interface NoteSample {
 export interface TagProposal {
   type?: 'proposal' | 'info';
   action?: 'merge_tags' | 'assign_tag';
+  // Unique per-card identity for this run, added so duplicate tag names (e.g. two clusters
+  // independently named "Topic") don't collapse into the same review-decision target.
+  // Optional because pending sets persisted before this field existed lack it — those fall
+  // back to tag-name matching.
+  proposal_id?: string;
   // Classic cluster tag proposal.
   tag_name?: string;
   note_ids?: string[];

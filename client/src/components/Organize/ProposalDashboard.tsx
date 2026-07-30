@@ -11,7 +11,7 @@ interface ProposalDashboardProps {
   onApprove: (id: string | number) => void;
   onReject: (id: string | number) => void;
   onRename: (id: string | number, newName: string) => void;
-  onMerge: (sourceTagName: string, targetTagName: string) => void;
+  onMerge: (sourceId: string, targetId: string) => void;
   onApproveAll: () => void;
   onReset: () => void;
   /** Throw the whole pending set away, server-side file included. */
@@ -117,11 +117,14 @@ export const ProposalDashboard = memo(
         <div className="proposals-list">
           {proposals.map((state, index) => {
             // Stable key so React does not reuse the wrong card as the list grows
-            // underneath the user. Classic proposals key on tag_name (unique within a
-            // vocabulary); dashboard cards key on their distinguishing fields, falling
-            // back to index only for read-only info cards.
+            // underneath the user. Classic proposals key on proposal_id (unique per card,
+            // even across duplicate tag names), falling back to tag_name for pre-fix
+            // persisted sets; dashboard cards key on their distinguishing fields, falling
+            // back to index only for read-only info cards. Dashboard cards (info/merge/
+            // assign) never carry proposal_id by design and keep this fallback chain.
             const p = state.proposal;
             const key =
+              p.proposal_id ??
               p.tag_name ??
               (p.action
                 ? `${p.action}:${p.source_tag ?? ''}:${p.target_tag ?? ''}:${p.note_id ?? ''}`

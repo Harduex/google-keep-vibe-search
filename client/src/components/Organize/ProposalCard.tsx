@@ -1,6 +1,20 @@
 import { memo, useState, useCallback } from 'react';
 
-import { ProposalState, isInfoProposal, isMergeProposal, isAssignProposal } from '@/types';
+import {
+  ProposalState,
+  ProposalAction,
+  isInfoProposal,
+  isMergeProposal,
+  isAssignProposal,
+} from '@/types';
+
+/** CSS class per action state; actions with no dedicated class (e.g. 'pending') fall back to ''. */
+const ACTION_CLASS_NAMES: Partial<Record<ProposalAction, string>> = {
+  approve: 'approved',
+  reject: 'rejected',
+  rename: 'renamed',
+  merge: 'merged',
+};
 
 interface ProposalCardProps {
   state: ProposalState;
@@ -12,9 +26,9 @@ interface ProposalCardProps {
   onApprove: (id: string | number) => void;
   onReject: (id: string | number) => void;
   onRename: (id: string | number, newName: string) => void;
-  /** Merge is keyed by tag name only — classic proposals. Dashboard cards are never merge
+  /** Merge is keyed by card id only — classic proposals. Dashboard cards are never merge
    * sources or targets, so this never receives an index. */
-  onMerge: (sourceTagName: string, targetTagName: string) => void;
+  onMerge: (sourceId: string, targetId: string) => void;
 }
 
 /** Approve / reject controls shared by the gray-zone merge and review cards.
@@ -68,11 +82,13 @@ export const ProposalCard = memo(
 
     const proposal = state.proposal;
 
-    // The stable id for approve/reject/rename: tag name for classic proposals, index for
-    // dashboard cards (which arrive together at the end, so an index is stable for them).
-    // Classic proposals stream in one at a time, so a positional index would shift when
-    // new cards arrive and silently retarget a click.
-    const cardId: string | number = proposal.tag_name ?? index;
+    // The stable id for approve/reject/rename/merge: proposal_id when the card has one
+    // (unique per card even across duplicate tag names), falling back to tag name for
+    // pre-fix persisted sets, and to the array index for dashboard cards (which arrive
+    // together at the end, so an index is stable for them). Classic proposals stream in one
+    // at a time, so a positional index would shift when new cards arrive and silently
+    // retarget a click.
+    const cardId: string | number = proposal.proposal_id ?? proposal.tag_name ?? index;
 
     const handleRenameSubmit = useCallback(() => {
       if (renameValue.trim() && renameValue !== proposal.tag_name) {
@@ -82,27 +98,18 @@ export const ProposalCard = memo(
     }, [renameValue, proposal.tag_name, cardId, onRename]);
 
     const handleMergeSelect = useCallback(
-      (targetTagName: string) => {
-        onMerge(proposal.tag_name ?? '', targetTagName);
+      (targetId: string) => {
+        onMerge(String(cardId), targetId);
         setIsMerging(false);
       },
-      [proposal.tag_name, onMerge],
+      [cardId, onMerge],
     );
 
     const confidence = proposal.confidence ?? 1;
     const confidenceColor =
       confidence >= 0.7 ? '#0f9d58' : confidence >= 0.4 ? '#f9ab00' : '#ea4335';
 
-    const actionClass =
-      state.action === 'approve'
-        ? 'approved'
-        : state.action === 'reject'
-          ? 'rejected'
-          : state.action === 'rename'
-            ? 'renamed'
-            : state.action === 'merge'
-              ? 'merged'
-              : '';
+    const actionClass = ACTION_CLASS_NAMES[state.action] ?? '';
 
     // Read-only auto-merge notice — no buttons.
     if (isInfoProposal(proposal)) {
@@ -188,17 +195,21 @@ export const ProposalCard = memo(
     }
 
     // Classic cluster tag proposal — full approve / rename / merge / reject.
-    // Merge targets are the classic proposals that have already arrived, keyed by tag name.
-    // Not positional: in a list that grows underneath the user, indices shift and a staged
-    // merge would silently retarget (item 6). Tag names are unique within a vocabulary.
-    const mergeTargets = allProposals.filter(
-      (p) =>
-        p.proposal.tag_name !== undefined &&
-        p.proposal.tag_name !== proposal.tag_name &&
-        !isInfoProposal(p.proposal) &&
-        !isMergeProposal(p.proposal) &&
-        !isAssignProposal(p.proposal),
-    );
+    // Merge targets are the classic proposals that have already arrived, keyed by card id
+    // (proposal_id, falling back to tag name). Not positional: in a list that grows
+    // underneath the user, indices shift and a staged merge would silently retarget (item
+    // 6). Identity-keyed (not name-keyed) so two cards sharing a display name are never
+    // conflated with each other or with the current card.
+    const mergeTargets = allProposals
+      .map((p, i) => ({ state: p, id: p.proposal.proposal_id ?? p.proposal.tag_name ?? String(i) }))
+      .filter(
+        ({ state: p, id }) =>
+          p.proposal.tag_name !== undefined &&
+          id !== cardId &&
+          !isInfoProposal(p.proposal) &&
+          !isMergeProposal(p.proposal) &&
+          !isAssignProposal(p.proposal),
+      );
 
     return (
       <div className={`proposal-card ${actionClass}`}>
@@ -295,12 +306,8 @@ export const ProposalCard = memo(
         {isMerging && (
           <div className="merge-selector">
             <span className="merge-label">Merge into:</span>
-            {mergeTargets.map((p) => (
-              <button
-                key={p.proposal.tag_name}
-                className="merge-target-btn"
-                onClick={() => handleMergeSelect(p.proposal.tag_name!)}
-              >
+            {mergeTargets.map(({ state: p, id }) => (
+              <button key={id} className="merge-target-btn" onClick={() => handleMergeSelect(id)}>
                 {p.proposal.tag_name}
               </button>
             ))}

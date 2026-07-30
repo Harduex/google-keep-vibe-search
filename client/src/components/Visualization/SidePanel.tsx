@@ -23,7 +23,8 @@ export interface SidePanelProps {
   onToggleGhost: () => void;
   hideUnfocused: boolean;
   onToggleHideUnfocused: () => void;
-  onOpenNote: (id: string) => void;
+  /** Search for notes related to this one — same gesture as the card's Related button. */
+  onShowRelated: (id: string) => void;
   onClearPath: () => void;
 }
 
@@ -74,7 +75,7 @@ export const SidePanel = ({
   onToggleGhost,
   hideUnfocused,
   onToggleHideUnfocused,
-  onOpenNote,
+  onShowRelated,
   onClearPath,
 }: SidePanelProps) => (
   <aside className="viz-side-panel">
@@ -144,8 +145,9 @@ export const SidePanel = ({
         {selected.tags.length > 0 && (
           <p className="viz-selected-tags">{selected.tags.join(', ')}</p>
         )}
-        <button className="viz-open-note" onClick={() => onOpenNote(selected.id)}>
-          Open note
+        {/* Same class as the note card's Related button, so the two gestures look alike. */}
+        <button className="show-related-button" onClick={() => onShowRelated(selected.id)}>
+          <span className="material-icons">layers</span> Show related
         </button>
 
         {connectionsError && <p className="viz-error">Connections failed: {connectionsError}</p>}

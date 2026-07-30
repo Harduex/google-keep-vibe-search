@@ -145,20 +145,6 @@ export const Notes = memo(
       [filteredNotes, visibleNotesCount],
     );
 
-    const handleSelectNote = useCallback((noteId: string) => {
-      setViewMode(VIEW_MODES.LIST);
-      setTimeout(() => {
-        const element = document.getElementById(`note-${noteId}`);
-        if (element) {
-          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          element.classList.add('highlighted-note');
-          setTimeout(() => {
-            element.classList.remove('highlighted-note');
-          }, 2000);
-        }
-      }, 100);
-    }, []);
-
     const handleViewChange = useCallback((newMode: ViewMode) => {
       setViewMode(newMode);
       if (newMode === VIEW_MODES.LIST) {
@@ -503,7 +489,7 @@ export const Notes = memo(
                 they are baked into filteredNotes. */}
             <Visualization
               searchResults={filteredNotes}
-              onSelectNote={handleSelectNote}
+              onShowRelated={onShowRelated}
               isAllNotesView={!searchActive}
               focusNoteId={focusNoteId}
             />

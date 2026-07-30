@@ -48,7 +48,8 @@ const NO_CONNECTIONS: ReadonlySet<string> = new Set();
 
 interface VisualizationProps {
   searchResults: Note[];
-  onSelectNote: (noteId: string) => void;
+  /** Search for notes related to the selected one — the card's Related gesture. */
+  onShowRelated: (content: string) => void;
   isAllNotesView?: boolean;
   /** Note to open the view focused on, set by "Show connections" in the list.
    *  The parent clears it when leaving the 3D view, so re-picking the same note
@@ -57,7 +58,7 @@ interface VisualizationProps {
 }
 
 export const Visualization = memo(
-  ({ searchResults, onSelectNote, focusNoteId = null }: VisualizationProps) => {
+  ({ searchResults, onShowRelated, focusNoteId = null }: VisualizationProps) => {
     const { embeddings, isLoading, error } = useEmbeddings();
     const themeMode = useDocumentTheme();
     const containerRef = useRef<HTMLDivElement>(null);
@@ -210,6 +211,16 @@ export const Visualization = memo(
       [connectedIds],
     );
     const handleClearSelection = useCallback(() => setChain([]), []);
+    /** The panel knows the note by id; the Related search wants its text. */
+    const handleShowRelated = useCallback(
+      (id: string) => {
+        const note = searchResults.find((candidate) => candidate.id === id);
+        if (note) {
+          onShowRelated(`${note.title} ${note.content}`);
+        }
+      },
+      [searchResults, onShowRelated],
+    );
     const handleToggleLayer = useCallback(
       (kind: keyof LayerToggles) => setLayers((prev) => ({ ...prev, [kind]: !prev[kind] })),
       [],
@@ -330,7 +341,7 @@ export const Visualization = memo(
             onToggleGhost={() => setGhost((g) => !g)}
             hideUnfocused={hideUnfocused}
             onToggleHideUnfocused={() => setHideUnfocused((h) => !h)}
-            onOpenNote={onSelectNote}
+            onShowRelated={handleShowRelated}
             onClearPath={() => setChain(chain.slice(0, 1))}
           />
         </div>

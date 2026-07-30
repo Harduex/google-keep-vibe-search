@@ -13,7 +13,21 @@ vi.mock('@/hooks/useAllNotes');
 vi.mock('@/hooks/useTags');
 
 vi.mock('@/components/NoteCard', () => ({
-  NoteCard: ({ note }: { note: Note }) => <div data-testid="note-card">{note.title}</div>,
+  NoteCard: ({
+    note,
+    onShowConnections,
+  }: {
+    note: Note;
+    onShowConnections?: (noteId: string) => void;
+  }) => (
+    <div data-testid="note-card">
+      {note.title}
+      <button
+        aria-label={`Show connections for ${note.id}`}
+        onClick={() => onShowConnections?.(note.id)}
+      />
+    </div>
+  ),
 }));
 
 vi.mock('@/components/NoteSkeleton', () => ({
@@ -29,7 +43,23 @@ vi.mock('@/components/ViewToggle', () => ({
 }));
 
 vi.mock('@/components/Visualization', () => ({
-  Visualization: () => <div data-testid="visualization" />,
+  Visualization: ({
+    searchResults,
+    onShowRelated,
+  }: {
+    searchResults: Note[];
+    onShowRelated: (content: string) => void;
+  }) => (
+    <div data-testid="visualization">
+      {searchResults.map((note) => (
+        <button
+          key={note.id}
+          aria-label={`Show related for ${note.id}`}
+          onClick={() => onShowRelated(`${note.title} ${note.content}`)}
+        />
+      ))}
+    </div>
+  ),
 }));
 
 vi.mock('@/components/RefinementSearchBar', () => ({
@@ -103,6 +133,7 @@ interface HarnessProps {
   results?: Note[];
   query?: string;
   onClearSearch?: () => void;
+  onShowRelated?: (content: string) => void;
 }
 
 /** The tag filter and search state are owned by App, so tests need a stateful owner. */
@@ -111,6 +142,7 @@ const StatefulNotes = ({
   results = [],
   query = '',
   onClearSearch = vi.fn(),
+  onShowRelated = vi.fn(),
 }: HarnessProps) => {
   const [tagFilter, setTagFilter] = useState(EMPTY_TAG_FILTER);
   return (
@@ -126,7 +158,7 @@ const StatefulNotes = ({
       onResetRefinement={vi.fn()}
       onClearSearch={onClearSearch}
       onResultsUpdate={vi.fn()}
-      onShowRelated={vi.fn()}
+      onShowRelated={onShowRelated}
       tagFilter={tagFilter}
       onTagFilterChange={setTagFilter}
     />
@@ -302,6 +334,37 @@ describe('Notes', () => {
 
       await user.click(showOnly('Work'));
       expect(container.querySelector('.tag-filter')).not.toHaveClass('sticky');
+    });
+  });
+
+  describe('show related from the 3D view', () => {
+    it('hands the selected note text to the Related search, even past the paged window', async () => {
+      // 25 notes, newest first — 'note-25' sorts last, past the 20-note page,
+      // but the 3D view receives the full filtered set, not the paged slice.
+      const manyNotes = Array.from({ length: 25 }, (_, i) =>
+        makeNote({
+          id: `${i + 1}`,
+          title: `Note ${i + 1}`,
+          content: `Content ${i + 1}`,
+          edited: `2025-01-${String(25 - i).padStart(2, '0')}T00:00:00Z`,
+        }),
+      );
+      mockUseAllNotes.mockReturnValue({
+        notes: manyNotes,
+        isLoading: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+      const onShowRelated = vi.fn();
+
+      const user = userEvent.setup();
+      render(<StatefulNotes onShowRelated={onShowRelated} />);
+
+      // Jump into the 3D view and ask for notes related to the last-ranked one.
+      await user.click(screen.getByRole('button', { name: 'Show connections for 1' }));
+      await user.click(screen.getByRole('button', { name: 'Show related for 25' }));
+
+      expect(onShowRelated).toHaveBeenCalledWith('Note 25 Content 25');
     });
   });
 });

@@ -20,7 +20,7 @@ const baseProps: SidePanelProps = {
   onToggleGhost: vi.fn(),
   hideUnfocused: false,
   onToggleHideUnfocused: vi.fn(),
-  onOpenNote: vi.fn(),
+  onShowRelated: vi.fn(),
   onClearPath: vi.fn(),
 };
 
@@ -51,12 +51,12 @@ describe('SidePanel', () => {
     expect(screen.getByRole('checkbox', { name: /shared entities.*0/i })).toBeTruthy();
   });
 
-  it('toggles layers and opens the note', () => {
+  it('toggles layers and asks for related notes', () => {
     render(<SidePanel {...selectedProps} />);
     fireEvent.click(screen.getByRole('checkbox', { name: /shared tags/i }));
     expect(selectedProps.onToggleLayer).toHaveBeenCalledWith('tags');
-    fireEvent.click(screen.getByRole('button', { name: /open note/i }));
-    expect(selectedProps.onOpenNote).toHaveBeenCalledWith('n1');
+    fireEvent.click(screen.getByRole('button', { name: /show related/i }));
+    expect(selectedProps.onShowRelated).toHaveBeenCalledWith('n1');
   });
 
   it('isolates a tag from the legend and clears it on second click', () => {

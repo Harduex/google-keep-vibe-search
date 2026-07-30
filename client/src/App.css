@@ -211,14 +211,36 @@ h1 {
   background-color: var(--accent-yellow);
 }
 
+.search-input-wrap {
+  position: relative;
+  display: flex;
+  flex-grow: 1;
+}
+
+.search-input-wrap #search-input {
+  width: 100%;
+  /* room for the overlaid clear button, so long queries don't run underneath it */
+  padding-right: 2.5rem;
+}
+
 .search-clear-button {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
   background: none;
   border: none;
   cursor: pointer;
   color: var(--text-secondary, #666);
   display: flex;
   align-items: center;
-  padding: 0 8px;
+  padding: 4px;
+  border-radius: 50%;
+}
+
+.search-clear-button:hover {
+  background-color: var(--light-bg);
+  color: var(--text-color);
 }
 
 /* Refinement search styles */

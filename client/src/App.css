@@ -211,6 +211,16 @@ h1 {
   background-color: var(--accent-yellow);
 }
 
+.search-clear-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary, #666);
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+}
+
 /* Refinement search styles */
 .refinement-search-container {
   display: flex;
@@ -304,10 +314,6 @@ h1 {
   background-color: rgba(0, 0, 0, 0.1);
 }
 
-.results-container {
-  margin-top: 1rem;
-}
-
 /* Refinement toggle button */
 .refinement-toggle-button {
   display: flex;
@@ -362,12 +368,6 @@ h1 {
     opacity: 1;
     transform: scale(1) translateY(0);
   }
-}
-
-#results-count {
-  margin-bottom: 1rem;
-  font-size: 0.9rem;
-  color: var(--text-secondary);
 }
 
 .note-card {
@@ -951,31 +951,6 @@ h1 {
   background-color: rgba(255, 255, 255, 0.1);
 }
 
-.results-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-}
-
-#results-visualization {
-  position: relative;
-  margin-top: 20px;
-}
-
-/* Make sure the graph container is responsive */
-@media (max-width: 768px) {
-  .results-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-  }
-
-  #results-visualization {
-    height: 60vh;
-  }
-}
-
 /* Highlight effect when note is selected from visualization */
 .highlighted-note {
   animation: highlight-pulse 2s ease-out;
@@ -995,12 +970,6 @@ h1 {
 }
 
 /* Add controls container and clusters button styling */
-.controls-container {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
 .clusters-button {
   background-color: var(--light-bg);
   color: var(--text-color);
@@ -1030,10 +999,6 @@ h1 {
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
-  .controls-container {
-    flex-wrap: wrap;
-  }
-
   .clusters-button {
     order: -1;
     margin-bottom: 8px;

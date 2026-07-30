@@ -19,6 +19,7 @@ interface UseSearchResult {
   resetRefinement: () => void;
   setResults: (results: Note[]) => void; // New method to set results directly
   setLoading: (loading: boolean) => void; // New method to manage loading state
+  clearSearch: () => void; // Back to browse mode: no query, no results, no refinement
 }
 
 export const useSearch = (): UseSearchResult => {
@@ -90,6 +91,15 @@ export const useSearch = (): UseSearchResult => {
     setIsLoading(loading);
   }, []);
 
+  // Leave search mode entirely — the Notes tab falls back to browsing all notes.
+  const clearSearch = useCallback(() => {
+    setQuery('');
+    setOriginalResults([]);
+    setRefinementKeywords('');
+    setHasSearched(false);
+    clearError();
+  }, [clearError]);
+
   return {
     query,
     results,
@@ -104,5 +114,6 @@ export const useSearch = (): UseSearchResult => {
     resetRefinement,
     setResults,
     setLoading,
+    clearSearch,
   };
 };

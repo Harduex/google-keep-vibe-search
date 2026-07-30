@@ -16,7 +16,7 @@ import { useCachedQuery } from './useCachedQuery';
  * the reads — replacing the old `await fetchTags()` callback chain.
  *
  * `onNotesChanged` is retained for callers that need to re-run an *uncached*
- * side-effect when note-tag membership changes — today only `Results` passes
+ * side-effect when note-tag membership changes — today only `Notes` passes
  * it, to re-POST the active search. Cached reads (e.g. `useAllNotes`) refresh
  * automatically via `invalidate(QUERY_KEYS.NOTES)` and do not need it.
  */

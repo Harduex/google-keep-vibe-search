@@ -110,9 +110,9 @@ function useCreateGallery(): GalleryContextData {
 
         const data = await searchResponse.json();
 
-        // Switch to search tab if the handler is provided
+        // Switch to the notes tab if the handler is provided
         if (onSwitchTab) {
-          onSwitchTab('search');
+          onSwitchTab('notes');
         }
 
         onResults(data.results);

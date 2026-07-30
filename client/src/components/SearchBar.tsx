@@ -2,10 +2,12 @@ import { FormEvent, useState, memo, useCallback, useEffect } from 'react';
 
 interface SearchBarProps {
   onSearch: (query: string) => void;
+  /** Leave search mode: the owner drops the query and its results. */
+  onClear?: () => void;
   currentQuery?: string;
 }
 
-export const SearchBar = memo(({ onSearch, currentQuery = '' }: SearchBarProps) => {
+export const SearchBar = memo(({ onSearch, onClear, currentQuery = '' }: SearchBarProps) => {
   const [inputValue, setInputValue] = useState(currentQuery);
 
   useEffect(() => {
@@ -24,6 +26,11 @@ export const SearchBar = memo(({ onSearch, currentQuery = '' }: SearchBarProps) 
     setInputValue(e.target.value);
   }, []);
 
+  const handleClear = useCallback(() => {
+    setInputValue('');
+    onClear?.();
+  }, [onClear]);
+
   return (
     <div className="search-container">
       <form onSubmit={handleSubmit} style={{ display: 'flex', width: '100%' }}>
@@ -35,6 +42,17 @@ export const SearchBar = memo(({ onSearch, currentQuery = '' }: SearchBarProps) 
           onChange={handleInputChange}
           autoFocus
         />
+        {inputValue !== '' && (
+          <button
+            type="button"
+            className="search-clear-button"
+            onClick={handleClear}
+            title="Clear search"
+            aria-label="Clear search"
+          >
+            <span className="material-icons">close</span>
+          </button>
+        )}
         <button id="search-button" type="submit">
           Search
         </button>

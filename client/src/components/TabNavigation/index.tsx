@@ -1,7 +1,7 @@
 import { memo, useCallback } from 'react';
 import './styles.css';
 
-export type TabId = 'search' | 'all-notes' | 'chat' | 'organize';
+export type TabId = 'notes' | 'chat' | 'organize';
 
 interface TabItem {
   id: TabId;
@@ -16,16 +16,10 @@ interface TabNavigationProps {
 
 const TABS: TabItem[] = [
   {
-    id: 'search',
-    label: 'Search',
-    icon: 'search',
-  },
-  {
-    id: 'all-notes',
-    label: 'All Notes',
+    id: 'notes',
+    label: 'Notes',
     icon: 'notes',
   },
-
   {
     id: 'chat',
     label: 'Chat',

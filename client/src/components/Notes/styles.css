@@ -85,3 +85,17 @@
     flex-wrap: wrap;
   }
 }
+
+.clear-search-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 12px;
+  background: none;
+  border: 1px solid var(--border-color, #dadce0);
+  border-radius: 16px;
+  padding: 2px 10px;
+  cursor: pointer;
+  color: inherit;
+  font-size: 0.85em;
+}

@@ -1,14 +1,13 @@
 import { useCallback, useMemo, useState } from 'react';
 
-import { AllNotes } from '@/components/AllNotes';
 import { Chat } from '@/components/Chat';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ErrorDisplay } from '@/components/ErrorDisplay';
 import { GalleryProvider, GalleryOverlay } from '@/components/ImageGallery';
 import { ImageSearchUpload } from '@/components/ImageSearchUpload';
 import { LoadingScreen } from '@/components/LoadingScreen';
+import { Notes } from '@/components/Notes';
 import { Organize } from '@/components/Organize';
-import { Results } from '@/components/Results';
 import { SearchBar } from '@/components/SearchBar';
 import { SearchModeToggle, type SearchMode } from '@/components/SearchModeToggle';
 import { TabNavigation, TabId } from '@/components/TabNavigation';
@@ -49,22 +48,23 @@ const App = () => {
     resetRefinement,
     setResults,
     setLoading,
+    clearSearch,
     error: searchError,
   } = useSearch();
 
   // Add state for active tab
-  const [activeTab, setActiveTab] = useState<TabId>('search');
+  const [activeTab, setActiveTab] = useState<TabId>('notes');
   // Add state for search mode
   const [searchMode, setSearchMode] = useState<SearchMode>('text');
-  // Which tags the notes list shows and hides. Owned here, not by AllNotes, so a tag chip in
-  // the search results or Explore in the Organize tab can point the notes list at one tag.
+  // Which tags the notes list shows and hides. Owned here, not by Notes, so a tag chip in
+  // the notes list or Explore in the Organize tab can point the notes list at one tag.
   // Purely a view filter — unrelated to the search-wide exclusion behind /api/tags/excluded.
   const [tagFilter, setTagFilter] = useState(EMPTY_TAG_FILTER);
 
   const handleSearch = useCallback(
     (searchQuery: string) => {
       performSearch(searchQuery);
-      setActiveTab('search'); // Switch to search tab when performing a search
+      setActiveTab('notes'); // Switch to the notes tab when performing a search
       scrollToElement('.search-container', UI_ELEMENTS.SEARCH_OFFSET);
     },
     [performSearch],
@@ -114,13 +114,13 @@ const App = () => {
     setActiveTab(tab as TabId);
   }, []);
 
-  /** Show exactly the notes carrying `tagName`, wherever the request came from.
-   *  Lifted to App because the include filter is owned by All Notes but triggered from
-   *  three places outside it: a tag chip in the search results, a tag chip in the notes
-   *  list, and Explore in the Organize tag manager. */
+  /** Show exactly the notes carrying `tagName`.
+   *  Lifted to App because the include filter is owned by App and rendered by the
+   *  Notes tab; the only external caller is Explore in the Organize tag manager
+   *  (tag chips on cards filter in place inside Notes). */
   const handleExploreTag = useCallback((tagName: string) => {
     setTagFilter((prev) => focusTag(prev, tagName));
-    setActiveTab('all-notes');
+    setActiveTab('notes');
     scrollToElement('.tab-navigation', UI_ELEMENTS.SEARCH_OFFSET);
   }, []);
 
@@ -166,18 +166,18 @@ const App = () => {
         {/* Navigation tabs */}
         <TabNavigation activeTab={activeTab} onChange={setActiveTab} />
 
-        {/* Show search bar only in search tab */}
-        {activeTab === 'search' && showImageSearchEnabled && (
+        {/* Show search bar only in the notes tab */}
+        {activeTab === 'notes' && showImageSearchEnabled && (
           <SearchModeToggle activeMode={searchMode} onChange={handleSearchModeChange} />
         )}
 
         {/* Text search */}
-        {activeTab === 'search' && (!showImageSearchEnabled || searchMode === 'text') && (
-          <SearchBar onSearch={handleSearch} currentQuery={query} />
+        {activeTab === 'notes' && (!showImageSearchEnabled || searchMode === 'text') && (
+          <SearchBar onSearch={handleSearch} onClear={clearSearch} currentQuery={query} />
         )}
 
         {/* Image search */}
-        {activeTab === 'search' && showImageSearchEnabled && searchMode === 'image' && (
+        {activeTab === 'notes' && showImageSearchEnabled && searchMode === 'image' && (
           <ImageSearchUpload
             onSearchResults={handleImageSearchResults}
             onError={handleDismissError}
@@ -186,28 +186,20 @@ const App = () => {
         )}
 
         {/* Show content based on active tab */}
-        {activeTab === 'search' && (
-          <ErrorBoundary fallbackLabel="Search">
-            <Results
+        {activeTab === 'notes' && (
+          <ErrorBoundary fallbackLabel="Notes">
+            <Notes
               query={query}
               results={results}
               originalResults={originalResults}
               refinementKeywords={refinementKeywords}
-              isLoading={isLoading}
+              isSearchLoading={isLoading}
               hasSearched={hasSearched}
               isRefined={isRefined}
-              onShowRelated={handleSearch}
               onRefine={handleRefinement}
               onResetRefinement={resetRefinement}
+              onClearSearch={clearSearch}
               onResultsUpdate={handleResultsUpdate}
-              onExploreTag={handleExploreTag}
-            />
-          </ErrorBoundary>
-        )}
-
-        {activeTab === 'all-notes' && (
-          <ErrorBoundary fallbackLabel="All Notes">
-            <AllNotes
               onShowRelated={handleSearch}
               tagFilter={tagFilter}
               onTagFilterChange={setTagFilter}

@@ -11,7 +11,18 @@ from app.core.security import (
     limit_request_size,
     rate_limit,
 )
-from app.routes import chat, embeddings, images, imports, notes, organize, search, stats, tags
+from app.routes import (
+    chat,
+    connections,
+    embeddings,
+    images,
+    imports,
+    notes,
+    organize,
+    search,
+    stats,
+    tags,
+)
 
 app = FastAPI(title="Google Keep Vibe Search", lifespan=lifespan)
 
@@ -37,6 +48,7 @@ app.include_router(tags.router)
 app.include_router(stats.router)
 app.include_router(images.router)
 app.include_router(embeddings.router)
+app.include_router(connections.router)
 app.include_router(organize.router)
 app.include_router(imports.router)
 

@@ -6,30 +6,19 @@ const point = (tags?: string[]) => ({ tags });
 
 describe('buildTagColorScale', () => {
   it('gives the most common tags a hue each and folds the rest into Other', () => {
+    const slotTags = ['Recipes', 'Travel', 'Work', 'Books', 'Health', 'Music', 'Ideas', 'Home'];
     const points = [
-      point(['Recipes']),
-      point(['Recipes']),
-      point(['Recipes']),
-      point(['Travel']),
-      point(['Travel']),
-      point(['Work']),
-      point(['Work']),
+      // Descending counts: Recipes ×9, Travel ×8, ... Home ×2 — then Rare ×1.
+      ...slotTags.flatMap((tag, i) => Array.from({ length: 9 - i }, () => point([tag]))),
       point(['Rare']),
     ];
 
     const scale = buildTagColorScale(points, 'light');
 
-    const recipes = scale.colorFor(['Recipes']);
-    const travel = scale.colorFor(['Travel']);
-    const work = scale.colorFor(['Work']);
-    expect(new Set([recipes, travel, work]).size).toBe(MAX_TAG_SLOTS);
+    const slotColors = slotTags.map((tag) => scale.colorFor([tag]));
+    expect(new Set(slotColors).size).toBe(MAX_TAG_SLOTS);
     expect(scale.colorFor(['Rare'])).toBe(OTHER_TAGS_COLOR);
-    expect(scale.legend.map((entry) => entry.label)).toEqual([
-      'Recipes',
-      'Travel',
-      'Work',
-      'Other tags',
-    ]);
+    expect(scale.legend.map((entry) => entry.label)).toEqual([...slotTags, 'Other tags']);
   });
 
   it('colours untagged notes with the neutral and lists them last', () => {

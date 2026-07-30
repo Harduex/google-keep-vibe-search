@@ -47,6 +47,7 @@ export const Results = memo(
     onExploreTag,
   }: ResultsProps) => {
     const [viewMode, setViewMode] = useState<ViewMode>(VIEW_MODES.LIST);
+    const [focusNoteId, setFocusNoteId] = useState<string | null>(null);
     const [showRefinement, setShowRefinement] = useState<boolean>(false);
     const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
     const [isTagDialogOpen, setIsTagDialogOpen] = useState(false);
@@ -79,6 +80,17 @@ export const Results = memo(
 
     const handleViewChange = useCallback((newMode: ViewMode) => {
       setViewMode(newMode);
+      if (newMode === VIEW_MODES.LIST) {
+        // Cleared on the way out so picking the same note again is a fresh change
+        // the 3D view can react to, rather than an unchanged prop it ignores.
+        setFocusNoteId(null);
+      }
+    }, []);
+
+    /** "Show connections" on a card: jump to the 3D view centred on that note. */
+    const handleShowConnections = useCallback((noteId: string) => {
+      setFocusNoteId(noteId);
+      setViewMode(VIEW_MODES.VISUALIZATION);
     }, []);
 
     const handleSelectNote = useCallback(
@@ -316,6 +328,7 @@ export const Results = memo(
                   isSelectable={true}
                   isSelected={selectedNoteIds.includes(note.id)}
                   onShowRelated={onShowRelated}
+                  onShowConnections={handleShowConnections}
                   onSelectNote={handleNoteSelection}
                   onRemoveTag={removeTagFromNote}
                   onRenameTag={renameTag}
@@ -328,7 +341,11 @@ export const Results = memo(
 
         {viewMode === VIEW_MODES.VISUALIZATION && hasSearched && results.length > 0 && (
           <div id="results-visualization">
-            <Visualization searchResults={results} onSelectNote={handleSelectNote} />
+            <Visualization
+              searchResults={results}
+              onSelectNote={handleSelectNote}
+              focusNoteId={focusNoteId}
+            />
           </div>
         )}
 

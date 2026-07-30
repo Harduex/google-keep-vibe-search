@@ -185,6 +185,42 @@ def test_embeddings_carry_tags_for_colouring(client):
     assert tagged.get("Labeled 7") == ["Label7"]
 
 
+def test_embeddings_payload_is_trimmed_and_3d(client):
+    """Points carry a bounded snippet instead of the full content, and 3D coordinates.
+
+    The full-content payload was many MB at real corpus scale and the view never
+    displayed more than a hover line of it.
+    """
+    resp = client.get("/api/embeddings")
+    assert resp.status_code == 200
+    points = resp.json()["embeddings"]
+    assert len(points) > 0
+    for point in points:
+        assert set(point) == {"id", "title", "snippet", "tags", "coordinates"}
+        assert "content" not in point
+        assert len(point["snippet"]) <= 120
+        assert len(point["coordinates"]) == 3
+
+
+def test_embeddings_fall_back_to_pca_when_umap_fails(client, monkeypatch):
+    """A UMAP failure must not 500 the endpoint — PCA is the fallback layout."""
+    import app.routes.embeddings as emb_route
+
+    emb_route.get_cached_projection.cache_clear()
+
+    def boom(**kwargs):
+        raise RuntimeError("synthetic umap failure")
+
+    import umap
+
+    monkeypatch.setattr(umap, "UMAP", boom)
+    resp = client.get("/api/embeddings")
+    assert resp.status_code == 200
+    points = resp.json()["embeddings"]
+    assert all(len(p["coordinates"]) == 3 for p in points)
+    emb_route.get_cached_projection.cache_clear()
+
+
 def _stub_agent_decision(monkeypatch, queries):
     """Make the agent's decision step deterministic and offline.
 

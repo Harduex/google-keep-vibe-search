@@ -14,6 +14,9 @@ interface NoteCardProps {
   isSelectable?: boolean;
   isSelected?: boolean;
   onShowRelated: (content: string) => void;
+  /** Open the 3D view focused on this note. Omitted where there is no 3D view to
+   *  switch to (the chat note list), in which case the button is not rendered. */
+  onShowConnections?: (noteId: string) => void;
   onSelectNote?: (noteId: string, isSelected: boolean) => void;
   onRemoveTag?: (noteId: string, tagName: string) => void;
   onRenameTag?: (oldTagName: string, newTagName: string) => void;
@@ -36,6 +39,7 @@ export const NoteCard = memo(
     isSelectable = false,
     isSelected = false,
     onShowRelated,
+    onShowConnections,
     onSelectNote,
     onRemoveTag,
     onRenameTag,
@@ -55,6 +59,10 @@ export const NoteCard = memo(
       const noteContent = `${note.title} ${note.content}`;
       onShowRelated(noteContent);
     }, [note.title, note.content, onShowRelated]);
+
+    const handleConnectionsClick = useCallback(() => {
+      onShowConnections?.(note.id);
+    }, [note.id, onShowConnections]);
 
     const handleSelectClick = useCallback(
       (e: React.MouseEvent) => {
@@ -339,6 +347,11 @@ export const NoteCard = memo(
           <button className="show-related-button" onClick={handleRelatedClick}>
             <span className="material-icons">layers</span> Show related
           </button>
+          {onShowConnections && (
+            <button className="show-connections-button" onClick={handleConnectionsClick}>
+              <span className="material-icons">hub</span> Show connections
+            </button>
+          )}
         </div>
       </div>
     );

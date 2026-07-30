@@ -832,8 +832,11 @@ h1 {
   margin-top: 1rem;
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
+.show-connections-button,
 .show-related-button {
   background-color: var(--light-bg);
   color: var(--text-color);
@@ -848,10 +851,12 @@ h1 {
   transition: background-color 0.2s;
 }
 
+.show-connections-button:hover,
 .show-related-button:hover {
   background-color: var(--border-color);
 }
 
+.show-connections-button .material-icons,
 .show-related-button .material-icons {
   font-size: 1rem;
 }

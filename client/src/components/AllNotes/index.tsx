@@ -43,6 +43,7 @@ export const AllNotes = memo(({ onShowRelated, tagFilter, onTagFilterChange }: A
   const [filterPinned, setFilterPinned] = useState<boolean>(false);
   const [visibleNotesCount, setVisibleNotesCount] = useState<number>(20);
   const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
+  const [focusNoteId, setFocusNoteId] = useState<string | null>(null);
 
   // Sort and filter notes
   const filteredNotes = useMemo(() => {
@@ -85,6 +86,17 @@ export const AllNotes = memo(({ onShowRelated, tagFilter, onTagFilterChange }: A
 
   const handleViewChange = useCallback((newMode: ViewMode) => {
     setViewMode(newMode);
+    if (newMode === VIEW_MODES.LIST) {
+      // Cleared on the way out so picking the same note again is a fresh change
+      // the 3D view can react to, rather than an unchanged prop it ignores.
+      setFocusNoteId(null);
+    }
+  }, []);
+
+  /** "Show connections" on a card: jump to the 3D view centred on that note. */
+  const handleShowConnections = useCallback((noteId: string) => {
+    setFocusNoteId(noteId);
+    setViewMode(VIEW_MODES.VISUALIZATION);
   }, []);
 
   const handleSortChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -303,6 +315,7 @@ export const AllNotes = memo(({ onShowRelated, tagFilter, onTagFilterChange }: A
                   isSelectable={true}
                   isSelected={selectedNoteIds.includes(note.id)}
                   onShowRelated={onShowRelated}
+                  onShowConnections={handleShowConnections}
                   onSelectNote={handleNoteSelection}
                   onRemoveTag={removeTagFromNote}
                   onRenameTag={renameTag}
@@ -316,10 +329,17 @@ export const AllNotes = memo(({ onShowRelated, tagFilter, onTagFilterChange }: A
         </div>
       ) : (
         <div className="all-notes-visualization">
+          {/* filteredNotes, not visibleNotes: `visibleNotes` is the card list's
+              infinite-scroll window (20 at a time, grown by a scroll listener that
+              never fires here because the list is not rendered in this mode). The
+              3D view filters by what it is given, so handing it the paged slice
+              showed a 20-point cloud. Tag/pinned/archived filters still apply —
+              they are baked into filteredNotes. */}
           <Visualization
-            searchResults={visibleNotes}
+            searchResults={filteredNotes}
             onSelectNote={handleSelectNote}
             isAllNotesView={true}
+            focusNoteId={focusNoteId}
           />
         </div>
       )}

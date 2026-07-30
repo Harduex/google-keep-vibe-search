@@ -21,6 +21,7 @@ export const API_ROUTES = {
   TAG_COVERAGE: '/api/tags/coverage',
   EXCLUDED_TAGS: '/api/tags/excluded',
   REMOVE_TAG: '/api/notes',
+  NOTE_CONNECTIONS: '/api/notes', // + `/${id}/connections`
   REMOVE_TAG_FROM_ALL: '/api/tags/remove',
   RENAME_TAG: '/api/tags/rename',
   REMOVE_ALL_TAGS: '/api/tags/all',

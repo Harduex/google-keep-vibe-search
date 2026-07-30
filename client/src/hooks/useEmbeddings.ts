@@ -5,7 +5,8 @@ import { useCachedQuery } from './useCachedQuery';
 export interface EmbeddingPoint {
   id: string;
   title: string;
-  content: string;
+  /** First ~120 chars of the note, for hover labels only. */
+  snippet: string;
   /** Tags the note carries, resolved server-side from the tag map (used to colour points). */
   tags: string[];
   coordinates: [number, number, number];

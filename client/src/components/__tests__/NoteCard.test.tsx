@@ -88,3 +88,29 @@ describe('NoteCard tag filter controls', () => {
     expect(screen.getByText('Work')).toBeInTheDocument();
   });
 });
+
+describe('NoteCard show connections', () => {
+  it('reports the note id so the host can focus it in the 3D view', async () => {
+    const user = userEvent.setup();
+    const onShowConnections = vi.fn();
+
+    render(
+      <NoteCard
+        note={note}
+        query=""
+        onShowRelated={vi.fn()}
+        onShowConnections={onShowConnections}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /show connections/i }));
+    expect(onShowConnections).toHaveBeenCalledWith('1');
+  });
+
+  it('hides the button where there is no 3D view to switch to', () => {
+    // The chat note list renders cards without a visualization behind them.
+    render(<NoteCard note={note} query="" onShowRelated={vi.fn()} />);
+
+    expect(screen.queryByRole('button', { name: /show connections/i })).not.toBeInTheDocument();
+  });
+});

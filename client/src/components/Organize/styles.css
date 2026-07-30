@@ -600,6 +600,28 @@
   color: white;
 }
 
+.proposal-action-btn.exclude:hover,
+.proposal-action-btn.exclude.active {
+  background-color: var(--accent-orange, #f29900);
+  border-color: var(--accent-orange, #f29900);
+  color: white;
+}
+
+/* An excluded tag's card reads as parked: its notes are hidden app-wide. */
+.proposal-card.excluded {
+  opacity: 0.65;
+}
+
+.excluded-badge {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background-color: var(--accent-orange, #f29900);
+  color: white;
+}
+
 /* Rename Input */
 .rename-input-group {
   display: flex;

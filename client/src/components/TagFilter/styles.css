@@ -258,39 +258,6 @@
   font-size: 18px;
 }
 
-.search-exclude-button,
-.delete-tag-button {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--text-secondary);
-  padding: 4px;
-  border-radius: 4px;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-}
-
-.tag-item-row:hover .search-exclude-button,
-.tag-item-row:hover .delete-tag-button {
-  opacity: 1;
-}
-
-.search-exclude-button.active {
-  color: var(--accent-color, #fbbc04);
-}
-
-.delete-tag-button:hover {
-  color: #d93025;
-}
-
-.search-exclude-button .material-icons,
-.delete-tag-button .material-icons {
-  font-size: 18px;
-}
-
 .tag-rename-row {
   padding: 8px 16px;
 }
@@ -479,17 +446,13 @@
 /* Keyboard reach. The row's rename/export buttons are revealed by hover, which leaves a
    keyboard user tabbing onto controls they cannot see — so focus reveals them too. */
 .tag-item-row:focus-within .tag-rename-button,
-.tag-item-row:focus-within .export-tag-button,
-.tag-item-row:focus-within .search-exclude-button,
-.tag-item-row:focus-within .delete-tag-button {
+.tag-item-row:focus-within .export-tag-button {
   opacity: 1;
 }
 
 .tag-state-option:focus-visible,
 .tag-rename-button:focus-visible,
 .export-tag-button:focus-visible,
-.search-exclude-button:focus-visible,
-.delete-tag-button:focus-visible,
 .filter-chip:focus-visible {
   outline: 2px solid var(--accent-blue);
   outline-offset: 1px;
@@ -499,9 +462,7 @@
    rather than making them unreachable on a phone. */
 @media (hover: none) {
   .tag-rename-button,
-  .export-tag-button,
-  .search-exclude-button,
-  .delete-tag-button {
+  .export-tag-button {
     opacity: 1;
   }
 }

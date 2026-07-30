@@ -82,15 +82,9 @@ export const Notes = memo(
     onTagFilterChange,
   }: NotesProps) => {
     const { notes: allNotes, isLoading: isNotesLoading, error, refetch } = useAllNotes();
-    const {
-      tags,
-      excludedTags,
-      tagNotes,
-      updateExcludedTags,
-      removeTagFromNote,
-      removeTagFromAllNotes,
-      renameTag,
-    } = useTags(hasSearched ? onResultsUpdate : refetch);
+    const { tags, tagNotes, removeTagFromNote, renameTag } = useTags(
+      hasSearched ? onResultsUpdate : refetch,
+    );
 
     const [viewMode, setViewMode] = useState<ViewMode>(VIEW_MODES.LIST);
     const [sortBy, setSortBy] = useState<NotesSortBy>('edited');
@@ -253,20 +247,6 @@ export const Notes = memo(
       [renameTag, tagFilter, onTagFilterChange],
     );
 
-    const handleToggleSearchExcluded = useCallback(
-      (tagName: string) => {
-        const next = excludedTags.includes(tagName)
-          ? excludedTags.filter((tag) => tag !== tagName)
-          : [...excludedTags, tagName];
-        void updateExcludedTags(next).then(() => {
-          if (hasSearched) {
-            onResultsUpdate();
-          }
-        });
-      },
-      [excludedTags, updateExcludedTags, hasSearched, onResultsUpdate],
-    );
-
     const handleNoteSelection = useCallback((noteId: string, isSelected: boolean) => {
       setSelectedNoteIds((prev) =>
         isSelected ? [...prev, noteId] : prev.filter((id) => id !== noteId),
@@ -370,9 +350,6 @@ export const Notes = memo(
             onRenameTag={handleRenameTag}
             onMergeTags={handleMergeSelectedTags}
             onExportTag={handleExportByTag}
-            searchExcludedTags={excludedTags}
-            onToggleSearchExcluded={handleToggleSearchExcluded}
-            onDeleteTagEverywhere={removeTagFromAllNotes}
           />
         )}
 

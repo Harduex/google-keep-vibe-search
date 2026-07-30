@@ -20,12 +20,6 @@ interface TagFilterProps {
   onRenameTag?: (oldName: string, newName: string) => void;
   onMergeTags?: (targetTag: string) => void | Promise<void>;
   onExportTag?: (tagName: string) => void;
-  /** Tags excluded search-wide (the /api/tags/excluded set — not the view filter). */
-  searchExcludedTags?: string[];
-  /** Flip one tag's search-wide exclusion. */
-  onToggleSearchExcluded?: (tagName: string) => void;
-  /** Remove the tag from every note carrying it. Confirmation happens here. */
-  onDeleteTagEverywhere?: (tagName: string) => void;
 }
 
 export const TagFilter = ({
@@ -37,9 +31,6 @@ export const TagFilter = ({
   onRenameTag,
   onMergeTags,
   onExportTag,
-  searchExcludedTags = [],
-  onToggleSearchExcluded,
-  onDeleteTagEverywhere,
 }: TagFilterProps) => {
   const { included: selectedTags, excluded: excludedTags } = filter;
   const [isExpanded, setIsExpanded] = useState(false);
@@ -211,24 +202,6 @@ export const TagFilter = ({
     [onExportTag],
   );
 
-  const createSearchExcludeHandler = useCallback(
-    (tagName: string) => (e: React.MouseEvent) => {
-      e.stopPropagation();
-      onToggleSearchExcluded?.(tagName);
-    },
-    [onToggleSearchExcluded],
-  );
-
-  const createDeleteEverywhereHandler = useCallback(
-    (tagName: string) => (e: React.MouseEvent) => {
-      e.stopPropagation();
-      if (window.confirm(`Are you sure you want to remove the tag "${tagName}" from all notes?`)) {
-        onDeleteTagEverywhere?.(tagName);
-      }
-    },
-    [onDeleteTagEverywhere],
-  );
-
   if (tags.length === 0) {
     return null;
   }
@@ -388,37 +361,6 @@ export const TagFilter = ({
                             <span className="material-icons">download</span>
                           </button>
                         )}
-                        {onToggleSearchExcluded && (
-                          <button
-                            className={`search-exclude-button${
-                              searchExcludedTags.includes(tag.name) ? ' active' : ''
-                            }`}
-                            onClick={createSearchExcludeHandler(tag.name)}
-                            aria-pressed={searchExcludedTags.includes(tag.name)}
-                            title={
-                              searchExcludedTags.includes(tag.name)
-                                ? `Include "${tag.name}" in search results again`
-                                : `Exclude "${tag.name}" from search results`
-                            }
-                            aria-label={
-                              searchExcludedTags.includes(tag.name)
-                                ? `Include "${tag.name}" in search results again`
-                                : `Exclude "${tag.name}" from search results`
-                            }
-                          >
-                            <span className="material-icons">search_off</span>
-                          </button>
-                        )}
-                        {onDeleteTagEverywhere && (
-                          <button
-                            className="delete-tag-button"
-                            onClick={createDeleteEverywhereHandler(tag.name)}
-                            title={`Delete tag "${tag.name}" from all notes`}
-                            aria-label={`Delete tag "${tag.name}" from all notes`}
-                          >
-                            <span className="material-icons">delete_forever</span>
-                          </button>
-                        )}
                         {/* One segmented control per row rather than a checkbox plus a
                             separate exclude button: show and hide are two values of the
                             same decision, so they belong in one control. */}
@@ -463,9 +405,7 @@ export const TagFilter = ({
             <span>
               Select tags to show only notes with those tags; when nothing is selected, all notes
               are displayed. The block icon hides a tag's notes instead, and wins over a selection.
-              The search-off icon excludes a tag from search results entirely; the trash icon
-              deletes the tag from every note. Select multiple tags to merge them into one of the
-              selected tags.
+              Select multiple tags to merge them into one of the selected tags.
             </span>
           </div>
         </div>

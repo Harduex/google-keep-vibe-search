@@ -42,14 +42,27 @@ export const Organize = ({ onExploreTag }: OrganizeProps) => {
 
   const {
     tags,
+    excludedTags,
     coverage,
     isCoverageLoading,
     isLoading: isTagsLoading,
     renameTag,
     removeTagFromAllNotes,
     removeAllTags,
+    updateExcludedTags,
     refetchTags: refetchTagList,
   } = useTags();
+
+  /** Flip one tag in and out of the app-wide excluded set (search, browsing, chat). */
+  const handleToggleExcluded = useCallback(
+    (tagName: string) => {
+      const next = excludedTags.includes(tagName)
+        ? excludedTags.filter((tag) => tag !== tagName)
+        : [...excludedTags, tagName];
+      void updateExcludedTags(next);
+    },
+    [excludedTags, updateExcludedTags],
+  );
 
   const handleApplyProposals = useCallback(async () => {
     await applyProposals();
@@ -145,6 +158,8 @@ export const Organize = ({ onExploreTag }: OrganizeProps) => {
         </div>
 
         <TagManagerDashboard
+          excludedTags={excludedTags}
+          onToggleExcluded={handleToggleExcluded}
           tags={tags}
           isLoading={isTagsLoading}
           onRename={renameTag}

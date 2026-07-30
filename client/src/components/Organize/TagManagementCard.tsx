@@ -6,6 +6,10 @@ import { NoteSample, Tag } from '@/types';
 interface TagManagementCardProps {
   tag: Tag;
   allTags: Tag[];
+  /** Whether the tag sits in the app-wide excluded set: its notes are dropped from
+   *  search results, the notes list and chat retrieval until re-included. */
+  isExcluded: boolean;
+  onToggleExcluded: (tagName: string) => void;
   onRename: (oldName: string, newName: string) => void;
   onMerge: (sourceTag: string, targetTag: string) => void;
   onRemove: (tagName: string) => void;
@@ -14,7 +18,16 @@ interface TagManagementCardProps {
 }
 
 export const TagManagementCard = memo(
-  ({ tag, allTags, onRename, onMerge, onRemove, onExplore }: TagManagementCardProps) => {
+  ({
+    tag,
+    allTags,
+    isExcluded,
+    onToggleExcluded,
+    onRename,
+    onMerge,
+    onRemove,
+    onExplore,
+  }: TagManagementCardProps) => {
     const [isRenaming, setIsRenaming] = useState(false);
     const [renameValue, setRenameValue] = useState(tag.name);
     const [isMerging, setIsMerging] = useState(false);
@@ -73,7 +86,7 @@ export const TagManagementCard = memo(
     }, [tag.name, onRemove]);
 
     return (
-      <div className="proposal-card">
+      <div className={`proposal-card${isExcluded ? ' excluded' : ''}`}>
         <div className="proposal-header">
           <div className="proposal-tag-info">
             {isRenaming ? (
@@ -109,6 +122,7 @@ export const TagManagementCard = memo(
           </div>
 
           <div className="proposal-meta">
+            {isExcluded && <span className="excluded-badge">hidden</span>}
             <span className="proposal-count">
               <span className="material-icons">description</span>
               {tag.count}
@@ -144,6 +158,21 @@ export const TagManagementCard = memo(
             title="Merge into another tag"
           >
             <span className="material-icons">merge_type</span>
+          </button>
+          <button
+            className={`proposal-action-btn exclude ${isExcluded ? 'active' : ''}`}
+            onClick={() => onToggleExcluded(tag.name)}
+            aria-pressed={isExcluded}
+            title={
+              isExcluded
+                ? `Show "${tag.name}" notes again`
+                : `Hide "${tag.name}" notes everywhere: search, browsing and chat`
+            }
+            aria-label={
+              isExcluded ? `Show "${tag.name}" notes again` : `Hide "${tag.name}" notes everywhere`
+            }
+          >
+            <span className="material-icons">{isExcluded ? 'visibility' : 'visibility_off'}</span>
           </button>
           <button
             className="proposal-action-btn remove"

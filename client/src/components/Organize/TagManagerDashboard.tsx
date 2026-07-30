@@ -7,7 +7,10 @@ import { SORT_LABELS, TagSort, sortTags } from './tagSort';
 
 interface TagManagerDashboardProps {
   tags: Tag[];
+  /** App-wide excluded set: these tags' notes are hidden from search, browsing and chat. */
+  excludedTags: string[];
   isLoading: boolean;
+  onToggleExcluded: (tagName: string) => void;
   onRename: (oldName: string, newName: string) => void;
   onMerge: (sourceTag: string, targetTag: string) => void;
   onRemove: (tagName: string) => void;
@@ -18,7 +21,9 @@ interface TagManagerDashboardProps {
 export const TagManagerDashboard = memo(
   ({
     tags,
+    excludedTags,
     isLoading,
+    onToggleExcluded,
     onRename,
     onMerge,
     onRemove,
@@ -121,6 +126,8 @@ export const TagManagerDashboard = memo(
               key={tag.name}
               tag={tag}
               allTags={tags}
+              isExcluded={excludedTags.includes(tag.name)}
+              onToggleExcluded={onToggleExcluded}
               onRename={onRename}
               onMerge={onMerge}
               onRemove={onRemove}

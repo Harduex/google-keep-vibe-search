@@ -265,3 +265,70 @@ async def test_get_llm_tag_name_passes_existing_tags_to_prompt(monkeypatch):
     assert "EXISTING TAGS" in user_msgs[-1]["content"]
     # And the supplied tags appear alongside the marker.
     assert "Cooking" in user_msgs[-1]["content"]
+
+
+# --------------------------------------------------------------------------
+# _get_llm_tag_name — case-insensitive vault-tag reuse before sanitizing
+# --------------------------------------------------------------------------
+#
+# `_sanitize_tag_name` title-cases and strips punctuation, which turns a
+# correctly-reused vault tag into a near-duplicate of itself (`iOS` ->
+# `Ios`) or drops it entirely (`C#` -> ``). The LLM's raw answer must be
+# matched against the vault list case-insensitively BEFORE sanitizing, and a
+# hit must return the vault's own spelling verbatim.
+
+
+@pytest.mark.asyncio
+async def test_get_llm_tag_name_reuses_vault_tag_case_insensitively(monkeypatch):
+    """LLM answers `ios`, vault has `iOS` -> exact vault spelling returned."""
+    monkeypatch.setattr(cat_mod.asyncio, "sleep", _instant_sleep)
+
+    llm = _ScriptedToolLLM([_tool_call_response("ios")])
+    service = CategorizationService(search_service=None, note_service=None, llm=llm)
+
+    result = await service._get_llm_tag_name(
+        notes_text="x",
+        keywords="x",
+        neighbor_keywords="x",
+        existing_tags=["iOS"],
+    )
+    assert result == "iOS"
+
+
+@pytest.mark.asyncio
+async def test_get_llm_tag_name_reuses_vault_tag_with_symbols(monkeypatch):
+    """LLM answers `C#`, vault has `C#` -> returned verbatim, not sanitized to "".
+
+    Today `_sanitize_tag_name("C#")` drops the `#` and returns "" since it is
+    outside the allowed char-set, silently discarding a perfectly valid,
+    already-existing vault tag.
+    """
+    monkeypatch.setattr(cat_mod.asyncio, "sleep", _instant_sleep)
+
+    llm = _ScriptedToolLLM([_tool_call_response("C#")])
+    service = CategorizationService(search_service=None, note_service=None, llm=llm)
+
+    result = await service._get_llm_tag_name(
+        notes_text="x",
+        keywords="x",
+        neighbor_keywords="x",
+        existing_tags=["C#"],
+    )
+    assert result == "C#"
+
+
+@pytest.mark.asyncio
+async def test_get_llm_tag_name_falls_back_to_sanitize_when_no_vault_match(monkeypatch):
+    """A non-matching answer keeps today's sanitize path unchanged."""
+    monkeypatch.setattr(cat_mod.asyncio, "sleep", _instant_sleep)
+
+    llm = _ScriptedToolLLM([_tool_call_response("Gardening")])
+    service = CategorizationService(search_service=None, note_service=None, llm=llm)
+
+    result = await service._get_llm_tag_name(
+        notes_text="x",
+        keywords="x",
+        neighbor_keywords="x",
+        existing_tags=["iOS"],
+    )
+    assert result == "Gardening"

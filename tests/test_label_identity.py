@@ -79,3 +79,66 @@ def test_ambiguous_merge_name_is_skipped():
         recipes.proposal_id,
     } == ids
     assert len(vocab.labels) == 4
+
+
+def test_merge_into_vault_spelled_tag_is_not_sanitized_apart():
+    """Defect: `into: "iOS"` must resolve against the existing "iOS" label by its
+    raw/vault spelling, not against `_sanitize_tag_name("iOS")` ("Ios"). Sanitizing
+    the target before lookup makes the real "iOS" label look like a lookup miss,
+    so the constituents fold into a brand-new "Ios" label while "iOS" survives
+    untouched — recreating the near-duplicate this branch was meant to eliminate.
+    """
+    vocab = LabelVocabulary()
+    ios = Label(name="iOS", seed_note_ids=["1", "2"])
+    apple_mobile = Label(name="Apple Mobile", seed_note_ids=["3"])
+    vocab.add(ios)
+    vocab.add(apple_mobile)
+
+    CategorizationService._apply_merge_map(
+        vocab, {"merges": [{"into": "iOS", "from": ["Apple Mobile"]}]}
+    )
+
+    names = [lbl.name for lbl in vocab.labels]
+    assert names == ["iOS"], f"expected a single vault-spelled 'iOS' label, got {names}"
+    (merged,) = vocab.labels
+    assert merged.proposal_id == ios.proposal_id
+    assert "Ios" not in names
+
+
+def test_merge_into_symbol_only_tag_name_is_not_dropped():
+    """Defect: `into: "C#"` sanitizes to "" (no alphanumeric-leading char set match),
+    so resolving the target through the sanitized form alone silently drops the
+    merge instead of applying it against the existing "C#" label.
+    """
+    vocab = LabelVocabulary()
+    csharp = Label(name="C#", seed_note_ids=["1"])
+    dotnet = Label(name="Dotnet Notes", seed_note_ids=["2"])
+    vocab.add(csharp)
+    vocab.add(dotnet)
+
+    CategorizationService._apply_merge_map(
+        vocab, {"merges": [{"into": "C#", "from": ["Dotnet Notes"]}]}
+    )
+
+    names = [lbl.name for lbl in vocab.labels]
+    assert names == ["C#"], f"expected the merge to apply into 'C#', got {names}"
+
+
+def test_merge_deduplicates_repeated_from_name():
+    """Defect: a `from` list repeating one name (e.g. the LLM listing "Recipes"
+    twice) resolves to the same proposal_id twice; popping it from prop_map a
+    second time raised KeyError, which the outer try/except swallowed and killed
+    the whole consolidation step.
+    """
+    vocab = LabelVocabulary()
+    cooking = Label(name="Cooking", seed_note_ids=["1"])
+    recipes = Label(name="Recipes", seed_note_ids=["2"])
+    vocab.add(cooking)
+    vocab.add(recipes)
+
+    CategorizationService._apply_merge_map(
+        vocab, {"merges": [{"into": "Cooking", "from": ["Recipes", "Recipes"]}]}
+    )
+
+    names = [lbl.name for lbl in vocab.labels]
+    assert names == ["Cooking"], f"expected a clean single merge, got {names}"

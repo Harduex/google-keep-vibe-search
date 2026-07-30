@@ -199,7 +199,14 @@ class CategorizationService:
         return {k: v for k, v in counts.items() if v >= PREFIX_MIN_COUNT}
 
     @staticmethod
-    def _sanitize_tag_name(raw: str) -> str:
+    def _unwrap_tag_text(raw: str) -> str:
+        """Strip a leading code fence and/or unwrap a JSON tool-call payload.
+
+        Returns the recovered tag text before punctuation stripping and
+        title-casing, so callers can compare it verbatim (e.g. for
+        case-insensitive vault-tag reuse) as well as feed it into
+        `_sanitize_tag_name`.
+        """
         text = raw.strip()
 
         # Unwrap a leading fence by cutting at its closing delimiter rather than
@@ -223,6 +230,12 @@ class CategorizationService:
                 text = data.get("tag", text)
             except json.JSONDecodeError:
                 pass
+
+        return text
+
+    @staticmethod
+    def _sanitize_tag_name(raw: str) -> str:
+        text = CategorizationService._unwrap_tag_text(raw)
 
         text = re.sub(r'[\'"{}\[\]:;.,!?]', "", text)
         text = re.sub(r"\s+", " ", text).strip()
@@ -252,7 +265,13 @@ class CategorizationService:
             from_list = merge.get("from", [])
             if not into_raw or not isinstance(from_list, list):
                 continue
-            into = CategorizationService._sanitize_tag_name(into_raw)
+            # Raw-first: an "into" naming an existing vault-spelled tag (e.g. "iOS",
+            # "C#") must survive untouched for the info card. Only fall back to the
+            # sanitized form when the raw/unwrapped name is empty (e.g. the LLM sent
+            # nothing usable) — sanitizing is for brand-new invented names, not for a
+            # spelling that already came straight from the vault.
+            into_trimmed = CategorizationService._unwrap_tag_text(into_raw).strip()
+            into = into_trimmed or CategorizationService._sanitize_tag_name(into_raw)
             if not into:
                 continue
             for src in from_list:
@@ -328,26 +347,42 @@ class CategorizationService:
             if not into_raw or not isinstance(from_list, list):
                 continue
 
+            # Raw-first resolution: an "into" naming an existing vault-spelled label
+            # (e.g. "iOS", "C#") must be looked up by its raw/unwrapped name BEFORE
+            # sanitizing, or sanitization mangles it into a lookup miss ("iOS" ->
+            # "Ios") and the constituents fold into a freshly-created near-duplicate
+            # while the real label survives untouched — exactly the bug this branch
+            # was meant to fix. Sanitizing is only appropriate once the raw name
+            # fails to resolve to anything, i.e. the LLM is naming a brand-new
+            # target that doesn't exist in the vocabulary yet.
+            into_trimmed = CategorizationService._unwrap_tag_text(into_raw).strip()
             into_sanitized = CategorizationService._sanitize_tag_name(into_raw)
-            if not into_sanitized:
+
+            into_ids = name_index.get(into_trimmed, []) if into_trimmed else []
+            if into_ids:
+                into_name = into_trimmed
+            elif into_sanitized:
+                into_ids = name_index.get(into_sanitized, [])
+                into_name = into_sanitized
+            else:
                 continue
 
             # Never merge INTO a locked tag — folding another cluster into a tag the user
             # already decided on would change its membership out from under them.
-            if into_sanitized in locked_tags:
+            if into_name in locked_tags:
                 continue
 
             # A name that maps to zero labels is simply a brand-new merge target (the
             # LLM is free to name a tag that doesn't exist yet — nothing to resolve). A
             # name mapping to more than one label is genuinely ambiguous — which one
             # would we fold into? — so that merge is skipped rather than guessed at.
-            into_ids = name_index.get(into_sanitized, [])
             if len(into_ids) > 1:
                 skipped_ambiguous += 1
                 continue
             into_id = into_ids[0] if into_ids else None
 
             valid_from_ids: List[str] = []
+            seen_from_ids: set = set()
             for f in from_list:
                 if f in locked_tags:
                     continue
@@ -360,6 +395,11 @@ class CategorizationService:
                 from_id = from_ids[0]
                 if from_id not in prop_map:
                     continue
+                # A repeated name in `from` (e.g. the LLM listing "Recipes" twice)
+                # must resolve to a single merge, not a double pop() below.
+                if from_id in seen_from_ids:
+                    continue
+                seen_from_ids.add(from_id)
                 valid_from_ids.append(from_id)
 
             if not valid_from_ids:
@@ -398,7 +438,7 @@ class CategorizationService:
                 weighted_conf = 0.0
 
             merged_prop = Label(
-                name=into_sanitized,
+                name=into_name,
                 seed_note_ids=merged_ids,
                 source="merged",
                 is_anchor=any(c.is_anchor for c in constituents),
@@ -409,7 +449,7 @@ class CategorizationService:
                 ),
             )
             prop_map[merged_prop.proposal_id] = merged_prop
-            name_index.setdefault(into_sanitized, []).append(merged_prop.proposal_id)
+            name_index.setdefault(into_name, []).append(merged_prop.proposal_id)
 
         if skipped_ambiguous:
             # Structural count only — these are tag names, not note content, but the
@@ -718,6 +758,22 @@ class CategorizationService:
                 self._log_llm_failure(f"{safe_exc(e1)} {safe_meta(attempt=attempt + 1)}")
                 print(f"          └─ LLM naming failed completely: {safe_exc(e1)}")
                 return ""
+
+        # Reuse a vault tag verbatim if the LLM's answer matches one
+        # case-insensitively, BEFORE sanitizing. `_sanitize_tag_name`
+        # title-cases and strips punctuation, which turns a correctly-reused
+        # vault tag into a near-duplicate of itself (`iOS` -> `Ios`) or drops
+        # it entirely (`C#` -> ``, since `#` is outside the allowed
+        # char-set). Check both the trimmed raw answer and its fence/JSON
+        # unwrapped form (a tool call reliably answers `{"tag": "iOS"}`) so a
+        # wrapped answer still matches the vault spelling.
+        if existing_tags:
+            vault_by_casefold = {t.casefold(): t for t in existing_tags if t}
+            for candidate in (raw.strip(), self._unwrap_tag_text(raw).strip()):
+                vault_tag = vault_by_casefold.get(candidate.casefold())
+                if vault_tag:
+                    print(f"          └─ {safe_meta(raw_llm=raw, reused_vault_tag=vault_tag)}")
+                    return vault_tag
 
         sanitized = self._sanitize_tag_name(raw)
         # `raw` is a model-generated tag, not note text — loggable, but truncated.

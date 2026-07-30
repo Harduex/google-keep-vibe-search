@@ -1073,6 +1073,14 @@ class CategorizationService:
                     print(
                         f"[TAGGING] Step 6/8 ── Generating cluster names via LLM ({total_llm} clusters)..."
                     )
+                    # Dedupe names as they are assigned, before each ``proposal`` frame
+                    # is streamed, so two clusters never show the same card even
+                    # momentarily. Covers every branch below (manifest reuse, LLM
+                    # answer, keyword fallback) — manifest reuse is exactly where
+                    # re-runs collide, since two clusters can reuse the same prior
+                    # tag. The end-of-run ``_deduplicate_name`` pass stays as a
+                    # safety net; it is idempotent on names already made unique here.
+                    stream_seen: Dict[str, int] = {}
                     for i, (lbl, n_text, kw_str, neighbor_kw, reused_tag) in enumerate(llm_tasks):
                         progress = 0.66 + (i / total_llm) * 0.25 if total_llm > 0 else 0.90
                         await queue.put(
@@ -1127,6 +1135,9 @@ class CategorizationService:
                                     )
                                 else:
                                     lbl.name = "DROP_ME"
+
+                        if lbl.name and lbl.name != "DROP_ME":
+                            lbl.name = self._deduplicate_name(lbl.name, stream_seen)
 
                         # Stream one proposal per named cluster so the user can start
                         # reviewing while naming continues. Naming is size-descending,

@@ -534,3 +534,47 @@ async def test_categorize_fits_umap_exactly_once_per_run(monkeypatch):
     assert (
         umap_ctor_spy.call_count == 1
     ), f"umap.UMAP constructed {umap_ctor_spy.call_count} times during one run; expected exactly 1"
+
+
+@pytest.mark.asyncio
+async def test_categorize_streams_unique_names_when_llm_always_answers_the_same_tag():
+    """Two clusters whose LLM answer collides must still stream unique cards.
+
+    Regression for the re-run defect where collisions were only repaired by
+    the end-of-run ``_deduplicate_name`` pass, after every streamed ``proposal``
+    card had already shown a duplicate name. ``_DeterministicLLM`` always
+    answers "Topic" for every cluster, so two tight blobs guarantee a
+    collision; the naming loop must now dedupe before each ``proposal``
+    frame is put on the queue, giving unique ``tag_name``s and unique
+    ``proposal_id``s at stream time.
+    """
+    rng = np.random.RandomState(7)
+    blob_a = (rng.randn(20, 384) + 5.0).astype(np.float32)
+    blob_b = (rng.randn(20, 384) - 5.0).astype(np.float32)
+    embeddings = np.vstack([blob_a, blob_b])
+    notes = [{"id": f"note_{i}.json", "title": "", "content": ""} for i in range(40)]
+    note_indices = list(range(40))
+
+    service = CategorizationService(
+        search_service=_StubSearchForCategorize(embeddings, notes, note_indices),
+        note_service=None,
+        llm=_DeterministicLLM(),
+    )
+
+    frames = []
+    async for line in service.categorize(granularity="broad"):
+        data = json.loads(line)
+        frames.append(data)
+        if data.get("type") in ("done", "error"):
+            break
+
+    assert frames and frames[-1]["type"] == "done", (
+        f"categorize did not terminate cleanly; last frame=" f"{frames[-1] if frames else None}"
+    )
+
+    proposal_frames = [f for f in frames if f["type"] == "proposal"]
+    names = [f["proposal"]["tag_name"] for f in proposal_frames]
+    ids = [f["proposal"]["proposal_id"] for f in proposal_frames]
+    assert len(proposal_frames) >= 2, "need a collision to test dedup"
+    assert len(set(names)) == len(names), f"streamed duplicate names: {names}"
+    assert len(set(ids)) == len(ids), f"streamed duplicate proposal_ids: {ids}"

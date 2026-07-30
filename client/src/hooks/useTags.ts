@@ -121,6 +121,14 @@ export const useTags = (onNotesChanged?: () => void) => {
     [mutate, afterNotesChanged],
   );
 
+  const removeAllTags = useCallback(async (): Promise<void> => {
+    const res = await mutate(API_ROUTES.REMOVE_ALL_TAGS, {}, 'DELETE');
+    if (res.ok) {
+      afterNotesChanged();
+      invalidate(QUERY_KEYS.EXCLUDED_TAGS);
+    }
+  }, [mutate, afterNotesChanged]);
+
   return {
     tags: tagsQuery.data?.tags ?? [],
     excludedTags: excludedQuery.data?.excluded_tags ?? [],
@@ -132,6 +140,7 @@ export const useTags = (onNotesChanged?: () => void) => {
     updateExcludedTags,
     removeTagFromNote,
     removeTagFromAllNotes,
+    removeAllTags,
     renameTag,
     refetchTags: tagsQuery.refetch,
     refetchExcludedTags: excludedQuery.refetch,

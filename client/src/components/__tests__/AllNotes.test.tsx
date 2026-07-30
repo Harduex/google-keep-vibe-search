@@ -102,6 +102,7 @@ describe('AllNotes tag merge from filter', () => {
       updateExcludedTags: vi.fn(),
       removeTagFromNote: vi.fn(),
       removeTagFromAllNotes: vi.fn(),
+      removeAllTags: vi.fn(),
       renameTag,
       refetchTags: vi.fn(),
       refetchExcludedTags: vi.fn(),

@@ -99,6 +99,17 @@ def save_manifest(manifest: Dict[str, Any], path: Optional[str] = None) -> None:
     os.replace(tmp, path)
 
 
+def clear_manifest(path: Optional[str] = None) -> None:
+    """Remove the tag manifest so the next run starts with fresh names."""
+    if path is None:
+        path = _default_manifest_path()
+    try:
+        if os.path.exists(path):
+            os.replace(path, f"{path}.bak")
+    except OSError as e:
+        print(f"[manifest] could not clear tag manifest: {type(e).__name__}")
+
+
 def _manifest_centroid_index(manifest: Dict[str, Any]) -> List[Tuple[str, np.ndarray]]:
     """[(tag_name, centroid_vec)] from a manifest, skipping malformed entries."""
     out: List[Tuple[str, np.ndarray]] = []

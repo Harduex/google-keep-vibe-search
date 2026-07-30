@@ -4,7 +4,9 @@ from app.core.dependencies import get_note_service
 from app.core.exceptions import NoteNotTagged, TagNotFound
 from app.core.redact import safe_exc
 from app.models.tag import RemoveTagRequest, RenameTagRequest, TagManagementRequest, TagNotesRequest
+from app.services.categorization_service import clear_manifest
 from app.services.note_service import NoteService
+from app.services.proposal_store import clear_pending_proposals
 
 router = APIRouter(prefix="/api", tags=["tags"])
 
@@ -102,3 +104,14 @@ def rename_tag(
         raise HTTPException(status_code=400, detail=f"invalid rename request: {safe_exc(e)}")
     except KeyError:
         raise TagNotFound(request.old_name)
+
+
+@router.delete("/tags/all")
+def remove_all_tags(
+    note_service: NoteService = Depends(get_note_service),
+):
+    count = note_service.remove_all_tags()
+    if count:
+        clear_pending_proposals()
+        clear_manifest()
+    return {"message": f"Removed all {count} tags", "tags_removed": count}

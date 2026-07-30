@@ -47,6 +47,7 @@ export const Organize = ({ onExploreTag }: OrganizeProps) => {
     isLoading: isTagsLoading,
     renameTag,
     removeTagFromAllNotes,
+    removeAllTags,
     refetchTags: refetchTagList,
   } = useTags();
 
@@ -149,6 +150,7 @@ export const Organize = ({ onExploreTag }: OrganizeProps) => {
           onRename={renameTag}
           onMerge={handleMerge}
           onRemove={removeTagFromAllNotes}
+          onRemoveAll={removeAllTags}
           onExplore={onExploreTag}
         />
       </div>

@@ -393,6 +393,25 @@ class NoteService:
         save_tags_to_cache(self.note_tags)
         return notes_updated
 
+    def remove_all_tags(self) -> int:
+        """Remove every tag from every note, clearing the entire tag map.
+
+        Also clears the excluded-tags set, since those tags no longer exist.
+        Returns the number of distinct tags that were removed.
+        """
+        distinct = len({t for tags in self.note_tags.values() for t in tags})
+        if not distinct:
+            return 0
+
+        self.note_tags.clear()
+        save_tags_to_cache(self.note_tags)
+
+        if self.excluded_tags:
+            self.excluded_tags.clear()
+            save_excluded_tags_to_cache(self.excluded_tags)
+
+        return distinct
+
     def enrich_with_tags(self, notes_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         for note in notes_list:
             note_id = note.get("id")

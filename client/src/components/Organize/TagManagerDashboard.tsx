@@ -11,11 +11,20 @@ interface TagManagerDashboardProps {
   onRename: (oldName: string, newName: string) => void;
   onMerge: (sourceTag: string, targetTag: string) => void;
   onRemove: (tagName: string) => void;
+  onRemoveAll: () => void;
   onExplore: (tagName: string) => void;
 }
 
 export const TagManagerDashboard = memo(
-  ({ tags, isLoading, onRename, onMerge, onRemove, onExplore }: TagManagerDashboardProps) => {
+  ({
+    tags,
+    isLoading,
+    onRename,
+    onMerge,
+    onRemove,
+    onRemoveAll,
+    onExplore,
+  }: TagManagerDashboardProps) => {
     const [sort, setSort] = useState<TagSort>('count-desc');
     const sortedTags = useMemo(() => sortTags(tags, sort), [tags, sort]);
 
@@ -32,6 +41,16 @@ export const TagManagerDashboard = memo(
       link.click();
       URL.revokeObjectURL(url);
     }, [sortedTags]);
+
+    const handleRemoveAll = useCallback(() => {
+      if (
+        window.confirm(
+          `Are you sure you want to delete ALL ${tags.length} tags? This will remove every tag from every note and cannot be undone.`,
+        )
+      ) {
+        onRemoveAll();
+      }
+    }, [onRemoveAll, tags.length]);
 
     if (isLoading) {
       return <div className="tag-manager-loading">Loading tags...</div>;
@@ -67,6 +86,15 @@ export const TagManagerDashboard = memo(
               aria-label="Export tags as JSON"
             >
               <span className="material-icons">download</span>
+            </button>
+            <button
+              className="tag-delete-all-btn"
+              onClick={handleRemoveAll}
+              title="Delete all tags from all notes"
+              aria-label="Delete all tags"
+            >
+              <span className="material-icons">delete_sweep</span>
+              Delete All
             </button>
           </div>
           <label className="tag-sort">

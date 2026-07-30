@@ -49,6 +49,12 @@ MANIFEST_REUSE_SIMILARITY = 0.90
 # and produces better tags.
 INCREMENTAL_NEW_NOTE_WARN_RATIO = 0.20
 
+# Recovers `{"tag": "..."}` from a naming reply that is not pure JSON. Models
+# that ignore the tool schema and answer in prose bury the object in a fence
+# and/or trail it with commentary; `[^{}]*` keeps the match inside one object so
+# surrounding chatter cannot be absorbed into the tag.
+_TAG_JSON_RE = re.compile(r'\{[^{}]*"tag"\s*:\s*"([^"]*)"[^{}]*\}')
+
 
 def _default_manifest_path() -> str:
     """Resolve the manifest path lazily against the current cache dir.
@@ -196,12 +202,22 @@ class CategorizationService:
     def _sanitize_tag_name(raw: str) -> str:
         text = raw.strip()
 
-        if text.startswith("```") and text.endswith("```"):
-            lines = text.split("\n")
-            if len(lines) >= 3:
-                text = "\n".join(lines[1:-1]).strip()
+        # Unwrap a leading fence by cutting at its closing delimiter rather than
+        # requiring the text to also END with one. A model that answers in prose
+        # instead of calling the tool emits ```json{...}``` and then keeps
+        # talking until max_tokens, and the old startswith-AND-endswith test
+        # missed that: the fence survived, `words[:3]` became "```Json Tag
+        # Music" and the char-set check below dropped the cluster name to "".
+        if text.startswith("```"):
+            body = text.split("\n", 1)[1] if "\n" in text else ""
+            text = body.split("```", 1)[0].strip()
 
-        if text.startswith("{") and text.endswith("}"):
+        # The object can still be trailed (or preceded) by prose, so match it
+        # in place instead of demanding it be the entire string.
+        tag_match = _TAG_JSON_RE.search(text)
+        if tag_match:
+            text = tag_match.group(1)
+        elif text.startswith("{") and text.endswith("}"):
             try:
                 data = json.loads(text)
                 text = data.get("tag", text)

@@ -70,6 +70,57 @@ def test_sanitize_handles_code_fence_wrapped_tag():
     assert CategorizationService._sanitize_tag_name(fenced) == "Gardening Tips"
 
 
+# --------------------------------------------------------------------------
+# _sanitize_tag_name — the chatty-model regression
+# --------------------------------------------------------------------------
+#
+# A model that answers in prose instead of calling the tool emits the JSON in a
+# ```json fence and then keeps talking past the closing fence until it hits
+# max_tokens. The fence unwrap used to require the text to both start AND end
+# with ```, so the trailing chatter left the fence in place, `words[:3]` became
+# "```Json Tag Music" and the leading-char check dropped the whole cluster name
+# to "". Every one of these shapes carries an unambiguous tag and must survive.
+
+
+def test_sanitize_handles_language_tagged_fence():
+    assert (
+        CategorizationService._sanitize_tag_name('```json\n{"tag": "Music Production"}\n```')
+        == "Music Production"
+    )
+
+
+def test_sanitize_handles_fence_with_trailing_prose():
+    """The exact shape observed from a chatty model, truncated at max_tokens."""
+    raw = (
+        '```json\n{"tag": "Music Production"}\n```' + "Okay, here is my reasoning: " + "blah " * 300
+    )
+    assert CategorizationService._sanitize_tag_name(raw) == "Music Production"
+
+
+def test_sanitize_handles_bare_json_with_trailing_prose():
+    raw = '{"tag": "Healthy Recipes"}\nI chose this because the notes are about food.'
+    assert CategorizationService._sanitize_tag_name(raw) == "Healthy Recipes"
+
+
+def test_sanitize_handles_prose_preamble_before_json():
+    raw = 'Sure! Here is the tag you asked for:\n{"tag": "Bodybuilding"}'
+    assert CategorizationService._sanitize_tag_name(raw) == "Bodybuilding"
+
+
+def test_sanitize_handles_unfenced_prose_without_json():
+    """No JSON to recover: fall through to the word path, not a silent "".
+
+    A leading fence with no closing delimiter still unwraps.
+    """
+    assert CategorizationService._sanitize_tag_name("```\nGardening") == "Gardening"
+
+
+def test_sanitize_rejects_prose_with_no_recoverable_tag():
+    # Widening the JSON match must not turn junk into a tag.
+    assert CategorizationService._sanitize_tag_name("```json\n{}\n```") == ""
+    assert CategorizationService._sanitize_tag_name("```json\n\n```") == ""
+
+
 def test_sanitize_truncates_to_three_words():
     assert CategorizationService._sanitize_tag_name("one two three four five") == "One Two Three"
 

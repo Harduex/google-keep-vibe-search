@@ -56,8 +56,13 @@ TAG_NAMING_SYSTEM_PROMPT = """You are a precise categorization engine. Your task
 RULES:
 1. Output EXACTLY 1-2 words in Title Case.
 2. Must be a descriptive noun or noun phrase.
-3. DO NOT use generic words: Misc, Various, Notes, Use, Learn, Https, Link.
-4. Output valid JSON only: {"tag": "Your Tag"}"""
+3. DO NOT use generic words: Misc, Various, Notes, Use, Learn, Https, Link."""
+# No "output valid JSON" rule: the caller passes a `generate_tag` tool schema
+# with tool_choice="required", and a prose instruction to emit JSON competes
+# with it. Models resolve the conflict differently -- Llama 3.1 and Ornith
+# favoured the tool call, Gemma 4 answered in a ```json fence and rambled to
+# max_tokens, yielding an unusable reply for a third of clusters. The schema
+# alone constrains the shape, so state the naming rules here and nothing else.
 
 
 TAG_NAMING_USER_PROMPT = """Hint keywords: {keywords}

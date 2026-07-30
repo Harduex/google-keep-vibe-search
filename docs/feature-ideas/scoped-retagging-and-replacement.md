@@ -1,7 +1,9 @@
 # Scoped Retagging & Tag Replacement — Feature Idea
 
-**Status:** Idea (not designed, not implemented). Part 2 below — the confirmed re-run
-defects — is diagnosed and ready to implement independently of the scope/write-mode design.
+**Status:** Part 1 (scope & write mode): idea, not designed, not implemented. Part 2 (the
+confirmed re-run defects): **fixed** on `fix/rerun-categorize-defects` (2026-07-30) — all
+four fixes plus the frontend identity staging landed; see the note at the top of Part 2 for
+the commits.
 **Created:** 2026-07-27
 **Updated:** 2026-07-30 — re-running Auto-Categorize over already-categorized notes was
 investigated; the near-duplicate tags in problem 1 now have confirmed root causes, and the
@@ -71,6 +73,25 @@ mode" concept:
 ---
 
 # Part 2 — Confirmed defects when re-running over already-tagged notes
+
+> **Fixed 2026-07-30 (branch `fix/rerun-categorize-defects`, plan
+> `docs/superpowers/plans/2026-07-30-rerun-categorize-defects.md`):**
+>
+> - ✅ Step 1 — stable identity: every `Label` carries a `proposal_id` emitted in streamed
+>   `proposal` frames and `label_updates`, preserved through consolidation merges (commits
+>   `8bd0227`, `58e527b`).
+> - ✅ Step 2 — names are deduped in the naming loop before any `proposal` frame streams;
+>   the manifest-reuse branch flows through the same dedup (commit `2bc3bd3`). New runs can
+>   no longer show two same-named cards.
+> - ✅ Step 3 / Defect 2 — consolidation keys on `proposal_id`; same-named bystanders
+>   survive unrelated merges, ambiguous name references are skipped instead of collapsed
+>   (commit `8ee6234`).
+> - ✅ Step 4 / Defect 3 — case-insensitive vault-tag reuse before `_sanitize_tag_name`
+>   (commit `1257eb6`).
+> - ✅ Frontend identity staging — `cardId`/`resolveById`/`toActionsMap`/`reattachActions`/
+>   `mergeProposals` and the React `key` now key on `proposal_id`, with synthetic ids
+>   generated for pre-fix pending sets restored from before this change (commit `aa515c1`).
+>   Defect 1 (mis-routed accept/discard) is fixed in the UI.
 
 Diagnosed 2026-07-30 with synthetic runs only (60 fake notes, stub LLM — never the real
 corpus). Independently shippable and worth doing **before** Part 1: re-running is the

@@ -305,7 +305,19 @@ class CategorizationService:
         # not exist, so locking can never change the outcome of an unlocked run.
         locked_tags = locked or set()
 
-        prop_map = {lbl.name: lbl for lbl in vocab.labels}
+        # Keyed on proposal_id, not name: two labels can legitimately share a name
+        # (e.g. two unrelated clusters both named "Topic"), and a name-keyed map would
+        # silently collapse them into one entry, dropping a bystander from an unrelated
+        # merge. `name_index` is the guarded name -> [proposal_id, ...] lookup that the
+        # LLM's name-based merge answers are resolved through; a name that resolves to
+        # anything other than exactly one id is ambiguous and the merge naming it is
+        # skipped rather than guessed at.
+        prop_map: Dict[str, Any] = {lbl.proposal_id: lbl for lbl in vocab.labels}
+        name_index: Dict[str, List[str]] = {}
+        for lbl in vocab.labels:
+            name_index.setdefault(lbl.name, []).append(lbl.proposal_id)
+
+        skipped_ambiguous = 0
 
         for merge in merges:
             if not isinstance(merge, dict):
@@ -325,17 +337,49 @@ class CategorizationService:
             if into_sanitized in locked_tags:
                 continue
 
-            valid_froms = [f for f in from_list if f in prop_map and f not in locked_tags]
-            if not valid_froms:
+            # A name that maps to zero labels is simply a brand-new merge target (the
+            # LLM is free to name a tag that doesn't exist yet — nothing to resolve). A
+            # name mapping to more than one label is genuinely ambiguous — which one
+            # would we fold into? — so that merge is skipped rather than guessed at.
+            into_ids = name_index.get(into_sanitized, [])
+            if len(into_ids) > 1:
+                skipped_ambiguous += 1
+                continue
+            into_id = into_ids[0] if into_ids else None
+
+            valid_from_ids: List[str] = []
+            for f in from_list:
+                if f in locked_tags:
+                    continue
+                from_ids = name_index.get(f, [])
+                if len(from_ids) > 1:
+                    skipped_ambiguous += 1
+                    continue
+                if not from_ids:
+                    continue
+                from_id = from_ids[0]
+                if from_id not in prop_map:
+                    continue
+                valid_from_ids.append(from_id)
+
+            if not valid_from_ids:
                 continue
 
-            constituents = [prop_map.pop(f) for f in valid_froms]
-            target_label = prop_map.get(into_sanitized)
-            if into_sanitized in prop_map:
-                constituents.append(prop_map.pop(into_sanitized))
+            constituents = [prop_map.pop(fid) for fid in valid_from_ids]
+            target_label = prop_map.get(into_id)
+            if into_id in prop_map:
+                constituents.append(prop_map.pop(into_id))
 
             if not constituents:
                 continue
+
+            # Keep the name index in sync so a later merge in the same batch that
+            # refers to one of these names by name resolves against current state,
+            # not the pre-loop snapshot.
+            for c in constituents:
+                bucket = name_index.get(c.name)
+                if bucket and c.proposal_id in bucket:
+                    bucket.remove(c.proposal_id)
 
             largest = max(constituents, key=lambda c: len(c.seed_note_ids))
             sample_notes = largest.sample_notes
@@ -364,7 +408,13 @@ class CategorizationService:
                     target_label.proposal_id if target_label is not None else largest.proposal_id
                 ),
             )
-            prop_map[into_sanitized] = merged_prop
+            prop_map[merged_prop.proposal_id] = merged_prop
+            name_index.setdefault(into_sanitized, []).append(merged_prop.proposal_id)
+
+        if skipped_ambiguous:
+            # Structural count only — these are tag names, not note content, but the
+            # count alone is what downstream diagnostics need.
+            print(f"[TAGGING] Skipped {skipped_ambiguous} ambiguous merge reference(s)")
 
         vocab.labels = list(prop_map.values())
 
@@ -1203,7 +1253,12 @@ class CategorizationService:
                         except Exception:
                             locked_tags = set()
 
-                        merged_into = {lbl.name: lbl.name for lbl in valid_labels}
+                        # Keyed on proposal_id, not name — two labels can share a name
+                        # (e.g. two unrelated clusters both named "Topic"), and a
+                        # name-keyed union-find dict would silently collapse them into
+                        # one entry, dropping a bystander from the graph entirely.
+                        id_to_label = {lbl.proposal_id: lbl for lbl in valid_labels}
+                        merged_into = {lbl.proposal_id: lbl.proposal_id for lbl in valid_labels}
 
                         def find_root(x):
                             if merged_into[x] == x:
@@ -1227,13 +1282,13 @@ class CategorizationService:
                                 sim = float(np.dot(v1, v2) / norm) if norm > 0 else 0
 
                                 if sim > 0.85:
-                                    ni = valid_labels[i].name
-                                    nj = valid_labels[j].name
+                                    li = valid_labels[i]
+                                    lj = valid_labels[j]
                                     # A locked tag is never auto-merged, in either direction:
                                     # folding it into a neighbour (source) or a neighbour
                                     # into it (target) would both undo the user's decision.
-                                    if ni not in locked_tags and nj not in locked_tags:
-                                        union_roots(ni, nj)
+                                    if li.name not in locked_tags and lj.name not in locked_tags:
+                                        union_roots(li.proposal_id, lj.proposal_id)
                                 elif sim > 0.70:
                                     borderline_pairs.append((valid_labels[i], valid_labels[j]))
 
@@ -1242,12 +1297,17 @@ class CategorizationService:
 
                         groups = defaultdict(list)
                         for lbl in valid_labels:
-                            r = find_root(lbl.name)
-                            if r != lbl.name:
-                                groups[r].append(lbl.name)
+                            r = find_root(lbl.proposal_id)
+                            if r != lbl.proposal_id:
+                                groups[r].append(lbl.proposal_id)
 
                         for r, children in groups.items():
-                            auto_merges["merges"].append({"into": r, "from": children})
+                            auto_merges["merges"].append(
+                                {
+                                    "into": id_to_label[r].name,
+                                    "from": [id_to_label[c].name for c in children],
+                                }
+                            )
 
                         if auto_merges["merges"]:
                             self._commit_merges(
@@ -1262,7 +1322,7 @@ class CategorizationService:
                         # tag — the LLM is not allowed to propose merging those either.
                         active_borderline = []
                         for a, b in borderline_pairs:
-                            ra, rb = find_root(a.name), find_root(b.name)
+                            ra, rb = find_root(a.proposal_id), find_root(b.proposal_id)
                             if ra != rb and a.name not in locked_tags and b.name not in locked_tags:
                                 active_borderline.append((a, b))
 
@@ -1282,11 +1342,11 @@ class CategorizationService:
 
                             prompt += "Borderline Pairs to Consider Merging:\n"
                             for a, b in active_borderline:
-                                prompt += (
-                                    f"- Pair: '{find_root(a.name)}' and '{find_root(b.name)}'\n"
-                                )
-                                prompt += f"  Evidence for {find_root(a.name)}: {[n.get('title') or n.get('content')[:30] for n in a.sample_notes[:2]]}\n"
-                                prompt += f"  Evidence for {find_root(b.name)}: {[n.get('title') or n.get('content')[:30] for n in b.sample_notes[:2]]}\n"
+                                root_a = id_to_label[find_root(a.proposal_id)].name
+                                root_b = id_to_label[find_root(b.proposal_id)].name
+                                prompt += f"- Pair: '{root_a}' and '{root_b}'\n"
+                                prompt += f"  Evidence for {root_a}: {[n.get('title') or n.get('content')[:30] for n in a.sample_notes[:2]]}\n"
+                                prompt += f"  Evidence for {root_b}: {[n.get('title') or n.get('content')[:30] for n in b.sample_notes[:2]]}\n"
 
                             prompt += "\nAll Current Tags:\n"
                             pairs = [

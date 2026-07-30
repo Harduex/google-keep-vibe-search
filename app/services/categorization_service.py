@@ -330,6 +330,7 @@ class CategorizationService:
                 continue
 
             constituents = [prop_map.pop(f) for f in valid_froms]
+            target_label = prop_map.get(into_sanitized)
             if into_sanitized in prop_map:
                 constituents.append(prop_map.pop(into_sanitized))
 
@@ -359,6 +360,9 @@ class CategorizationService:
                 is_anchor=any(c.is_anchor for c in constituents),
                 sample_notes=sample_notes,
                 confidence=round(weighted_conf, 2),
+                proposal_id=(
+                    target_label.proposal_id if target_label is not None else largest.proposal_id
+                ),
             )
             prop_map[into_sanitized] = merged_prop
 
@@ -1140,6 +1144,7 @@ class CategorizationService:
                                     {
                                         "type": "proposal",
                                         "proposal": {
+                                            "proposal_id": lbl.proposal_id,
                                             "tag_name": lbl.name,
                                             "note_ids": lbl.seed_note_ids,
                                             "note_count": len(lbl.seed_note_ids),

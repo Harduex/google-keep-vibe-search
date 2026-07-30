@@ -352,6 +352,7 @@ async def test_one_proposal_frame_per_named_cluster_with_correct_shape():
         assert set(f.keys()) >= {"type", "proposal", "current", "total"}
         p = f["proposal"]
         assert set(p.keys()) == {
+            "proposal_id",
             "tag_name",
             "note_ids",
             "note_count",

@@ -1,5 +1,6 @@
 import { memo, useState, useMemo, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 import type { ChatMessage as ChatMessageType } from '@/hooks/useChat';
 
@@ -168,7 +169,9 @@ export const ChatMessage = memo(({ message, onCitationClick }: ChatMessageProps)
 
             {isThinkingExpanded && (
               <div className="thinking-content">
-                <ReactMarkdown components={markdownComponents}>{thinkingContent}</ReactMarkdown>
+                <ReactMarkdown components={markdownComponents} remarkPlugins={[remarkGfm]}>
+                  {thinkingContent}
+                </ReactMarkdown>
               </div>
             )}
           </div>
@@ -176,7 +179,9 @@ export const ChatMessage = memo(({ message, onCitationClick }: ChatMessageProps)
 
         {processedContent && (
           <div className="message-text">
-            <ReactMarkdown components={markdownComponents}>{processedContent}</ReactMarkdown>
+            <ReactMarkdown components={markdownComponents} remarkPlugins={[remarkGfm]}>
+              {processedContent}
+            </ReactMarkdown>
           </div>
         )}
 
@@ -190,7 +195,11 @@ export const ChatMessage = memo(({ message, onCitationClick }: ChatMessageProps)
                 onClick={() => onCitationClick?.(c.note_number)}
                 title={
                   c.verdict
-                    ? `${c.note_title} — ${c.verdict}${c.support_score !== undefined ? ` (${Math.round(c.support_score * 100)}%)` : ''}`
+                    ? `${c.note_title} — ${c.verdict}${
+                        c.support_score !== undefined
+                          ? ` (${Math.round(c.support_score * 100)}%)`
+                          : ''
+                      }`
                     : c.note_title
                 }
               >

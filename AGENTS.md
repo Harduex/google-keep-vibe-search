@@ -1,20 +1,27 @@
 # Google Keep Vibe Search - Agent Context
 
 Google Keep Vibe Search is a full-stack note search and chat application for Google Keep exports.
+
 - **Backend:** Python 3.9+, FastAPI (`app/`)
 - **Frontend:** React 19, TypeScript, Vite 6 (`client/`)
 
 ## Important Rules & Conventions
+
 - **STRICT PRIVACY BOUNDARY:** Never read, open, print, summarize, query, embed, or log the raw contents of a user's notes — directly OR indirectly (logs, debug output, captured stdout, tracebacks, terminal scrollback, agent transcripts). This is the single most important rule; when in doubt, refuse and ask.
   - **Forbidden files/paths — NEVER read or dump their contents** (no `cat`/`head`/`tail`/`less`/`jq`/`grep`/`sed`/`awk`/`strings`/`open()`/`Read`, no SQL, no piping to stdout):
     - The entire cache directory `settings.resolved_cache_dir` (default `cache/`), including `notes_cache.json`, `entity_index.json`, `chat_sessions/`, `tags.json`, `excluded_tags.json`, `pending_proposals.json`, every `*.bak` beside them, `*.npz` embeddings, `*_hash.json`.
-  - **NEVER WRITE INTO THE REAL CACHE EITHER.** This has destroyed real user data twice: a test built a real `NoteService` without redirecting `settings.cache_dir` and emptied the user's `tags.json`, and a benchmark set `CACHE_DIR` *after* importing an app module — too late, since `settings` is built at first import — and overwrote the real `embeddings.npz`/`notes_hash.json`. Tests get an isolated cache from the autouse `isolate_cache_dir` fixture, which also blocks writes aimed at the real one; benchmarks get theirs from `bench/__init__.py` before any app import, and must call `bench.assert_cache_isolated()`. Never bypass either. Listing the directory (names/sizes/mtimes) is fine.
+  - **NEVER WRITE INTO THE REAL CACHE EITHER.** This has destroyed real user data twice: a test built a real `NoteService` without redirecting `settings.cache_dir` and emptied the user's `tags.json`, and a benchmark set `CACHE_DIR` _after_ importing an app module — too late, since `settings` is built at first import — and overwrote the real `embeddings.npz`/`notes_hash.json`. Tests get an isolated cache from the autouse `isolate_cache_dir` fixture, which also blocks writes aimed at the real one; benchmarks get theirs from `bench/__init__.py` before any app import, and must call `bench.assert_cache_isolated()`. Never bypass either. Listing the directory (names/sizes/mtimes) is fine.
     - The Google Takeout / Keep export folder at `$GOOGLE_KEEP_PATH` (all `*.json` / `*.html` note files).
     - `.env` and any secrets file.
-    - Any log or scratch file that may embed a note or an LLM prompt (e.g. `llm_failures.log`, `*.log`, debug dumps). Reading the *directory listing* (names/sizes) is fine; reading file *contents* is not.
+    - Any log or scratch file that may embed a note or an LLM prompt (e.g. `llm_failures.log`, `*.log`, debug dumps). Reading the _directory listing_ (names/sizes) is fine; reading file _contents_ is not.
   - **The debugging/logging vector is the real risk.** The tag-naming prompt embeds sampled note text via `format_note_sample()` (`Title: … / Snippet: …`). NEVER write prompts, note titles, or note bodies to a file, `print()`, or log statement — not even temporarily "just for debugging". If you add debug logging, log only structural metadata: counts, array shapes, cluster sizes, note IDs/hashes, timings, exception types — never note/prompt text.
   - **Do not run the app or pipeline in a way that dumps notes to captured stdout** (e.g. verbose prompt logging while a tool captures output). If a traceback or command output would contain note text, redact it before saving or pasting anywhere.
   - When you need to reproduce a bug involving notes, use synthetic/fixture data (see the fake-data generators), never the real corpus.
+- **MANDATORY LEAK CHECK BEFORE EVERY COMMIT AND PUSH:** Before committing, check the staged changes, filenames, proposed commit message, and author identity. Before pushing, check every commit that the push would expose, including its changes, filenames, message, and author identity. Include intermediate commits where data may have been added and later removed.
+  - Check for real notes and derived data (including titles, snippets, prompts, and embeddings), personal or user information, credentials and keys, and sensitive security or environment details. Use synthetic data in fixtures, examples, and screenshots.
+  - Start with filenames, file types, and provenance. Flag forbidden paths and suspect copies without opening them. Review only material the privacy boundary permits. Keep any scanner local and configure its output to omit matched values. Report only the finding category and a safe file or commit reference.
+  - Stop the commit or push if anything sensitive is found or if any material cannot be checked safely. Resolve the finding and repeat the check. A push also requires explicit user approval.
+- **GIT COMMIT IDENTITY:** For every authorized commit, use the user's configured Git name and email as both author and committer. Never substitute a Codex, bot, or other agent identity. If the user's identity is missing, ambiguous, or fails the leak check, stop and ask the user which identity to use.
 - Be concise in responses.
 - Ask clarifying questions instead of guessing when codebase is ambiguous.
 - Read existing code before changing. Make minimal, surgical changes.
@@ -22,6 +29,7 @@ Google Keep Vibe Search is a full-stack note search and chat application for Goo
 - Use the available global and project level skills when a use case for them exists.
 
 ## Architecture & Workflows
+
 - **LLM Integration:** All calls go through `app/services/llm_client.py` (LiteLLM). Model string is `settings.resolved_litellm_model`. For Ollama, `api_base` must be the raw URL without `/v1/`.
 - **Chat Pipeline:** One agentic path, always on — the `ENABLE_AGENT_MODE` flag and the legacy single-shot path were removed in T20. It yields `AgentStep` for live UI streaming. Streaming Protocol uses NDJSON (types: `phase`, `context`, `delta`, `done`, `suggestions`, `verification`, `agent_step`, `grounding`, `error`). The Organize categorize stream (separate NDJSON protocol) uses `progress`, `proposals`, `proposal`, `label_updates`, `done`, `error`.
 - **Categorization Pipeline:** Math-heavy, LLM-light. Embeds notes -> groups via HDBSCAN (logarithmic sizing) -> extracts cluster keywords via c-TF-IDF -> samples 5-10 notes per cluster -> asks LLM to generate 1 tag via `complete_with_tools` -> applies tag to entire cluster. The LLM NEVER reads the whole corpus.
@@ -29,6 +37,7 @@ Google Keep Vibe Search is a full-stack note search and chat application for Goo
 - **Plan Tracking:** Implementation plans live in `docs/plans/PLANS.md`.
 
 ## Critical Technical Findings (Memory)
+
 - **PyTorch/CUDA Setup:** App runs on GPU with `torch==2.13.0` and `numpy==2.2.6`. The CUDA wheels now come straight from PyPI (they vendor a CUDA 13 runtime, so a driver >= 580 is required) — the old `+cu121` pins against the `download.pytorch.org/whl/cu121` index are gone, because that index stops at torch 2.5.1 and the advisories against torch need >= 2.13. GPU-less machines use `uv sync --no-group gpu --group cpu`, which still goes through the `pytorch-cpu` index and skips ~3 GB of CUDA wheels. Keep using `SentenceTransformer(...).to("cuda")` — the pattern the code already follows. numpy is capped at 2.2.6 only because that is the last release publishing cp310 wheels.
 - **Dependency Floors Are Security Floors:** The oddly specific pins in `pyproject.toml` are each the first patched release for a Dependabot advisory. Do not lower one without checking which advisory it closes. `transformers` is only ever reached through `sentence-transformers` (nothing imports it directly), and nothing imports `starlette` directly — which is why the jumps to transformers 5.x and starlette 1.x needed no call-site changes.
 - **The Test Suite Cannot Catch Model-API Breakage:** `tests/conftest.py` stubs `SentenceTransformer`, `CrossEncoder` and `spacy.load`, so a green pytest run proves nothing about those libraries' real constructors. After upgrading any of torch / transformers / sentence-transformers / pillow / CLIP, exercise the real classes once — `.to("cuda")` + `encode`, both `CrossEncoder` call shapes, and `clip.load` + `preprocess` + `encode_image` — using synthetic text and a generated image, never the corpus.

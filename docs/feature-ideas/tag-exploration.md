@@ -2,6 +2,8 @@
 
 **Status:** Option A shipped (2026-07-28); B and C still open ideas
 
+Track the open options under **RM-07** in the [product roadmap](../ROADMAP.md).
+
 > **Update (2026-07-28):** the "simple filter" fork below is implemented. Tag chips in the
 > notes list toggle that tag in the include filter (green while applied); chips in the
 > search results and Explore in the tag manager jump to the notes list filtered by that

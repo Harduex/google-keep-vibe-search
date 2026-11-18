@@ -35,6 +35,7 @@ Google Keep Vibe Search is a full-stack note search and chat application for Goo
 - **Categorization Pipeline:** Math-heavy, LLM-light. Embeds notes -> groups via HDBSCAN (logarithmic sizing) -> extracts cluster keywords via c-TF-IDF -> samples 5-10 notes per cluster -> asks LLM to generate 1 tag via `complete_with_tools` -> applies tag to entire cluster. The LLM NEVER reads the whole corpus.
 - **Setup/Validation:** Use `make setup`, `make dev`, `make test`, `make lint`, `make build`.
 - **Plan Tracking:** Implementation plans live in `docs/plans/PLANS.md`.
+- **Product Roadmap:** Product direction, research spikes, and postponed ideas live in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Critical Technical Findings (Memory)
 

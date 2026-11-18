@@ -4,6 +4,9 @@
 confirmed re-run defects): **fixed** on `fix/rerun-categorize-defects` (2026-07-30) — all
 four fixes plus the frontend identity staging landed; see the note at the top of Part 2 for
 the commits.
+
+Track the open scope and write-mode proposal under **RM-06** in the [product roadmap](../ROADMAP.md).
+
 **Created:** 2026-07-27
 **Updated:** 2026-07-30 — re-running Auto-Categorize over already-categorized notes was
 investigated; the near-duplicate tags in problem 1 now have confirmed root causes, and the

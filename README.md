@@ -183,6 +183,9 @@ conflicting groups in `pyproject.toml`, so pick exactly one.
 
 ## Development
 
+- [Product roadmap](docs/ROADMAP.md)
+- [Implementation plans](docs/plans/PLANS.md)
+
 ### Project structure
 
 ```

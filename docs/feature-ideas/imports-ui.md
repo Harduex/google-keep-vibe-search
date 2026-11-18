@@ -2,6 +2,8 @@
 
 **Status:** idea, not scheduled. **Size:** ~1½ days. **Depends on:** nothing — the backend already exists.
 
+Track scheduling under **RM-02** in the [product roadmap](../ROADMAP.md).
+
 Written to be executable by a small model. Every step names the exact file, the exact symbol, and a
 command that proves it worked. Follow the steps in order; do not skip the verification lines.
 

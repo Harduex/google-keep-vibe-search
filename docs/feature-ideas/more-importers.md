@@ -4,6 +4,8 @@
 **Depends on:** [`imports-ui.md`](./imports-ui.md) — build that first, or these are unreachable from
 the app the same way `markdown-dir` currently is.
 
+Track scheduling under **RM-05** in the [product roadmap](../ROADMAP.md).
+
 ---
 
 ## 1. What already exists

@@ -75,6 +75,8 @@ needing a lock.
 Work discovered while executing, recorded instead of built (`EXECUTION-PROTOCOL.md` §7). One line
 each, naming the task that found it and why it was not done then.
 
+The [product roadmap](../ROADMAP.md) tracks the user-facing citation and startup outcomes under RM-03 and RM-04.
+
 | From | Proposal |
 |---|---|
 
